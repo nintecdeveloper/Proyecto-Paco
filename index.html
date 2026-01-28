@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PACO ERP - Gestión Integral de Hostelería</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .modal-active { display: flex !important; }
+    </style>
+</head>
+<body class="bg-slate-50 flex h-screen overflow-hidden text-slate-800 font-sans">
+
+    <aside class="w-64 bg-slate-900 text-white flex flex-col shadow-2xl z-20">
+        <div class="p-8 text-2xl font-black tracking-tighter text-blue-400 italic">
+            PACO ERP <span class="text-[10px] block text-slate-500 not-italic tracking-widest font-bold">V 3.0 PRO</span>
+        </div>
+        <nav class="flex-1 px-4 space-y-2">
+            <button onclick="showSection('hosteleria')" class="nav-btn w-full flex items-center p-4 hover:bg-slate-800 rounded-2xl transition group bg-slate-800/50">
+                <i class="fas fa-box mr-3 text-blue-400"></i> Almacén
+            </button>
+            <button onclick="showSection('carta')" class="nav-btn w-full flex items-center p-4 hover:bg-slate-800 rounded-2xl transition group">
+                <i class="fas fa-utensils mr-3 text-orange-400"></i> Mi Carta
+            </button>
+            <button onclick="showSection('mesas')" class="nav-btn w-full flex items-center p-4 hover:bg-slate-800 rounded-2xl transition group">
+                <i class="fas fa-chair mr-3 text-purple-400"></i> Gestión de Sala
+            </button>
+            <button onclick="showSection('facturacion')" class="nav-btn w-full flex items-center p-4 hover:bg-slate-800 rounded-2xl transition group">
+                <i class="fas fa-file-invoice-dollar mr-3 text-green-400"></i> Facturación AI
+            </button>
+        </nav>
+        <div class="p-6 border-t border-slate-800">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center font-bold">AD</div>
+                <div>
+                    <p class="text-xs font-bold">Admin</p>
+                    <p class="text-[10px] text-slate-400">Restaurante Paco</p>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <main class="flex-1 overflow-y-auto p-10 relative">
+        
+        <section id="sec-hosteleria">
+            <div class="flex justify-between items-end mb-10">
+                <div>
+                    <h1 class="text-4xl font-black text-slate-900 uppercase italic tracking-tighter">Inventario</h1>
+                    <p class="text-slate-500 font-medium">Control de stock en tiempo real</p>
+                </div>
+                <button onclick="toggleModal('modal-ing', true)" class="bg-blue-600 text-white px-8 py-3 rounded-2xl font-black hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all transform hover:-translate-y-1">
+                    + ENTRADA MERCANCÍA
+                </button>
+            </div>
+
+            <div class="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 overflow-hidden">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-50/50 border-b border-slate-100">
+                            <th class="p-6 text-xs font-black text-slate-400 uppercase tracking-widest">Ingrediente</th>
+                            <th class="p-6 text-xs font-black text-slate-400 uppercase tracking-widest">Stock Disponible</th>
+                            <th class="p-6 text-xs font-black text-slate-400 uppercase tracking-widest">Unidad</th>
+                            <th class="p-6 text-xs font-black text-slate-400 uppercase tracking-widest text-right">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ing-table" class="divide-y divide-slate-50">
+                        </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section id="sec-carta" class="hidden">
+            <div class="flex justify-between items-end mb-10">
+                <div>
+                    <h1 class="text-4xl font-black text-slate-900 uppercase italic tracking-tighter">Mi Carta</h1>
+                    <p class="text-slate-500 font-medium">Escandallos y precios de venta</p>
+                </div>
+                <button onclick="openModalPlato()" class="bg-orange-500 text-white px-8 py-3 rounded-2xl font-black hover:bg-orange-600 shadow-lg shadow-orange-200 transition-all transform hover:-translate-y-1">
+                    + DISEÑAR PLATO
+                </button>
+            </div>
+            <div id="lista-platos-cards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                </div>
+        </section>
+
+        <section id="sec-mesas" class="hidden">
+            <div class="flex justify-between items-end mb-10">
+                <div>
+                    <h1 class="text-4xl font-black text-slate-900 uppercase italic tracking-tighter">Mapa de Sala</h1>
+                    <p class="text-slate-500 font-medium">Gestión de comensales y cuentas</p>
+                </div>
+                <button onclick="toggleModal('modal-nueva-mesa', true)" class="bg-purple-600 text-white px-8 py-3 rounded-2xl font-black hover:bg-purple-700 shadow-lg shadow-purple-200">
+                    + NUEVA MESA
+                </button>
+            </div>
+            <div id="grid-mesas" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-8">
+                </div>
+        </section>
+
+        <section id="sec-facturacion" class="hidden">
+            <div class="mb-10">
+                <h1 class="text-4xl font-black text-slate-900 uppercase italic tracking-tighter">Facturación AI</h1>
+                <p class="text-slate-500 font-medium">Escaneado inteligente de facturas de proveedores</p>
+            </div>
+            <div id="drop-zone" onclick="document.getElementById('file-input').click()" class="bg-white border-4 border-dashed border-slate-200 rounded-[3rem] p-20 text-center hover:border-blue-400 hover:bg-blue-50/30 transition-all cursor-pointer group">
+                <div class="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform">
+                    <i class="fas fa-file-invoice text-3xl text-slate-400 group-hover:text-blue-500"></i>
+                </div>
+                <p class="text-xl font-black text-slate-700">Arrastra tu factura aquí</p>
+                <p class="text-slate-400 mt-2 font-medium text-sm">Soporta PDF, JPG y PNG • La IA procesará el stock automáticamente</p>
+                <input type="file" id="file-input" class="hidden" accept="image/*" onchange="simularProcesadoIA(this.files[0])">
+            </div>
+            
+            <div id="ia-loading" class="hidden mt-10 p-10 bg-slate-900 rounded-[2.5rem] text-center">
+                <div class="flex items-center justify-center gap-4 mb-4">
+                    <div class="w-3 h-3 bg-blue-500 rounded-full animate-bounce"></div>
+                    <div class="w-3 h-3 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                    <div class="w-3 h-3 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.5s]"></div>
+                </div>
+                <p class="text-white font-black uppercase tracking-widest italic">Analizando artículos con IA...</p>
+            </div>
+        </section>
+    </main>
+
+    <div id="modal-ing" class="fixed inset-0 bg-slate-900/60 backdrop-blur-md hidden items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-[2.5rem] w-full max-w-md p-10 shadow-2xl border-t-[12px] border-blue-600">
+            <h3 class="text-2xl font-black mb-8 text-slate-900 uppercase italic tracking-tight">Entrada de Mercancía</h3>
+            <form id="form-ing" class="space-y-6">
+                <div>
+                    <label class="block text-[10px] font-black uppercase text-slate-400 mb-2 ml-1">Nombre del producto</label>
+                    <input type="text" id="ing-name" placeholder="Ej: Solomillo de Ternera" class="w-full bg-slate-50 border-none p-4 rounded-2xl font-bold focus:ring-2 focus:ring-blue-500 outline-none" required>
+                </div>
+                <div class="flex gap-4">
+                    <div class="flex-1">
+                        <label class="block text-[10px] font-black uppercase text-slate-400 mb-2 ml-1">Cantidad</label>
+                        <input type="number" step="0.001" id="ing-stock" placeholder="0.00" class="w-full bg-slate-50 border-none p-4 rounded-2xl font-bold focus:ring-2 focus:ring-blue-500 outline-none" required>
+                    </div>
+                    <div class="w-32">
+                        <label class="block text-[10px] font-black uppercase text-slate-400 mb-2 ml-1">Unidad</label>
+                        <input type="text" id="ing-unit" placeholder="Kg/Ud" class="w-full bg-slate-50 border-none p-4 rounded-2xl font-bold focus:ring-2 focus:ring-blue-500 outline-none" required>
+                    </div>
+                </div>
+                <div class="flex gap-3 pt-4">
+                    <button type="submit" class="flex-1 bg-blue-600 text-white font-black py-5 rounded-2xl shadow-lg shadow-blue-100">REGISTRAR ENTRADA</button>
+                    <button type="button" onclick="toggleModal('modal-ing', false)" class="px-6 bg-slate-100 text-slate-500 font-black py-5 rounded-2xl">SALIR</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-plato" class="fixed inset-0 bg-slate-900/60 backdrop-blur-md hidden items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-[3rem] w-full max-w-2xl p-10 shadow-2xl border-t-[12px] border-orange-500">
+            <h3 class="text-3xl font-black mb-8 text-slate-900 uppercase italic tracking-tight">Ficha Técnica del Plato</h3>
+            <div class="grid grid-cols-2 gap-6 mb-8">
+                <input type="text" id="p-nombre" placeholder="Nombre del plato" class="bg-slate-50 p-5 rounded-2xl font-black outline-none border-none">
+                <input type="number" step="0.01" id="p-precio" placeholder="Precio Venta (€)" class="bg-slate-50 p-5 rounded-2xl font-black outline-none border-none">
+            </div>
+            
+            <div class="bg-slate-900 rounded-3xl p-8 mb-8 text-white">
+                <p class="text-[10px] font-black uppercase text-blue-400 mb-6 tracking-widest">Añadir Ingredientes al Escandallo</p>
+                <div class="flex gap-3 mb-6">
+                    <select id="receta-ing-select" class="flex-1 bg-slate-800 border-none p-4 rounded-xl font-bold text-sm outline-none"></select>
+                    <input type="number" step="0.001" id="receta-cant" placeholder="Cantidad" class="w-28 bg-slate-800 border-none p-4 rounded-xl font-bold text-sm outline-none">
+                    <button onclick="addIngredienteAReceta()" class="bg-blue-500 text-white px-6 rounded-xl font-black hover:bg-blue-400 transition-colors">+</button>
+                </div>
+                <div class="max-h-40 overflow-y-auto space-y-2" id="lista-ingredientes-receta">
+                    </div>
+            </div>
+            
+            <div class="flex gap-4">
+                <button onclick="guardarPlato()" class="flex-1 bg-orange-500 text-white font-black py-5 rounded-2xl shadow-xl">GUARDAR PLATO EN CARTA</button>
+                <button onclick="toggleModal('modal-plato', false)" class="px-8 font-black text-slate-400 uppercase text-xs">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-pedido" class="fixed inset-0 bg-slate-900/70 backdrop-blur-md hidden items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-[3rem] w-full max-w-lg shadow-2xl p-10 overflow-hidden relative">
+            <div id="mesa-status-tag" class="absolute top-0 right-0 px-8 py-2 bg-green-500 text-white text-[10px] font-black uppercase rounded-bl-3xl">Libre</div>
+            
+            <div class="flex justify-between items-start mb-8">
+                <div>
+                    <h3 id="pedido-titulo" class="text-4xl font-black italic uppercase text-slate-900 tracking-tighter">Mesa</h3>
+                    <div id="controles-estado-directo" class="mt-2"></div>
+                </div>
+            </div>
+
+            <div id="zona-pedido-interactiva" class="transition-all duration-500">
+                <div class="flex gap-2 mb-6">
+                    <select id="select-productos" class="flex-1 bg-slate-100 p-4 rounded-xl font-bold border-none outline-none"></select>
+                    <button onclick="agregarPlatoALista()" class="bg-slate-900 text-white px-8 rounded-xl font-black">+</button>
+                </div>
+                
+                <div class="bg-slate-50 rounded-3xl p-6 mb-8 border border-slate-100">
+                    <p class="text-[10px] font-black text-slate-400 uppercase mb-4 tracking-widest">Detalle de la comanda</p>
+                    <ul id="lista-comanda" class="space-y-3 mb-6 max-h-48 overflow-y-auto pr-2"></ul>
+                    <div class="border-t-2 border-dashed border-slate-200 pt-5 flex justify-between items-end">
+                        <span class="font-black uppercase text-slate-400 text-xs">Total a pagar</span>
+                        <span id="total-comanda" class="text-4xl font-black text-slate-900 italic">0.00€</span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <button onclick="guardarComandaEnServidor()" class="bg-slate-200 text-slate-600 font-black py-5 rounded-2xl hover:bg-slate-300">GUARDAR CUENTA</button>
+                    <button onclick="confirmarPedidoFinal()" class="bg-green-600 text-white font-black py-5 rounded-2xl shadow-xl shadow-green-100 hover:bg-green-700">COBRAR Y CERRAR</button>
+                </div>
+            </div>
+            
+            <input type="hidden" id="current-table-id">
+            <button onclick="toggleModal('modal-pedido', false)" class="w-full mt-6 text-slate-400 font-bold uppercase text-[10px] tracking-widest hover:text-red-500">Cerrar Ventana</button>
+        </div>
+    </div>
+
+    <div id="modal-nueva-mesa" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-[2rem] w-full max-w-sm p-8 shadow-2xl">
+            <h3 class="font-black text-xl mb-6 text-purple-600 uppercase italic">Añadir Nueva Mesa</h3>
+            <div class="space-y-4">
+                <input type="number" id="new-m-number" placeholder="Número de Mesa" class="w-full bg-slate-50 p-4 rounded-xl font-bold outline-none">
+                <input type="number" id="new-m-capacity" placeholder="Pax (Capacidad)" class="w-full bg-slate-50 p-4 rounded-xl font-bold outline-none">
+                <button onclick="crearMesaFetch()" class="w-full bg-purple-600 text-white font-black py-4 rounded-xl shadow-lg">REGISTRAR MESA</button>
+                <button onclick="toggleModal('modal-nueva-mesa', false)" class="w-full text-slate-400 font-bold text-xs uppercase">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- VARIABLES GLOBALES ---
+        const API_URL = "http://127.0.0.1:8000";
+        let carta = JSON.parse(localStorage.getItem('paco_carta')) || [];
+        let recetaTemporal = [];
+        let platosSeleccionados = [];
+
+        // --- SISTEMA DE NAVEGACIÓN ---
+        function showSection(sectionId) {
+            document.querySelectorAll('main > section').forEach(sec => sec.classList.add('hidden'));
+            document.getElementById(`sec-${sectionId}`).classList.remove('hidden');
+            
+            // Estética Sidebar
+            document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('bg-slate-800/50'));
+            event.currentTarget.classList.add('bg-slate-800/50');
+
+            if (sectionId === 'hosteleria') loadIngredients();
+            if (sectionId === 'mesas') loadTables();
+            if (sectionId === 'carta') renderCarta();
+        }
+
+        function toggleModal(id, show) {
+            const el = document.getElementById(id);
+            show ? el.classList.add('modal-active') : el.classList.remove('modal-active');
+        }
+
+        // --- LÓGICA DE ALMACÉN ---
+        async function loadIngredients() {
+            try {
+                const res = await fetch(`${API_URL}/ingredients`);
+                const ings = await res.json();
+                const tbody = document.getElementById('ing-table');
+                tbody.innerHTML = ings.map(i => `
+                    <tr class="group hover:bg-slate-50 transition-colors">
+                        <td class="p-6 font-black uppercase text-slate-700 text-sm tracking-tight">${i.name}</td>
+                        <td class="p-6">
+                            <span class="font-mono font-bold text-lg ${i.stock < 2 ? 'text-red-500 animate-pulse' : 'text-blue-600'}">
+                                ${Number(i.stock).toFixed(3)}
+                            </span>
+                        </td>
+                        <td class="p-6 text-slate-400 font-black text-xs uppercase">${i.unit}</td>
+                        <td class="p-6 text-right">
+                            <span class="px-3 py-1 rounded-full text-[9px] font-black uppercase ${i.stock < 2 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}">
+                                ${i.stock < 2 ? 'Pedido Necesario' : 'Stock OK'}
+                            </span>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (e) { console.error("Error cargando inventario"); }
+        }
+
+        document.getElementById('form-ing').onsubmit = async (e) => {
+            e.preventDefault();
+            const payload = {
+                name: document.getElementById('ing-name').value.trim(),
+                stock: parseFloat(document.getElementById('ing-stock').value),
+                unit: document.getElementById('ing-unit').value.trim()
+            };
+
+            const res = await fetch(`${API_URL}/ingredients`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if(res.ok) {
+                toggleModal('modal-ing', false);
+                loadIngredients();
+                e.target.reset();
+            } else {
+                alert("Error: Revisa que el nombre no exista ya.");
+            }
+        };
+
+        // --- LÓGICA DE CARTA & ESCANDALLOS ---
+        async function openModalPlato() {
+            const res = await fetch(`${API_URL}/ingredients`);
+            const ings = await res.json();
+            const select = document.getElementById('receta-ing-select');
+            select.innerHTML = ings.map(i => `<option value="${i.name}">${i.name} (${i.unit})</option>`).join('');
+            recetaTemporal = [];
+            document.getElementById('lista-ingredientes-receta').innerHTML = '';
+            toggleModal('modal-plato', true);
+        }
+
+        function addIngredienteAReceta() {
+            const name = document.getElementById('receta-ing-select').value;
+            const cant = parseFloat(document.getElementById('receta-cant').value);
+            if(!cant) return;
+            
+            recetaTemporal.push({ nombre: name, cantidad: cant });
+            const list = document.getElementById('lista-ingredientes-receta');
+            list.innerHTML += `
+                <div class="flex justify-between items-center bg-slate-800 p-3 rounded-xl border border-slate-700">
+                    <span class="text-xs font-bold uppercase">${name}</span>
+                    <span class="text-xs font-black text-blue-400">${cant}</span>
+                </div>`;
+            document.getElementById('receta-cant').value = '';
+        }
+
+        function guardarPlato() {
+            const nombre = document.getElementById('p-nombre').value;
+            const precio = parseFloat(document.getElementById('p-precio').value);
+            if(!nombre || !precio || recetaTemporal.length === 0) return alert("Faltan datos en la receta");
+
+            carta.push({ nombre, precio, receta: [...recetaTemporal] });
+            localStorage.setItem('paco_carta', JSON.stringify(carta));
+            renderCarta();
+            toggleModal('modal-plato', false);
+        }
+
+        function renderCarta() {
+            const grid = document.getElementById('lista-platos-cards');
+            grid.innerHTML = carta.map((p, i) => `
+                <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200 hover:border-orange-500 transition-all group relative">
+                    <button onclick="eliminarPlato(${i})" class="absolute top-6 right-6 text-slate-300 hover:text-red-500"><i class="fas fa-trash"></i></button>
+                    <div class="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center mb-6">
+                        <i class="fas fa-utensils text-orange-500"></i>
+                    </div>
+                    <h3 class="text-2xl font-black italic uppercase text-slate-800 mb-2 leading-none">${p.nombre}</h3>
+                    <p class="text-3xl font-black text-slate-900 mb-4">${p.precio.toFixed(2)}€</p>
+                    <div class="pt-4 border-t border-slate-50">
+                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Escandallo:</p>
+                        <p class="text-[10px] font-bold text-slate-500 mt-1">${p.receta.map(r => r.nombre).join(', ')}</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function eliminarPlato(index) {
+            carta.splice(index, 1);
+            localStorage.setItem('paco_carta', JSON.stringify(carta));
+            renderCarta();
+        }
+
+        // --- LÓGICA DE SALA & COMANDAS ---
+        async function loadTables() {
+            const res = await fetch(`${API_URL}/tables`);
+            const tables = await res.json();
+            const grid = document.getElementById('grid-mesas');
+            grid.innerHTML = tables.map(t => `
+                <div onclick="clickMesa(${t.id}, ${t.number}, '${t.status}')" 
+                     class="h-32 ${t.status === 'Ocupada' ? 'bg-red-500 shadow-red-200' : 'bg-green-500 shadow-green-200'} 
+                     rounded-[2.5rem] flex flex-col items-center justify-center text-white cursor-pointer shadow-lg transition transform hover:scale-105 active:scale-95">
+                    <span class="text-4xl font-black italic tracking-tighter">${t.number}</span>
+                    <span class="text-[9px] font-black uppercase bg-black/20 px-3 py-1 rounded-full mt-1">${t.status}</span>
+                </div>
+            `).join('');
+        }
+
+        async function clickMesa(id, number, status) {
+            document.getElementById('current-table-id').value = id;
+            document.getElementById('pedido-titulo').innerText = "Mesa " + number;
+            
+            const tag = document.getElementById('mesa-status-tag');
+            tag.innerText = status;
+            tag.className = `absolute top-0 right-0 px-8 py-2 text-white text-[10px] font-black uppercase rounded-bl-3xl ${status === 'Ocupada' ? 'bg-red-500' : 'bg-green-500'}`;
+
+            // Poblar select de productos
+            const selectP = document.getElementById('select-productos');
+            selectP.innerHTML = carta.map(p => `<option value="${p.nombre}" data-precio="${p.precio}">${p.nombre} (${p.precio}€)</option>`).join('');
+
+            if(status === 'Libre') {
+                document.getElementById('zona-pedido-interactiva').classList.add('opacity-10', 'pointer-events-none', 'blur-sm');
+                document.getElementById('controles-estado-directo').innerHTML = `<button onclick="cambiarEstadoMesa('Ocupada')" class="bg-blue-600 text-white px-6 py-2 rounded-xl font-black text-xs uppercase shadow-lg">Abrir Mesa</button>`;
+                platosSeleccionados = [];
+                actualizarListaUI();
+            } else {
+                document.getElementById('zona-pedido-interactiva').classList.remove('opacity-10', 'pointer-events-none', 'blur-sm');
+                document.getElementById('controles-estado-directo').innerHTML = `<button onclick="cambiarEstadoMesa('Libre')" class="bg-slate-100 text-slate-400 px-6 py-2 rounded-xl font-black text-[10px] uppercase">Liberar sin cobrar</button>`;
+                // Cargar pedido actual del servidor
+                const res = await fetch(`${API_URL}/tables/${id}/order`);
+                const data = await res.json();
+                platosSeleccionados = data.items || [];
+                actualizarListaUI();
+            }
+            toggleModal('modal-pedido', true);
+        }
+
+        async function cambiarEstadoMesa(nuevoEstado) {
+            const id = document.getElementById('current-table-id').value;
+            await fetch(`${API_URL}/tables/${id}/status?status=${nuevoEstado}`, { method: 'PUT' });
+            loadTables();
+            toggleModal('modal-pedido', false);
+        }
+
+        function agregarPlatoALista() {
+            const sel = document.getElementById('select-productos');
+            const opt = sel.options[sel.selectedIndex];
+            if(!opt) return;
+            platosSeleccionados.push({ nombre: sel.value, precio: parseFloat(opt.dataset.precio) });
+            actualizarListaUI();
+        }
+
+        function actualizarListaUI() {
+            const list = document.getElementById('lista-comanda');
+            list.innerHTML = platosSeleccionados.map((p, i) => `
+                <li class="flex justify-between items-center bg-white p-4 rounded-2xl border border-slate-100 group">
+                    <span class="font-bold text-slate-700 uppercase text-xs">${p.nombre}</span>
+                    <div class="flex items-center gap-4">
+                        <span class="font-black text-slate-900">${p.precio.toFixed(2)}€</span>
+                        <button onclick="platosSeleccionados.splice(${i},1);actualizarListaUI()" class="text-slate-300 hover:text-red-500">
+                            <i class="fas fa-times-circle"></i>
+                        </button>
+                    </div>
+                </li>
+            `).join('');
+            const total = platosSeleccionados.reduce((a, b) => a + b.precio, 0);
+            document.getElementById('total-comanda').innerText = total.toFixed(2) + "€";
+        }
+
+        async function guardarComandaEnServidor() {
+            const id = document.getElementById('current-table-id').value;
+            await fetch(`${API_URL}/tables/${id}/order`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ items: platosSeleccionados })
+            });
+            alert("✅ Comanda sincronizada con el servidor");
+        }
+
+        async function confirmarPedidoFinal() {
+            if(platosSeleccionados.length === 0) return alert("La cuenta está vacía");
+            if(!confirm("¿Confirmar cobro y descontar stock automáticamente?")) return;
+
+            // Lógica de descuento de stock basada en escandallos
+            for(let item of platosSeleccionados) {
+                const platoOriginal = carta.find(p => p.nombre === item.nombre);
+                if(platoOriginal && platoOriginal.receta) {
+                    for(let ing of platoOriginal.receta) {
+                        await fetch(`${API_URL}/ingredients/reduce?name=${encodeURIComponent(ing.nombre)}&amount=${ing.cantidad}`, { method: 'PUT' });
+                    }
+                }
+            }
+
+            // Liberar mesa
+            await cambiarEstadoMesa('Libre');
+            alert("💰 Cuenta cerrada. Stock actualizado.");
+        }
+
+        // --- FACTURACIÓN AI ---
+        function simularProcesadoIA(file) {
+            if(!file) return;
+            document.getElementById('ia-loading').classList.remove('hidden');
+            document.getElementById('drop-zone').classList.add('hidden');
+
+            setTimeout(() => {
+                document.getElementById('ia-loading').innerHTML = `
+                    <div class="bg-green-500/10 p-10 rounded-[2.5rem] border border-green-500/20">
+                        <i class="fas fa-check-circle text-5xl text-green-500 mb-4"></i>
+                        <h2 class="text-white text-2xl font-black italic uppercase mb-2">Factura Procesada</h2>
+                        <p class="text-slate-400 mb-6">Se han detectado 3 artículos y se ha actualizado el stock.</p>
+                        <button onclick="location.reload()" class="bg-white text-slate-900 px-8 py-3 rounded-xl font-black">VOLVER</button>
+                    </div>
+                `;
+            }, 3000);
+        }
+
+        async function crearMesaFetch() {
+            const num = document.getElementById('new-m-number').value;
+            const cap = document.getElementById('new-m-capacity').value;
+            await fetch(`${API_URL}/tables`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ number: parseInt(num), capacity: parseInt(cap), status: "Libre" })
+            });
+            toggleModal('modal-nueva-mesa', false);
+            loadTables();
+        }
+
+        // --- INICIO ---
+        window.onload = () => {
+            showSection('hosteleria');
+            renderCarta();
+        };
+
+    </script>
+</body>
+</html>

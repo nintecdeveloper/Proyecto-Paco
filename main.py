@@ -1,56 +1,99 @@
-from fastapi import FastAPI, Depends, HTTPException
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-from sqlalchemy.orm import Session
+from fastapi import FastAPI, HTTPException, Query
+from pydantic import BaseModel
 from typing import List
-import models, schemas, database
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+import os
 
-models.Base.metadata.create_all(bind=database.engine)
-app = FastAPI(title="PACO ERP - Sistema Integral")
+app = FastAPI(title="PACO ERP - Servidor Estable")
 
-def get_db():
-    db = database.SessionLocal()
-    try: yield db
-    finally: db.close()
+# Configuración de CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-# --- HOSTELERÍA ---
-@app.get("/ingredients", response_model=List[schemas.IngredientResponse])
-def list_ingredients(db: Session = Depends(get_db)):
-    return db.query(models.Ingredient).all()
+# --- MODELOS ---
+class Ingredient(BaseModel):
+    name: str
+    stock: float
+    unit: str
 
-@app.post("/ingredients", response_model=schemas.IngredientResponse)
-def create_ingredient(ingredient: schemas.IngredientCreate, db: Session = Depends(get_db)):
-    db_item = models.Ingredient(**ingredient.dict())
-    db.add(db_item)
-    db.commit()
-    db.refresh(db_item)
-    return db_item
+class OrderItem(BaseModel):
+    nombre: str
+    precio: float
 
-@app.get("/dashboard/alerts")
-def get_alerts(db: Session = Depends(get_db)):
-    low_stock = db.query(models.Ingredient).filter(models.Ingredient.stock <= models.Ingredient.min_stock).all()
-    total = db.query(models.Ingredient).count()
-    return {"low_stock_count": len(low_stock), "total_ingredients": total}
+class OrderUpdate(BaseModel):
+    items: List[OrderItem]
 
-# --- SAT (TÉCNICOS) ---
-@app.get("/work-orders", response_model=List[schemas.WorkOrderResponse])
-def get_orders(db: Session = Depends(get_db)):
-    return db.query(models.WorkOrder).all()
+# --- BASE DE DATOS TEMPORAL ---
+db_ingredients = []
+db_tables = [
+    {"id": 1, "number": 1, "capacity": 4, "status": "Libre", "order": []},
+    {"id": 2, "number": 2, "capacity": 2, "status": "Libre", "order": []}
+]
 
-@app.patch("/work-orders/{order_id}/complete")
-def complete_work_order(order_id: int, update_data: schemas.WorkOrderUpdate, db: Session = Depends(get_db)):
-    db_order = db.query(models.WorkOrder).filter(models.WorkOrder.id == order_id).first()
-    if not db_order:
-        raise HTTPException(status_code=404, detail="Orden no encontrada")
-    
-    db_order.status = update_data.status
-    db_order.summary = update_data.summary
-    db_order.time_spent = update_data.time_spent
-    db.commit()
-    return {"message": "Parte guardado"}
+# --- RUTAS DE LA API ---
 
-# --- FRONTEND ---
-app.mount("/static", StaticFiles(directory="static"), name="static")
+@app.get("/ingredients")
+def get_ingredients():
+    return db_ingredients
+
+@app.post("/ingredients")
+def create_ingredient(item: Ingredient):
+    try:
+        if any(ing["name"].lower() == item.name.lower() for ing in db_ingredients):
+            raise HTTPException(status_code=400, detail="Ya existe")
+        db_ingredients.append(item.dict())
+        return item
+    except Exception as e:
+        print(f"ERROR EN POST INGREDIENTS: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/ingredients/reduce")
+def reduce_stock(name: str = Query(...), amount: float = Query(...)):
+    for ing in db_ingredients:
+        if ing["name"].lower() == name.lower():
+            ing["stock"] -= amount
+            return {"status": "success", "new_stock": ing["stock"]}
+    raise HTTPException(status_code=404)
+
+@app.get("/tables")
+def get_tables():
+    return db_tables
+
+@app.put("/tables/{table_id}/status")
+def update_table_status(table_id: int, status: str):
+    for t in db_tables:
+        if t["id"] == table_id:
+            t["status"] = status
+            if status == "Libre": t["order"] = []
+            return t
+    raise HTTPException(status_code=404)
+
+@app.post("/tables/{table_id}/order")
+def update_table_order(table_id: int, update: OrderUpdate):
+    for t in db_tables:
+        if t["id"] == table_id:
+            t["order"] = [item.dict() for item in update.items]
+            return {"status": "ok"}
+    raise HTTPException(status_code=404)
+
+# --- RUTA PARA EL HTML ---
+
 @app.get("/")
-async def read_index():
-    return FileResponse('static/index.html')
+def read_index():
+    # Buscamos el archivo primero en la carpeta static, luego en la raíz
+    paths = ["static/index.html", "index.html"]
+    for path in paths:
+        if os.path.exists(path):
+            return FileResponse(path)
+    
+    return {"error": "No he encontrado el archivo index.html. Asegúrate de que esté en la misma carpeta que main.py"}
+
+if __name__ == "__main__":
+    import uvicorn
+    # Cambiamos a puerto 8000
+    uvicorn.run(app, host="127.0.0.1", port=8000)
