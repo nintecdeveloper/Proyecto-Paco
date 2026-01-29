@@ -1,13 +1,11 @@
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from typing import List
+from typing import List, Union
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-import os
 
-app = FastAPI(title="PACO ERP - Servidor Estable")
+app = FastAPI()
 
-# Configuración de CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -15,85 +13,95 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- MODELOS ---
 class Ingredient(BaseModel):
     name: str
     stock: float
     unit: str
+    type: str
 
-class OrderItem(BaseModel):
-    nombre: str
-    precio: float
+class RecipeItem(BaseModel):
+    name: str
+    amount: float
 
-class OrderUpdate(BaseModel):
-    items: List[OrderItem]
+class Plate(BaseModel):
+    name: str
+    price: float
+    category: str = "Comida"
+    recipe: List[RecipeItem]
 
-# --- BASE DE DATOS TEMPORAL ---
-db_ingredients = []
-db_tables = [
-    {"id": 1, "number": 1, "capacity": 4, "status": "Libre", "order": []},
-    {"id": 2, "number": 2, "capacity": 2, "status": "Libre", "order": []}
-]
+class Table(BaseModel):
+    id: int
+    number: int
+    capacity: int
+    status: str = "Libre"
+    order: List[dict] = []
 
-# --- RUTAS DE LA API ---
+db = {"ingredients": [], "plates": [], "tables": []}
 
+@app.get("/")
+def home(): return FileResponse("index.html")
+
+# --- ALMACÉN ---
 @app.get("/ingredients")
-def get_ingredients():
-    return db_ingredients
+def get_ingredients(): return db["ingredients"]
 
 @app.post("/ingredients")
-def create_ingredient(item: Ingredient):
-    try:
-        if any(ing["name"].lower() == item.name.lower() for ing in db_ingredients):
-            raise HTTPException(status_code=400, detail="Ya existe")
-        db_ingredients.append(item.dict())
-        return item
-    except Exception as e:
-        print(f"ERROR EN POST INGREDIENTS: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+def add_ingredient(item: Ingredient):
+    db["ingredients"].append(item.dict())
+    return item
 
-@app.put("/ingredients/reduce")
-def reduce_stock(name: str = Query(...), amount: float = Query(...)):
-    for ing in db_ingredients:
-        if ing["name"].lower() == name.lower():
-            ing["stock"] -= amount
-            return {"status": "success", "new_stock": ing["stock"]}
-    raise HTTPException(status_code=404)
+# --- CARTA (Solo Comida) ---
+@app.get("/plates")
+def get_plates(): return db["plates"]
 
+@app.post("/plates")
+def create_plate(plate: Plate):
+    db["plates"].append(plate.dict())
+    return plate
+
+# --- MESAS ---
 @app.get("/tables")
-def get_tables():
-    return db_tables
+def get_tables(): return db["tables"]
 
-@app.put("/tables/{table_id}/status")
-def update_table_status(table_id: int, status: str):
-    for t in db_tables:
-        if t["id"] == table_id:
+@app.post("/tables")
+def create_table(table: Table):
+    db["tables"].append(table.dict())
+    return table
+
+@app.put("/tables/{t_id}/status")
+def update_status(t_id: int, status: str):
+    for t in db["tables"]:
+        if t["id"] == t_id:
             t["status"] = status
             if status == "Libre": t["order"] = []
             return t
-    raise HTTPException(status_code=404)
+    raise HTTPException(404)
 
-@app.post("/tables/{table_id}/order")
-def update_table_order(table_id: int, update: OrderUpdate):
-    for t in db_tables:
-        if t["id"] == table_id:
-            t["order"] = [item.dict() for item in update.items]
-            return {"status": "ok"}
-    raise HTTPException(status_code=404)
+@app.post("/tables/{t_id}/order")
+def save_order(t_id: int, items: List[dict]):
+    for t in db["tables"]:
+        if t["id"] == t_id:
+            t["order"] = items
+            return {"ok": True}
+    raise HTTPException(404)
 
-# --- RUTA PARA EL HTML ---
-
-@app.get("/")
-def read_index():
-    # Buscamos el archivo primero en la carpeta static, luego en la raíz
-    paths = ["static/index.html", "index.html"]
-    for path in paths:
-        if os.path.exists(path):
-            return FileResponse(path)
-    
-    return {"error": "No he encontrado el archivo index.html. Asegúrate de que esté en la misma carpeta que main.py"}
+@app.post("/tables/{t_id}/checkout")
+def checkout(t_id: int):
+    table = next((t for t in db["tables"] if t["id"] == t_id), None)
+    for item in table["order"]:
+        if "recipe" in item: # Es un plato elaborado
+            for req in item["recipe"]:
+                for ing in db["ingredients"]:
+                    if ing["name"] == req["name"]:
+                        ing["stock"] -= req["amount"]
+        else: # Es una bebida directa del almacén
+            for ing in db["ingredients"]:
+                if ing["name"] == item["name"]:
+                    ing["stock"] -= 1 # Se descuenta una unidad (botella/lata)
+    table["status"] = "Libre"
+    table["order"] = []
+    return {"ok": True}
 
 if __name__ == "__main__":
     import uvicorn
-    # Cambiamos a puerto 8000
     uvicorn.run(app, host="127.0.0.1", port=8000)
