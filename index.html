@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>PACO ERP | Gestión Total v4.0</title>
+    <title>PACO ERP | Gestión Total v4.2</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -51,7 +51,7 @@
         <button onclick="showSection('historial')" class="nav-btn w-full flex items-center p-3 rounded-lg font-bold text-slate-400 hover:bg-slate-700 hover:text-white">
             <i class="fas fa-history w-8"></i> Historial
         </button>
-        <div class="p-4 text-xs text-slate-500 text-center font-mono">Versión 4.0</div>
+        <div class="p-4 text-xs text-slate-500 text-center font-mono">Versión 4.2</div>
     </aside>
 
     <main class="flex-1 overflow-y-auto bg-[#0f172a] p-8 relative">
@@ -130,9 +130,9 @@
             <div class="flex justify-between items-end mb-8 border-b border-slate-700 pb-4">
                 <div>
                     <h2 class="text-3xl font-black text-white uppercase tracking-tight">Sala</h2>
-                    <p class="text-slate-400 text-xs mt-1">Control de sala y comandas.</p>
+                    <p class="text-slate-400 text-xs mt-1">Control de sala, capacidades y comandas.</p>
                 </div>
-                <button onclick="toggleModal('modal-mesa-create', true)" class="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 rounded-lg font-bold shadow-lg transition">
+                <button onclick="openMesaModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 rounded-lg font-bold shadow-lg transition">
                     <i class="fas fa-plus mr-2"></i> Añadir Mesa
                 </button>
             </div>
@@ -268,11 +268,23 @@
     </div>
 
     <div id="modal-mesa-create" class="modal-bg fixed inset-0 hidden items-center justify-center p-4 z-50">
-        <div class="bg-[#1e293b] p-8 rounded-2xl w-full max-w-sm border border-slate-600">
-            <h3 class="text-xl font-black mb-4 uppercase text-white">Nueva Mesa</h3>
-            <input id="m-num" type="number" placeholder="Nº Mesa" class="w-full bg-slate-900 p-3 mb-3 rounded-lg border border-slate-700 text-white">
-            <button onclick="saveTable()" class="w-full bg-emerald-600 py-3 rounded-lg font-bold text-white uppercase">Crear</button>
-            <button onclick="toggleModal('modal-mesa-create', false)" class="w-full mt-2 text-slate-400 text-xs uppercase font-bold">Cancelar</button>
+        <div class="bg-[#1e293b] p-8 rounded-2xl w-full max-w-sm border border-slate-600 shadow-2xl relative">
+            <button onclick="toggleModal('modal-mesa-create', false)" class="absolute top-4 right-4 text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
+            <h3 id="modal-mesa-title" class="text-xl font-black mb-6 uppercase text-white italic text-emerald-400">Nueva Mesa</h3>
+            <div class="space-y-4">
+                <input type="hidden" id="m-id-edit">
+                <div>
+                    <label class="block text-xs uppercase font-bold text-slate-500 mb-1">Número de Mesa</label>
+                    <input id="m-num" type="number" placeholder="Ej: 1" class="w-full bg-slate-900 p-3 rounded-lg border border-slate-700 text-white font-bold outline-none focus:border-emerald-500">
+                </div>
+                <div>
+                    <label class="block text-xs uppercase font-bold text-slate-500 mb-1">Capacidad (Comensales)</label>
+                    <input id="m-cap" type="number" placeholder="Ej: 4" class="w-full bg-slate-900 p-3 rounded-lg border border-slate-700 text-white font-bold outline-none focus:border-emerald-500">
+                </div>
+                <button onclick="saveTable()" class="w-full bg-emerald-600 hover:bg-emerald-500 py-3 rounded-lg font-black text-white uppercase transition shadow-lg">
+                    Guardar Mesa
+                </button>
+            </div>
         </div>
     </div>
 
@@ -632,23 +644,103 @@
             }).join('');
         }
 
-        // --- MESAS Y COMANDAS ---
+        // --- MESAS Y COMANDAS ACTUALIZADO ---
+        
+        // Abrir modal para crear o editar mesa
+        function openMesaModal(editData = null) {
+            const title = document.getElementById('modal-mesa-title');
+            const idField = document.getElementById('m-id-edit');
+            const numField = document.getElementById('m-num');
+            const capField = document.getElementById('m-cap');
+
+            if (editData) {
+                // Modo Edición
+                title.innerText = "Editar Mesa " + editData.number;
+                idField.value = editData.id;
+                numField.value = editData.number;
+                capField.value = editData.capacity || 0;
+            } else {
+                // Modo Creación
+                title.innerText = "Nueva Mesa";
+                idField.value = "";
+                numField.value = "";
+                capField.value = "";
+            }
+            toggleModal('modal-mesa-create', true);
+        }
+
+        // Guardar mesa (crear o actualizar)
         function saveTable() {
-            const payload = { id: Date.now(), number: document.getElementById('m-num').value, status: 'Libre', order: [] };
-            DB.addOrUpdate('paco_tables', payload);
+            const id = document.getElementById('m-id-edit').value;
+            const num = document.getElementById('m-num').value;
+            const cap = document.getElementById('m-cap').value;
+
+            if (!num || !cap) return alert("Por favor, rellena todos los campos");
+
+            const tables = DB.get('paco_tables');
+            
+            if (id) {
+                // Estamos editando
+                const idx = tables.findIndex(t => t.id == id);
+                if (idx !== -1) {
+                    tables[idx].number = num;
+                    tables[idx].capacity = cap;
+                    DB.set('paco_tables', tables);
+                }
+            } else {
+                // Estamos creando nueva
+                const payload = { 
+                    id: Date.now(), 
+                    number: num, 
+                    capacity: cap, 
+                    status: 'Libre', 
+                    order: [] 
+                };
+                DB.addOrUpdate('paco_tables', payload);
+            }
+
             toggleModal('modal-mesa-create', false);
             loadTables();
         }
 
+        // Cargar mesas visualmente con capacidad y opciones
         function loadTables() {
             const tables = DB.get('paco_tables');
-            document.getElementById('grid-mesas').innerHTML = tables.map(t => `
-                <div onclick="openComanda(${t.id})" class="h-32 rounded-3xl cursor-pointer flex flex-col items-center justify-center transition border-b-4 shadow-xl hover:translate-y-1 relative overflow-hidden
-                    ${t.status === 'Libre' ? 'bg-emerald-600 border-emerald-800 text-white' : 'bg-red-500 border-red-800 text-white'}">
-                    <span class="text-4xl font-black italic uppercase z-10">${t.number}</span>
-                    <span class="text-[10px] font-black uppercase opacity-80 italic z-10 mt-2">${t.status}</span>
-                    ${t.order && t.order.length > 0 ? '<i class="fas fa-utensils absolute text-6xl opacity-20 -bottom-2 -right-2"></i>' : ''}
-                </div>`).join('');
+            document.getElementById('grid-mesas').innerHTML = tables.map(t => {
+                const safeObj = encodeURIComponent(JSON.stringify(t));
+                return `
+                <div class="relative group">
+                    <div class="absolute -top-3 -right-3 z-20 flex gap-1 opacity-0 group-hover:opacity-100 transition">
+                         <button onclick='event.stopPropagation(); openMesaModal(${JSON.stringify(t)})' 
+                            class="bg-blue-600 text-white w-8 h-8 rounded-full border-2 border-slate-800 hover:bg-blue-500 shadow-lg flex items-center justify-center">
+                            <i class="fas fa-pen text-[10px]"></i>
+                        </button>
+                        <button onclick='event.stopPropagation(); deleteTableDirect(${t.id})' 
+                            class="bg-red-600 text-white w-8 h-8 rounded-full border-2 border-slate-800 hover:bg-red-500 shadow-lg flex items-center justify-center">
+                            <i class="fas fa-trash text-[10px]"></i>
+                        </button>
+                    </div>
+
+                    <div onclick="openComanda(${t.id})" class="h-32 rounded-3xl cursor-pointer flex flex-col items-center justify-center transition border-b-4 shadow-xl hover:translate-y-1 relative overflow-hidden
+                        ${t.status === 'Libre' ? 'bg-emerald-600 border-emerald-800 text-white' : 'bg-red-500 border-red-800 text-white'}">
+                        
+                        <span class="text-4xl font-black italic uppercase z-10">${t.number}</span>
+                        
+                        <div class="z-10 flex items-center gap-1 mt-1 bg-black/20 px-2 rounded-full text-[10px] font-bold">
+                            <i class="fas fa-users text-[8px]"></i> ${t.capacity || '?'}
+                        </div>
+
+                        <span class="text-[9px] font-black uppercase opacity-80 italic z-10 mt-1">${t.status}</span>
+                        ${t.order && t.order.length > 0 ? '<i class="fas fa-utensils absolute text-6xl opacity-20 -bottom-2 -right-2"></i>' : ''}
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function deleteTableDirect(id) {
+            if (!confirm("¿Eliminar esta mesa y su configuración?")) return;
+            DB.delete('paco_tables', id);
+            loadTables();
         }
 
         function openComanda(id) {
