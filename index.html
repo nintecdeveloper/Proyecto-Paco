@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>PACO ERP | Gestión Total v4.2</title>
+    <title>PACO ERP | Gestión Total v5.1</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -28,6 +28,12 @@
         .ticket-jagged {
             background: radial-gradient(circle, transparent, transparent 50%, #f8fafc 50%, #f8fafc 100%) -10px -10px / 20px 20px repeat-x;
         }
+        /* Loader */
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #a855f7; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        /* Drag Zone Animation */
+        .drag-active { border-color: #a855f7 !important; background-color: rgba(168, 85, 247, 0.1) !important; transform: scale(1.01); }
     </style>
 </head>
 
@@ -41,6 +47,9 @@
             <button onclick="showSection('almacen')" class="nav-btn w-full flex items-center p-3 rounded-lg font-bold text-slate-400 hover:bg-slate-700 hover:text-white nav-active">
                 <i class="fas fa-boxes w-8"></i> Almacén
             </button>
+            <button onclick="showSection('facturas')" class="nav-btn w-full flex items-center p-3 rounded-lg font-bold text-slate-400 hover:bg-slate-700 hover:text-white">
+                <i class="fas fa-file-invoice-dollar w-8"></i> Facturas IA
+            </button>
             <button onclick="showSection('carta')" class="nav-btn w-full flex items-center p-3 rounded-lg font-bold text-slate-400 hover:bg-slate-700 hover:text-white">
                 <i class="fas fa-utensils w-8"></i> Recetas / Carta
             </button>
@@ -51,7 +60,7 @@
         <button onclick="showSection('historial')" class="nav-btn w-full flex items-center p-3 rounded-lg font-bold text-slate-400 hover:bg-slate-700 hover:text-white">
             <i class="fas fa-history w-8"></i> Historial
         </button>
-        <div class="p-4 text-xs text-slate-500 text-center font-mono">Versión 4.2</div>
+        <div class="p-4 text-xs text-slate-500 text-center font-mono">Versión 5.1</div>
     </aside>
 
     <main class="flex-1 overflow-y-auto bg-[#0f172a] p-8 relative">
@@ -108,6 +117,60 @@
                             </thead>
                             <tbody id="list-bebidas" class="divide-y divide-slate-700 text-sm"></tbody>
                         </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="sec-facturas" class="hidden h-full flex flex-col">
+            <div class="mb-8 border-b border-slate-700 pb-4">
+                <h2 class="text-3xl font-black text-white uppercase tracking-tight">Escáner de Facturas IA</h2>
+                <p class="text-slate-400 text-xs mt-1">Arrastra tu factura o albarán para actualizar el stock automáticamente.</p>
+            </div>
+
+            <div class="flex-1 flex flex-col gap-6">
+                <div id="drop-zone" class="border-4 border-dashed border-slate-600 bg-slate-800/50 rounded-3xl p-10 flex flex-col items-center justify-center cursor-pointer transition hover:bg-slate-800/80 hover:border-slate-500 group relative">
+                    <input type="file" id="invoice-input" accept="image/*" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="handleFileSelect(this)">
+                    
+                    <div id="upload-prompt" class="text-center">
+                        <div class="w-20 h-20 bg-slate-700 rounded-full flex items-center justify-center mb-4 mx-auto group-hover:scale-110 transition">
+                            <i class="fas fa-cloud-upload-alt text-3xl text-purple-400"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-white mb-2">Arrastra tu factura aquí</h3>
+                        <p class="text-slate-400 text-sm">o haz clic para explorar archivos (JPG, PNG)</p>
+                    </div>
+
+                    <div id="upload-loader" class="hidden text-center">
+                        <div class="loader mx-auto mb-4"></div>
+                        <p class="text-purple-400 animate-pulse font-bold text-lg">Procesando con IA...</p>
+                        <p class="text-slate-500 text-xs mt-2">Extrayendo productos y cantidades</p>
+                    </div>
+                </div>
+
+                <div id="invoice-results" class="hidden bg-[#1e293b] rounded-2xl border border-slate-700 overflow-hidden shadow-2xl flex-1 flex flex-col">
+                    <div class="p-4 bg-purple-900/20 border-b border-purple-500/30 flex justify-between items-center">
+                        <h3 class="font-black text-purple-400 uppercase tracking-widest text-xs"><i class="fas fa-magic mr-2"></i>Resultados del Análisis</h3>
+                        <button onclick="resetInvoice()" class="text-xs text-slate-400 hover:text-white uppercase font-bold"><i class="fas fa-redo mr-1"></i> Escanear otra</button>
+                    </div>
+                    
+                    <div class="flex-1 overflow-y-auto p-4">
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-slate-800 text-slate-400 uppercase font-bold text-xs sticky top-0">
+                                <tr>
+                                    <th class="p-3">Detectado</th>
+                                    <th class="p-3">Cant.</th>
+                                    <th class="p-3">Acción en Stock</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ocr-list" class="divide-y divide-slate-700"></tbody>
+                        </table>
+                    </div>
+
+                    <div class="p-6 bg-slate-800 border-t border-slate-700 flex justify-end gap-3">
+                        <button onclick="resetInvoice()" class="px-6 py-3 rounded-lg font-bold text-slate-400 hover:text-white hover:bg-slate-700 transition">Cancelar</button>
+                        <button onclick="confirmInvoice()" class="bg-purple-600 hover:bg-purple-500 text-white px-8 py-3 rounded-lg font-black uppercase shadow-lg transition transform hover:scale-105">
+                            <i class="fas fa-check-circle mr-2"></i> Confirmar y Guardar
+                        </button>
                     </div>
                 </div>
             </div>
@@ -343,20 +406,16 @@
                     </div>
                     <button onclick="toggleModal('modal-ticket', false)" class="absolute top-4 right-4 text-slate-400 hover:text-slate-800"><i class="fas fa-times"></i></button>
                 </div>
-
                 <div class="border-b-2 border-dashed border-slate-300 pb-4 mb-4 text-xs font-mono space-y-1">
                     <div class="flex justify-between"><span>Mesa:</span> <span id="t-mesa" class="font-bold"></span></div>
                     <div class="flex justify-between"><span>Llegada:</span> <span id="t-start"></span></div>
                     <div class="flex justify-between"><span>Cobro:</span> <span id="t-end"></span></div>
                 </div>
-
                 <ul id="t-items" class="space-y-2 text-sm font-mono border-b-2 border-slate-800 pb-4 mb-4"></ul>
-
                 <div class="flex justify-between items-end text-xl font-black">
                     <span>TOTAL</span>
                     <span id="t-total"></span>
                 </div>
-
                 <div class="mt-8 text-center">
                     <p class="text-[10px] text-slate-400 italic">Gracias por su visita</p>
                 </div>
@@ -364,7 +423,6 @@
             <div class="h-4 w-full ticket-jagged -mt-2 relative z-10"></div>
         </div>
     </div>
-
 
     <script>
         const DB = {
@@ -391,6 +449,7 @@
         let curRecipe = [];
         let allIngredients = [];
         let activeTableId = null;
+        let scannedItems = [];
 
         // --- NAVEGACIÓN ---
         function showSection(id) {
@@ -412,6 +471,141 @@
         function toggleModal(id, show) {
             const el = document.getElementById(id);
             show ? (el.classList.remove('hidden'), el.classList.add('flex')) : (el.classList.add('hidden'), el.classList.remove('flex'));
+        }
+
+        // --- OCR LOGIC (ACTUALIZADA PARA LA NUEVA UI) ---
+        
+        // Manejar selección por clic
+        function handleFileSelect(input) {
+            if (input.files && input.files[0]) {
+                processInvoiceFile(input.files[0]);
+            }
+        }
+
+        // Configuración Drag & Drop
+        const dropZone = document.getElementById('drop-zone');
+        
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('drag-active');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('drag-active');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-active');
+            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                processInvoiceFile(e.dataTransfer.files[0]);
+            }
+        });
+
+        async function processInvoiceFile(file) {
+            // UI Update: Mostrar Loader
+            document.getElementById('upload-prompt').classList.add('hidden');
+            document.getElementById('upload-loader').classList.remove('hidden');
+            document.getElementById('invoice-results').classList.add('hidden');
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                // LLAMADA AL BACKEND
+                const response = await fetch('http://127.0.0.1:8000/api/scan-invoice', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+                
+                if(result.status === 'success') {
+                    renderOCRResults(result.data);
+                } else {
+                    alert("Error leyendo factura: " + result.message);
+                    resetInvoice();
+                }
+            } catch (e) {
+                alert("Error de conexión con el servidor Python. Asegúrate de ejecutar 'python main.py'");
+                console.error(e);
+                resetInvoice();
+            }
+        }
+
+        function renderOCRResults(items) {
+            scannedItems = items;
+            const list = document.getElementById('ocr-list');
+            const stock = DB.get('paco_ings');
+            
+            list.innerHTML = items.map((item, index) => {
+                const match = stock.find(s => s.name.toLowerCase().includes(item.name.toLowerCase()) || item.name.toLowerCase().includes(s.name.toLowerCase()));
+                const selectHTML = `
+                    <select id="ocr-match-${index}" class="bg-slate-900 border border-slate-700 text-white p-2 rounded w-full text-xs">
+                        <option value="">-- Crear Nuevo --</option>
+                        ${stock.map(s => `<option value="${s.id}" ${match && match.id === s.id ? 'selected' : ''}>${s.name} (Stock: ${s.stock})</option>`).join('')}
+                    </select>
+                `;
+
+                return `
+                <tr class="hover:bg-slate-700/30">
+                    <td class="p-3">
+                        <div class="font-bold text-white">${item.name}</div>
+                        <div class="text-[10px] text-slate-500">${item.unit || 'Unidad'} - ${item.price}€</div>
+                    </td>
+                    <td class="p-3 font-mono text-emerald-400 font-bold">+${item.qty}</td>
+                    <td class="p-3">${selectHTML}</td>
+                </tr>
+                `;
+            }).join('');
+
+            // UI Update: Mostrar Resultados
+            document.getElementById('upload-loader').classList.add('hidden');
+            document.getElementById('drop-zone').classList.add('hidden');
+            document.getElementById('invoice-results').classList.remove('hidden');
+        }
+
+        function resetInvoice() {
+            document.getElementById('upload-prompt').classList.remove('hidden');
+            document.getElementById('upload-loader').classList.add('hidden');
+            document.getElementById('drop-zone').classList.remove('hidden');
+            document.getElementById('invoice-results').classList.add('hidden');
+            document.getElementById('invoice-input').value = ""; // Limpiar input
+        }
+
+        function confirmInvoice() {
+            let stock = DB.get('paco_ings');
+            let updatedCount = 0;
+            let newCount = 0;
+
+            scannedItems.forEach((item, index) => {
+                const matchId = document.getElementById(`ocr-match-${index}`).value;
+                
+                if (matchId) {
+                    const ingIndex = stock.findIndex(s => s.id == matchId);
+                    if (ingIndex >= 0) {
+                        stock[ingIndex].stock += parseFloat(item.qty);
+                        updatedCount++;
+                    }
+                } else {
+                    const newIng = {
+                        id: Date.now() + index,
+                        type: 'Cocina',
+                        name: item.name,
+                        stock: parseFloat(item.qty),
+                        min_stock: 5,
+                        unit: 'Unidades',
+                        sub_qty: 1,
+                        sub_name: 'Unidades'
+                    };
+                    stock.push(newIng);
+                    newCount++;
+                }
+            });
+
+            DB.set('paco_ings', stock);
+            loadStock();
+            alert(`Factura procesada.\nProductos actualizados: ${updatedCount}\nNuevos creados: ${newCount}`);
+            resetInvoice();
         }
 
         // --- ALMACÉN ---
@@ -491,7 +685,6 @@
             loadStock();
         }
 
-        // --- LÓGICA DE ORDENACIÓN (NUEVO) ---
         function loadStock() {
             allIngredients = DB.get('paco_ings');
             
@@ -644,9 +837,7 @@
             }).join('');
         }
 
-        // --- MESAS Y COMANDAS ACTUALIZADO ---
-        
-        // Abrir modal para crear o editar mesa
+        // --- MESAS Y COMANDAS ---
         function openMesaModal(editData = null) {
             const title = document.getElementById('modal-mesa-title');
             const idField = document.getElementById('m-id-edit');
@@ -669,7 +860,6 @@
             toggleModal('modal-mesa-create', true);
         }
 
-        // Guardar mesa (crear o actualizar)
         function saveTable() {
             const id = document.getElementById('m-id-edit').value;
             const num = document.getElementById('m-num').value;
@@ -703,7 +893,6 @@
             loadTables();
         }
 
-        // Cargar mesas visualmente con capacidad y opciones
         function loadTables() {
             const tables = DB.get('paco_tables');
             document.getElementById('grid-mesas').innerHTML = tables.map(t => {
@@ -775,7 +964,7 @@
             const table = tables.find(t => t.id === activeTableId);
             
             if (!table.order) table.order = [];
-            // CAPTURA DE TIEMPO: Si es el primer item, guardamos timestamp
+            // CAPTURA DE TIEMPO
             if (table.order.length === 0) {
                 table.startTime = Date.now();
             }
@@ -821,7 +1010,7 @@
             table.order.splice(idx, 1);
             if (table.order.length === 0) {
                 table.status = 'Libre';
-                delete table.startTime; // Reset tiempo si se vacía
+                delete table.startTime;
             }
             DB.addOrUpdate('paco_tables', table);
             openComanda(activeTableId);
@@ -854,21 +1043,19 @@
                 }
             });
 
-            // --- GUARDAR EN HISTORIAL (MEJORADO) ---
             const ticket = {
                 id: Date.now(),
                 date: new Date().toLocaleDateString(),
                 tableName: table.number,
-                items: table.order, // Guardamos objeto completo
+                items: table.order,
                 total: totalVenta,
                 startTime: table.startTime || Date.now(),
                 endTime: Date.now()
             };
             history.push(ticket);
             DB.set('paco_history', history);
-            // ----------------------------
-
             DB.set('paco_ings', ingredients);
+            
             table.order = [];
             table.status = 'Libre';
             delete table.startTime;
@@ -887,7 +1074,7 @@
             loadTables();
         }
 
-        // --- HISTORIAL DETALLADO (NUEVO) ---
+        // --- HISTORIAL DETALLADO ---
         function loadHistory() {
             const history = DB.get('paco_history').reverse();
             const container = document.getElementById('list-historial');
@@ -898,7 +1085,6 @@
             }
 
             container.innerHTML = history.map(t => {
-                // Compatibilidad con registros antiguos que no tenían array de objetos
                 const displayItems = Array.isArray(t.items) ? t.items.map(i => i.name).join(', ') : t.items;
                 const dateDisplay = new Date(t.endTime || t.id).toLocaleString();
 
@@ -921,14 +1107,12 @@
 
             document.getElementById('t-mesa').innerText = t.tableName;
             
-            // Formateo de fechas
             const start = t.startTime ? new Date(t.startTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : "N/A";
             const end = t.endTime ? new Date(t.endTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : new Date(t.id).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
             
             document.getElementById('t-start').innerText = start;
             document.getElementById('t-end').innerText = end;
 
-            // Lista items
             const list = document.getElementById('t-items');
             if(Array.isArray(t.items)) {
                 list.innerHTML = t.items.map(i => `
@@ -938,7 +1122,6 @@
                     </li>
                 `).join('');
             } else {
-                // Fallback para datos antiguos
                 list.innerHTML = `<li class="text-xs italic text-slate-400">${t.items}</li>`;
             }
 
