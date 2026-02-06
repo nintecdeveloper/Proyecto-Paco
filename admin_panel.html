@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OSLAPRINT | Administración</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
+    
+    <style>
+        :root { 
+            --osla-orange: #f37021; 
+            --osla-dark: #0a0a0a; 
+            --osla-card: #161616; 
+        }
+        
+        body { 
+            background-color: var(--osla-dark); 
+            color: #fff; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+        }
+
+        /* Navbar Estilo Profesional */
+        .navbar { 
+            background: #000; 
+            border-bottom: 2px solid var(--osla-orange); 
+            padding: 1rem 2rem;
+        }
+        
+        .logo-text { font-weight: 800; font-size: 1.5rem; color: #fff; text-decoration: none; }
+        .logo-orange { color: var(--osla-orange); }
+
+        /* Pestañas de Navegación */
+        .nav-tabs { border: none; gap: 10px; }
+        .nav-link { 
+            color: #888; 
+            font-weight: 600; 
+            border: none !important; 
+            padding: 10px 20px;
+            transition: 0.3s;
+        }
+        .nav-link:hover { color: #fff; }
+        .nav-link.active { 
+            color: var(--osla-orange) !important; 
+            background: transparent !important; 
+            border-bottom: 3px solid var(--osla-orange) !important; 
+        }
+
+        /* Tarjetas de Empleados */
+        .card-emp { 
+            background: var(--osla-card); 
+            border: 1px solid #333; 
+            border-radius: 15px; 
+            padding: 30px; 
+            text-align: center; 
+            transition: transform 0.3s, border-color 0.3s;
+        }
+        .card-emp:hover { 
+            transform: translateY(-5px);
+            border-color: var(--osla-orange);
+        }
+        .icon-user { font-size: 3rem; color: var(--osla-orange); margin-bottom: 15px; }
+
+        /* Tabla de Informes */
+        .table-container {
+            background: var(--osla-card);
+            border-radius: 15px;
+            padding: 20px;
+            border: 1px solid #333;
+        }
+        .table-dark { --bs-table-bg: transparent; color: #ddd; }
+        .table thead th { color: var(--osla-orange); border-bottom: 2px solid #333; }
+
+        /* Calendario en Modal */
+        #calendarAdmin { 
+            background: #fff; 
+            color: #000; 
+            padding: 15px; 
+            border-radius: 8px; 
+            min-height: 500px;
+        }
+        
+        /* Ajustes Modal */
+        .modal-content { border: 1px solid var(--osla-orange); }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar d-flex justify-content-between align-items-center">
+        <a href="#" class="logo-text">OSLA<span class="logo-orange">PRINT</span> <small class="ms-2 badge bg-dark text-secondary border border-secondary" style="font-size: 0.7rem;">SISTEMA ADMIN</small></a>
+        <div class="d-flex align-items-center">
+            <span class="me-3 text-muted small">Conectado como: <strong>{{ current_user.username }}</strong></span>
+            <a href="/logout" class="btn btn-outline-danger btn-sm">Cerrar Sesión</a>
+        </div>
+    </nav>
+
+    <div class="container mt-4 pb-5">
+        
+        <ul class="nav nav-tabs mb-4" id="adminTab" role="tablist">
+            <li class="nav-item">
+                <button class="nav-link active" id="team-tab" data-bs-toggle="tab" data-bs-target="#team" type="button">GESTIÓN DE EQUIPO</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" id="data-tab" data-bs-toggle="tab" data-bs-target="#data" type="button">HISTORIAL DE INFORMES</button>
+            </li>
+        </ul>
+
+        <div class="tab-content">
+            
+            <div class="tab-pane fade show active" id="team">
+                <div class="row g-4">
+                    {% for emp in empleados %}
+                    <div class="col-md-4">
+                        <div class="card-emp">
+                            <i class="bi bi-person-circle icon-user"></i>
+                            <h3 class="fw-bold mb-1">{{ emp.username|upper }}</h3>
+                            <p class="text-muted small mb-4">Técnico Especialista</p>
+                            <button class="btn btn-warning w-100 fw-bold" onclick="abrirCalendarioAdmin('{{ emp.id }}', '{{ emp.username }}')">
+                                <i class="bi bi-calendar3 me-2"></i> VER AGENDA
+                            </button>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="col-12 text-center py-5">
+                        <i class="bi bi-people text-muted display-1"></i>
+                        <p class="mt-3 text-muted">No se han encontrado técnicos registrados en el sistema.</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="data">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h4 class="fw-bold text-white mb-0">Registros Globales</h4>
+                    <a href="/export_excel" class="btn btn-success">
+                        <i class="bi bi-file-earmark-excel me-2"></i> EXPORTAR A EXCEL
+                    </a>
+                </div>
+                
+                <div class="table-container">
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover">
+                            <thead>
+                                <tr>
+                                    <th>FECHA</th>
+                                    <th>TÉCNICO</th>
+                                    <th>CLIENTE</th>
+                                    <th>DESCRIPCIÓN</th>
+                                    <th>PIEZAS/NOTAS</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for inf in informes %}
+                                <tr>
+                                    <td class="text-nowrap">{{ inf.date.strftime('%d/%m/%Y') }}</td>
+                                    <td><span class="badge bg-secondary">{{ inf.tech.username }}</span></td>
+                                    <td class="text-warning fw-bold">{{ inf.client_name }}</td>
+                                    <td class="small">{{ inf.description }}</td>
+                                    <td class="small text-muted italic">{{ inf.parts }}</td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="5" class="text-center py-4 text-muted">No existen informes registrados actualmente.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalCaleAdmin" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered">
+            <div class="modal-content bg-dark">
+                <div class="modal-header border-bottom border-secondary">
+                    <h5 class="modal-title text-white">Agenda Detallada: <span id="nombreTecnicoHeader" class="text-warning"></span></h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div id="calendarAdmin"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+
+    <script>
+        let fullCalendarInstance = null;
+
+        function abrirCalendarioAdmin(id, nombre) {
+            // Seteamos el nombre en el modal
+            document.getElementById('nombreTecnicoHeader').innerText = nombre.toUpperCase();
+            
+            // Instanciamos el modal de Bootstrap
+            const modalElemento = document.getElementById('modalCaleAdmin');
+            const bsModal = new bootstrap.Modal(modalElemento);
+            bsModal.show();
+
+            // Renderizamos el calendario SOLO cuando el modal esté visible (evita errores de ancho)
+            modalElemento.addEventListener('shown.bs.modal', function () {
+                const calendarEl = document.getElementById('calendarAdmin');
+                
+                // Si ya existía un calendario anterior, lo destruimos para limpiar datos
+                if (fullCalendarInstance) {
+                    fullCalendarInstance.destroy();
+                }
+
+                fullCalendarInstance = new FullCalendar.Calendar(calendarEl, {
+                    initialView: 'dayGridMonth',
+                    locale: 'es',
+                    firstDay: 1, // Lunes
+                    headerToolbar: {
+                        left: 'prev,next today',
+                        center: 'title',
+                        right: 'dayGridMonth,timeGridWeek'
+                    },
+                    buttonText: {
+                        today: 'Hoy',
+                        month: 'Mes',
+                        week: 'Semana'
+                    },
+                    // Esta URL debe coincidir con la definida en tu app.py
+                    events: '/api/admin/tasks/' + id,
+                    eventColor: '#f37021',
+                    eventTextColor: '#ffffff'
+                });
+                
+                fullCalendarInstance.render();
+            }, { once: true }); // El listener se ejecuta una sola vez por apertura
+        }
+    </script>
+</body>
+</html>
