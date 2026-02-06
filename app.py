@@ -78,11 +78,6 @@ def logout():
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-        # Crear Admin por defecto (admin / admin123)
-        if not User.query.filter_by(username='admin').first():
-            db.session.add(User(username='admin', role='admin', password_hash=generate_password_hash('admin123')))
-        # Crear un Técnico de prueba (tech / tech123)
-        if not User.query.filter_by(username='tech').first():
-            db.session.add(User(username='tech', role='tech', password_hash=generate_password_hash('tech123')))
-        db.session.commit()
-    app.run(debug=True)
+    # Cambiamos esto para que Render pueda conectar
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
