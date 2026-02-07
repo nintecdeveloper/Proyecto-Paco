@@ -293,6 +293,7 @@ def search_clients():
 
 # --- VISUALIZAR PARTE (IMPRIMIR) ---
 @app.route('/print_report/<int:task_id>')
+@login_required
 def print_report(task_id):
     task = Task.query.get_or_404(task_id)
     if current_user.role != 'admin' and current_user.id != task.tech_id:
@@ -410,9 +411,12 @@ def logout():
     logout_user()
     return redirect(url_for('login'))
 
-if __name__ == '__main__':
+# Función de inicialización de la base de datos
+def init_db():
+    """Inicializa la base de datos con datos por defecto"""
     with app.app_context():
         db.create_all()
+        
         # Inicializar usuarios
         if not User.query.filter_by(username='admin').first():
             db.session.add(User(username='admin', role='admin', password_hash=generate_password_hash('admin123')))
@@ -435,5 +439,10 @@ if __name__ == '__main__':
                 db.session.add(Client(name=c))
                 
         db.session.commit()
+
+# Inicializar base de datos al cargar el módulo (importante para Gunicorn/Render)
+init_db()
+
+if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
