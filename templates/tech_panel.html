@@ -2,111 +2,298 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>OSLAPRINT | Panel Técnico</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js'></script>
     <style>
         :root { --osla-orange: #f37021; --osla-dark: #0a0a0a; --osla-card: #161616; }
-        body { background-color: var(--osla-dark); color: #fff; font-family: 'Segoe UI', sans-serif; }
-        .form-control { background: #000 !important; border: 1px solid #444 !important; color: #fff !important; }
-        .menu-card { background: var(--osla-card); border: 2px solid #222; border-radius: 20px; padding: 40px 20px; cursor: pointer; transition: 0.3s; }
+        body { background-color: var(--osla-dark); color: #fff; font-family: 'Segoe UI', sans-serif; padding-bottom: 80px;}
+        .navbar { background: #000; border-bottom: 2px solid var(--osla-orange); }
+        /* Prevent iOS zoom on inputs */
+        .form-control, .form-select { background: #000 !important; border: 1px solid #444 !important; color: #fff !important; font-size: 16px !important; }
+        .form-control:focus, .form-select:focus { border-color: var(--osla-orange); box-shadow: none; }
+        
+        .text-muted { color: #d1d1d1 !important; }
+        .text-secondary { color: #bcbcbc !important; }
+        .form-label, label { color: #f8f9fa !important; font-weight: 500; }
+        .small, small { color: #e0e0e0 !important; }
+        .fc-event { cursor: pointer; }
+
+        .menu-card { background: var(--osla-card); border: 2px solid #222; border-radius: 20px; padding: 25px; cursor: pointer; transition: 0.3s; text-align: center; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; }
         .menu-card:hover { border-color: var(--osla-orange); transform: translateY(-5px); background: #1f1f1f; }
-        .btn-osla { background: var(--osla-orange); color: white; border: none; padding: 12px; border-radius: 10px; width: 100%; font-weight: bold; }
-        #calendar { background: #fff; color: #333; padding: 15px; border-radius: 15px; }
+        .btn-osla { background: var(--osla-orange); color: white; border: none; font-weight: bold; padding: 12px; width: 100%; border-radius: 8px; font-size: 1.1rem; }
+        #calendar { background: #fff; color: #333; padding: 10px; border-radius: 10px; }
+        
+        /* Mobile adjustments */
+        @media (max-width: 768px) {
+            .container { padding-left: 15px; padding-right: 15px; }
+            .fc-toolbar { flex-direction: column; gap: 10px; }
+            .fc-toolbar-title { font-size: 1.2rem !important; }
+        }
     </style>
 </head>
 <body>
 
-<nav class="navbar border-bottom border-dark px-4 py-3 mb-4">
-    <span class="fw-bold fs-4">OSLA<span style="color:var(--osla-orange)">PRINT</span></span>
-    <a href="/logout" class="btn btn-outline-danger btn-sm">Salir</a>
+<nav class="navbar px-3 py-3 mb-4 sticky-top">
+    <div class="d-flex justify-content-between w-100 align-items-center">
+        <span class="fw-bold fs-4 text-white">OSLA<span style="color:var(--osla-orange)">PRINT</span></span>
+        <div class="d-flex align-items-center gap-2">
+            <span class="text-white fw-bold me-2">Hola {{ current_user.username }}!</span>
+            <a href="/logout" class="btn btn-outline-danger btn-sm"><i class="bi bi-box-arrow-right"></i></a>
+        </div>
+    </div>
 </nav>
 
 <div class="container" style="max-width: 900px;">
-    
     {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        {% for category, message in messages %}
-          <div class="alert alert-{{ category }} alert-dismissible fade show bg-dark text-white border-warning">
-            {{ message }}
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
+      {% if messages %}{% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show bg-dark text-white border-secondary">
+            {{ message }}<button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
           </div>
-        {% endfor %}
-      {% endif %}
+      {% endfor %}{% endif %}
     {% endwith %}
 
-    <div id="home-menu" class="row g-4 justify-content-center">
-        <div class="col-md-6" onclick="showSection('section-parte')">
-            <div class="menu-card text-center">
-                <i class="bi bi-file-earmark-plus-fill fs-1 text-warning mb-3 d-block"></i>
-                <h3 class="fw-bold">NUEVO INFORME</h3>
+    <div id="home-menu" class="row g-3 justify-content-center">
+        <div class="col-12 col-md-6" onclick="showSection('section-parte')">
+            <div class="menu-card">
+                <i class="bi bi-clipboard-check-fill fs-1 text-warning mb-2 d-block"></i>
+                <h4 class="text-white">NUEVO PARTE</h4>
+                <p class="text-muted small">Cerrar trabajo realizado</p>
             </div>
         </div>
-        <div class="col-md-6" onclick="showSection('section-agenda')">
-            <div class="menu-card text-center">
-                <i class="bi bi-calendar-range-fill fs-1 text-warning mb-3 d-block"></i>
-                <h3 class="fw-bold">MI AGENDA</h3>
+        <div class="col-12 col-md-6" onclick="showSection('section-agenda')">
+            <div class="menu-card">
+                <i class="bi bi-calendar-week fs-1 text-white mb-2 d-block"></i>
+                <h4 class="text-white">MI AGENDA</h4>
+                <p class="text-muted small">Ver calendario y citas</p>
             </div>
         </div>
     </div>
 
     <div id="section-parte" class="d-none">
-        <button class="btn btn-dark mb-4 btn-sm" onclick="showSection('home-menu')">← Volver</button>
-        <form action="/save_task" method="POST">
-            <div class="mb-4">
-                <label class="text-warning small fw-bold">CLIENTE</label>
-                <input list="clientesList" name="client_name" class="form-control" placeholder="Escribe para buscar..." required>
-                <datalist id="clientesList">
-                    {% for c in clients %}<option value="{{ c.name }}">{% endfor %}
-                </datalist>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h3 class="text-warning fw-bold m-0 fs-4">Parte de Trabajo</h3>
+            <button class="btn btn-outline-secondary btn-sm px-3" onclick="showSection('home-menu')">Atrás</button>
+        </div>
+        <form action="/save_report" method="POST" class="card bg-dark border-secondary p-3 p-md-4">
+            
+            <div class="mb-3 p-3 rounded" style="background: #1f1f1f; border-left: 4px solid var(--osla-orange);">
+                <label class="form-label text-warning fw-bold mb-2 small">VINCULAR CITA (OPCIONAL)</label>
+                <select name="linked_task_id" id="linkedTaskSelect" class="form-select form-select-lg" onchange="fillFromTask(this)">
+                    <option value="none" selected>Nueva incidencia (Sin cita)</option>
+                    {% for task in pending_tasks %}
+                    <option value="{{ task.id }}" data-client="{{ task.client_name }}">
+                        {{ task.date.strftime('%d/%m') }} - {{ task.client_name }}
+                    </option>
+                    {% endfor %}
+                </select>
             </div>
-            <div class="row mb-4">
-                <div class="col-6"><label class="small text-warning">INICIO</label><input type="time" name="start_time" class="form-control" value="09:00"></div>
-                <div class="col-6"><label class="small text-warning">FIN</label><input type="time" name="end_time" class="form-control" value="10:00"></div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-12 col-md-8">
+                    <label class="form-label">CLIENTE</label>
+                    <input type="text" name="client_name" id="fieldClient" class="form-control" required placeholder="Nombre cliente">
+                </div>
+                <div class="col-12 col-md-4">
+                    <label class="form-label">TIPO SERVICIO</label>
+                    <select name="service_type" class="form-select">
+                        <option>Avería</option><option>Mantenimiento</option><option>Instalación</option><option>Otro</option>
+                    </select>
+                </div>
             </div>
-            <div class="mb-4"><label class="small text-warning">PIEZAS / MATERIAL</label><input type="text" name="parts" class="form-control"></div>
-            <div class="mb-5"><label class="small text-warning">DESCRIPCIÓN</label><textarea name="description" class="form-control" rows="4" required></textarea></div>
-            <button type="submit" class="btn btn-osla shadow">ENVIAR INFORME</button>
+            
+            <div class="row g-3 mb-3">
+                <div class="col-12 col-md-4">
+                    <label class="form-label">FECHA</label>
+                    <input type="date" name="date" class="form-control" value="{{ today_date }}" required>
+                </div>
+                <div class="col-6 col-md-4">
+                    <label class="form-label">ENTRADA</label>
+                    <input type="time" name="entry_time" class="form-control" required>
+                </div>
+                <div class="col-6 col-md-4">
+                    <label class="form-label">SALIDA</label>
+                    <input type="time" name="exit_time" class="form-control" required>
+                </div>
+            </div>
+            
+            <div class="mb-3">
+                <label class="form-label">TRABAJO REALIZADO</label>
+                <textarea name="description" class="form-control" rows="4" required placeholder="Describa la solución..."></textarea>
+            </div>
+            
+            <div class="p-3 mb-3 rounded" style="background: #161616; border: 1px dashed #666;">
+                <label class="text-white fw-bold small mb-2 d-block"><i class="bi bi-box-seam me-2"></i>PIEZAS / STOCK</label>
+                <div class="mb-2 d-flex gap-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="stock_action" value="used" checked id="r1">
+                        <label class="form-check-label text-danger small" for="r1">Gastado</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="stock_action" value="retrieved" id="r2">
+                        <label class="form-check-label text-success small" for="r2">Recuperado</label>
+                    </div>
+                </div>
+                <div class="row g-2">
+                    <div class="col-8">
+                        <select name="stock_item" class="form-select">
+                            <option value="" selected>-- Pieza --</option>
+                            {% for item in stock_items %}<option value="{{ item.id }}">{{ item.name }} ({{ item.quantity }})</option>{% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-4"><input type="number" name="stock_qty" class="form-control" placeholder="#" min="1" value="1"></div>
+                </div>
+                <div class="mt-3">
+                    <label class="form-label small">OTRAS NOTAS / MATERIAL</label>
+                    <input type="text" name="parts_removed" class="form-control" placeholder="Ej: Retirado fusor viejo">
+                </div>
+            </div>
+            
+            <button type="submit" class="btn btn-osla py-3 mt-2 shadow-sm">FINALIZAR Y GUARDAR</button>
         </form>
     </div>
 
     <div id="section-agenda" class="d-none">
-        <button class="btn btn-dark mb-4 btn-sm" onclick="showSection('home-menu')">← Volver</button>
+        <div class="d-flex justify-content-between mb-3 align-items-center">
+            <h3 class="text-white fs-4 m-0">Calendario</h3>
+            <div>
+                <button class="btn btn-primary btn-sm me-1" onclick="openCitaModal('{{ today_date }}')"><i class="bi bi-plus-lg"></i> Cita</button>
+                <button class="btn btn-outline-secondary btn-sm" onclick="showSection('home-menu')">Atrás</button>
+            </div>
+        </div>
         <div id="calendar"></div>
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+<div class="modal fade" id="modalCita" tabindex="-1">
+    <div class="modal-dialog modal-fullscreen-sm-down">
+        <form action="/schedule_appointment" method="POST" class="modal-content bg-dark border-primary">
+            <div class="modal-header border-bottom border-secondary">
+                <h5 class="modal-title text-white">Agendar Cita</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3"><label class="form-label">CLIENTE</label><input type="text" name="client_name" class="form-control" required></div>
+                <div class="row g-2 mb-3">
+                    <div class="col-7"><label class="form-label">FECHA</label><input type="date" name="date" id="modalDateInput" class="form-control" required></div>
+                    <div class="col-5"><label class="form-label">HORA</label><input type="time" name="time" class="form-control"></div>
+                </div>
+                <div class="mb-3"><label class="form-label">TIPO</label><select name="service_type" class="form-select"><option>Revisión</option><option>Instalación</option><option>Urgencia</option></select></div>
+                <div class="mb-3"><label class="form-label">NOTAS</label><textarea name="notes" class="form-control" rows="3"></textarea></div>
+            </div>
+            <div class="modal-footer border-top border-secondary"><button type="submit" class="btn btn-primary w-100 py-2">Confirmar Cita</button></div>
+        </form>
+    </div>
+</div>
 
+<div class="modal fade" id="modalEventAction" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark border-secondary text-white shadow">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title" id="evtTitle">Detalles Cita</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <span id="evtStatus" class="badge p-2"></span>
+                </div>
+                <h5 id="evtClient" class="text-warning fw-bold mb-3"></h5>
+                <p class="small text-muted bg-black p-3 rounded border border-secondary" id="evtDesc"></p>
+                <input type="hidden" id="evtId">
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-outline-danger flex-grow-1" onclick="performTaskAction('delete')">Eliminar</button>
+                <button type="button" class="btn btn-success flex-grow-1" id="btnComplete" onclick="performTaskAction('complete')">Marcar Hecha</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
     let calendar;
+    const modalCita = new bootstrap.Modal(document.getElementById('modalCita'));
+    const modalAction = new bootstrap.Modal(document.getElementById('modalEventAction'));
 
     function showSection(id) {
-        document.getElementById('home-menu').classList.add('d-none');
-        document.getElementById('section-parte').classList.add('d-none');
-        document.getElementById('section-agenda').classList.add('d-none');
-        
+        ['home-menu', 'section-parte', 'section-agenda'].forEach(el => document.getElementById(el).classList.add('d-none'));
         document.getElementById(id).classList.remove('d-none');
-        
-        // Si entramos a la agenda, renderizamos el calendario para evitar errores visuales
-        if(id === 'section-agenda' && calendar) { 
-            setTimeout(() => calendar.render(), 100); 
+        if(id === 'section-agenda') setTimeout(() => { if(!calendar) initCalendar(); else calendar.render(); }, 150);
+    }
+
+    function fillFromTask(select) {
+        const option = select.options[select.selectedIndex];
+        if (option.value !== 'none') {
+            document.getElementById('fieldClient').value = option.getAttribute('data-client');
+        } else {
+            document.getElementById('fieldClient').value = '';
         }
     }
 
-    document.addEventListener('DOMContentLoaded', function() {
+    function initCalendar() {
         var calendarEl = document.getElementById('calendar');
+        // Mobile optimization: Use List view on small screens
+        var isMobile = window.innerWidth < 768;
+        
         calendar = new FullCalendar.Calendar(calendarEl, {
-            initialView: 'dayGridMonth',
-            locale: 'es',
-            headerToolbar: { left: 'prev,next', center: 'title', right: 'today' },
-            events: '/api/tasks' // <--- AQUÍ ESTÁ LA SOLUCIÓN: Carga limpia desde API
+            initialView: isMobile ? 'listWeek' : 'dayGridMonth', 
+            locale: 'es', 
+            headerToolbar: { 
+                left: 'prev,next', 
+                center: 'title', 
+                right: isMobile ? 'dayGridMonth,listWeek' : 'dayGridMonth,listWeek' 
+            },
+            height: isMobile ? 'auto' : 600,
+            contentHeight: 'auto',
+            events: '/api/tasks', 
+            
+            dateClick: function(info) { openCitaModal(info.dateStr); },
+            
+            eventClick: function(info) {
+                const props = info.event.extendedProps;
+                document.getElementById('evtId').value = info.event.id;
+                document.getElementById('evtTitle').innerText = info.event.title;
+                document.getElementById('evtClient').innerText = props.client;
+                document.getElementById('evtDesc').innerText = props.desc;
+                
+                const statusSpan = document.getElementById('evtStatus');
+                statusSpan.innerText = props.status;
+                
+                const btnComplete = document.getElementById('btnComplete');
+                
+                if(props.status === 'Completado') {
+                    statusSpan.className = 'badge bg-success';
+                    btnComplete.style.display = 'none'; 
+                } else {
+                    statusSpan.className = 'badge bg-primary';
+                    btnComplete.style.display = 'inline-block';
+                }
+                
+                modalAction.show();
+            }
         });
         calendar.render();
-    });
+    }
+
+    function openCitaModal(dateStr) { document.getElementById('modalDateInput').value = dateStr; modalCita.show(); }
+
+    function performTaskAction(action) {
+        const id = document.getElementById('evtId').value;
+        if(!confirm('¿Confirmar acción?')) return;
+
+        fetch(`/api/task_action/${id}/${action}`, { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+            if(data.success) {
+                calendar.refetchEvents(); 
+                modalAction.hide();
+            } else {
+                alert('Error: ' + data.msg);
+            }
+        });
+    }
 </script>
 </body>
 </html>
