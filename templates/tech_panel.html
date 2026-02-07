@@ -26,6 +26,27 @@
         .btn-osla { background: var(--osla-orange); color: white; border: none; font-weight: bold; padding: 12px; width: 100%; border-radius: 8px; font-size: 1.1rem; }
         #calendar { background: #fff; color: #333; padding: 10px; border-radius: 10px; }
         
+        /* Autocomplete Styles */
+        .suggestions-list {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            width: 100%;
+            max-height: 200px;
+            overflow-y: auto;
+            background: #1f1f1f;
+            border: 1px solid #444;
+            border-radius: 0 0 8px 8px;
+            z-index: 1050;
+            display: none;
+        }
+        .suggestion-item {
+            padding: 10px 15px;
+            cursor: pointer;
+            border-bottom: 1px solid #333;
+        }
+        .suggestion-item:hover { background: var(--osla-orange); color: white; }
+        
         /* Mobile adjustments */
         @media (max-width: 768px) {
             .container { padding-left: 15px; padding-right: 15px; }
@@ -40,7 +61,7 @@
     <div class="d-flex justify-content-between w-100 align-items-center">
         <span class="fw-bold fs-4 text-white">OSLA<span style="color:var(--osla-orange)">PRINT</span></span>
         <div class="d-flex align-items-center gap-2">
-            <span class="text-white fw-bold me-2">Hola {{ current_user.username }}!</span>
+            <span class="text-white fw-bold me-2">Hola {{ current_user.username }}</span>
             <a href="/logout" class="btn btn-outline-danger btn-sm"><i class="bi bi-box-arrow-right"></i></a>
         </div>
     </div>
@@ -92,9 +113,10 @@
             </div>
 
             <div class="row g-3 mb-3">
-                <div class="col-12 col-md-8">
+                <div class="col-12 col-md-8 position-relative">
                     <label class="form-label">CLIENTE</label>
-                    <input type="text" name="client_name" id="fieldClient" class="form-control" required placeholder="Nombre cliente">
+                    <input type="text" name="client_name" id="fieldClient" class="form-control" required placeholder="Buscar cliente..." autocomplete="off">
+                    <div id="listClient" class="suggestions-list"></div>
                 </div>
                 <div class="col-12 col-md-4">
                     <label class="form-label">TIPO SERVICIO</label>
@@ -175,7 +197,11 @@
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <div class="mb-3"><label class="form-label">CLIENTE</label><input type="text" name="client_name" class="form-control" required></div>
+                <div class="mb-3 position-relative">
+                    <label class="form-label">CLIENTE</label>
+                    <input type="text" name="client_name" id="modalFieldClient" class="form-control" required placeholder="Buscar cliente..." autocomplete="off">
+                    <div id="modalListClient" class="suggestions-list"></div>
+                </div>
                 <div class="row g-2 mb-3">
                     <div class="col-7"><label class="form-label">FECHA</label><input type="date" name="date" id="modalDateInput" class="form-control" required></div>
                     <div class="col-5"><label class="form-label">HORA</label><input type="time" name="time" class="form-control"></div>
@@ -234,7 +260,6 @@
 
     function initCalendar() {
         var calendarEl = document.getElementById('calendar');
-        // Mobile optimization: Use List view on small screens
         var isMobile = window.innerWidth < 768;
         
         calendar = new FullCalendar.Calendar(calendarEl, {
@@ -294,6 +319,54 @@
             }
         });
     }
+
+    // --- AUTOCOMPLETE LOGIC ---
+    function setupAutocomplete(inputId, listId) {
+        const input = document.getElementById(inputId);
+        const list = document.getElementById(listId);
+        
+        input.addEventListener('input', function() {
+            const val = this.value;
+            if(!val || val.length < 2) {
+                list.innerHTML = '';
+                list.style.display = 'none';
+                return;
+            }
+            
+            fetch(`/api/clients_search?q=${encodeURIComponent(val)}`)
+                .then(res => res.json())
+                .then(data => {
+                    list.innerHTML = '';
+                    if (data.length > 0) {
+                        list.style.display = 'block';
+                        data.forEach(item => {
+                            const div = document.createElement('div');
+                            div.className = 'suggestion-item';
+                            div.innerText = item.name;
+                            div.onclick = function() {
+                                input.value = item.name;
+                                list.innerHTML = '';
+                                list.style.display = 'none';
+                            };
+                            list.appendChild(div);
+                        });
+                    } else {
+                        list.style.display = 'none';
+                    }
+                });
+        });
+
+        // Ocultar si clic fuera
+        document.addEventListener('click', function(e) {
+            if(e.target !== input && e.target !== list) {
+                list.style.display = 'none';
+            }
+        });
+    }
+
+    // Activar autocompletado en los campos
+    setupAutocomplete('fieldClient', 'listClient'); // Formulario parte
+    setupAutocomplete('modalFieldClient', 'modalListClient'); // Modal cita
 </script>
 </body>
 </html>

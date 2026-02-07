@@ -23,6 +23,11 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(128))
     role = db.Column(db.String(20)) # 'admin' o 'tech'
 
+class Client(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+    # Se pueden añadir más campos (email, tlf) en el futuro
+
 class Stock(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
@@ -78,7 +83,8 @@ def dashboard():
         empleados = User.query.filter_by(role='tech').all()
         informes = Task.query.filter_by(status='Completado').order_by(Task.date.desc()).all()
         inventory = Stock.query.order_by(Stock.name).all()
-        return render_template('admin_panel.html', empleados=empleados, informes=informes, inventory=inventory)
+        clients = Client.query.order_by(Client.name).all()
+        return render_template('admin_panel.html', empleados=empleados, informes=informes, inventory=inventory, clients=clients)
     
     # Lógica Técnico
     stock_items = Stock.query.all()
@@ -222,34 +228,68 @@ def manage_stock():
     action = request.form['action']
     
     if action == 'add':
-        # Añadir nuevo
         db.session.add(Stock(name=request.form['name'], category=request.form['category'], quantity=int(request.form['quantity'])))
         flash('Artículo añadido.', 'success')
-        
     elif action == 'update':
-        # Ajuste rápido (+/-)
         item = Stock.query.get(request.form['item_id'])
         if item:
             item.quantity += int(request.form['quantity'])
             if item.quantity < 0: item.quantity = 0
             flash(f'Stock ajustado: {item.name}', 'success')
-            
     elif action == 'edit_full':
-        # Edición completa (Nombre, Categoría, Cantidad absoluta)
         item = Stock.query.get(request.form['item_id'])
         if item:
             item.name = request.form['name']
             item.category = request.form['category']
             item.quantity = int(request.form['quantity'])
             flash(f'Artículo editado: {item.name}', 'success')
-            
     elif action == 'delete':
-        # Eliminar
         Stock.query.filter_by(id=request.form['item_id']).delete()
         flash('Artículo eliminado.', 'warning')
 
     db.session.commit()
     return redirect(url_for('dashboard'))
+
+# --- GESTIÓN CLIENTES ADMIN ---
+@app.route('/manage_clients', methods=['POST'])
+@login_required
+def manage_clients():
+    if current_user.role != 'admin': return redirect(url_for('dashboard'))
+    
+    action = request.form.get('action')
+    
+    if action == 'add':
+        existing = Client.query.filter_by(name=request.form['name']).first()
+        if not existing:
+            db.session.add(Client(name=request.form['name']))
+            flash('Cliente añadido a la base de datos.', 'success')
+        else:
+            flash('Este cliente ya existe.', 'warning')
+            
+    elif action == 'edit':
+        client = Client.query.get(request.form['client_id'])
+        if client:
+            client.name = request.form['name']
+            flash('Nombre de cliente actualizado.', 'success')
+            
+    elif action == 'delete':
+        Client.query.filter_by(id=request.form['client_id']).delete()
+        flash('Cliente eliminado.', 'warning')
+        
+    db.session.commit()
+    return redirect(url_for('dashboard'))
+
+# --- API BUSQUEDA CLIENTES (AUTOCOMPLETE) ---
+@app.route('/api/clients_search')
+@login_required
+def search_clients():
+    query = request.args.get('q', '')
+    if len(query) < 2:
+        return jsonify([])
+    
+    # Busca clientes que contengan el texto, ordenados alfabéticamente
+    results = Client.query.filter(Client.name.ilike(f'%{query}%')).order_by(Client.name).limit(10).all()
+    return jsonify([{'name': c.name} for c in results])
 
 # --- VISUALIZAR PARTE (IMPRIMIR) ---
 @app.route('/print_report/<int:task_id>')
@@ -373,12 +413,27 @@ def logout():
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
+        # Inicializar usuarios
         if not User.query.filter_by(username='admin').first():
             db.session.add(User(username='admin', role='admin', password_hash=generate_password_hash('admin123')))
         if not User.query.filter_by(username='tech').first():
             db.session.add(User(username='tech', role='tech', password_hash=generate_password_hash('tech123')))
+        
+        # Inicializar Stock
         if not Stock.query.first():
             db.session.add(Stock(name='Toner Genérico', category='Consumible', quantity=10))
+            db.session.add(Stock(name='Fusor HP 4000', category='Pieza', quantity=2))
+        
+        # Inicializar Clientes de Prueba
+        if not Client.query.first():
+            sample_clients = [
+                'Oficinas Centrales Bankia', 'Talleres Manolo S.L.', 'Colegio San José', 
+                'Hospital General', 'Gestoría López', 'Restaurante El Puerto', 
+                'Inmobiliaria Sol', 'Centro Deportivo Municipal', 'Librería Cervantes'
+            ]
+            for c in sample_clients:
+                db.session.add(Client(name=c))
+                
         db.session.commit()
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
