@@ -26,6 +26,13 @@
         .btn-osla { background: var(--osla-orange); color: white; border: none; font-weight: bold; padding: 12px; width: 100%; border-radius: 8px; font-size: 1.1rem; }
         #calendar { background: #fff; color: #333; padding: 10px; border-radius: 10px; }
         
+        /* Task List Styles */
+        .task-list-container { max-height: 600px; overflow-y: auto; }
+        .task-item { background: #1f1f1f; border-left: 4px solid #444; padding: 10px; margin-bottom: 10px; border-radius: 4px; transition: all 0.2s; }
+        .task-item:hover { background: #2a2a2a; }
+        .task-item.status-Completado { border-left-color: #198754; opacity: 0.7; }
+        .task-item.status-Pendiente { border-left-color: var(--osla-orange); }
+
         /* Autocomplete Styles */
         .suggestions-list {
             position: absolute;
@@ -40,7 +47,6 @@
             z-index: 1050;
             display: none;
         }
-        /* FIX: Asegurar color blanco para legibilidad */
         .suggestion-item {
             padding: 10px 15px;
             cursor: pointer;
@@ -69,7 +75,7 @@
     </div>
 </nav>
 
-<div class="container" style="max-width: 900px;">
+<div class="container-fluid px-3 px-md-5">
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}{% for category, message in messages %}
           <div class="alert alert-{{ category }} alert-dismissible fade show bg-dark text-white border-secondary">
@@ -78,7 +84,7 @@
       {% endfor %}{% endif %}
     {% endwith %}
 
-    <div id="home-menu" class="row g-3 justify-content-center">
+    <div id="home-menu" class="row g-3 justify-content-center" style="max-width: 900px; margin: auto;">
         <div class="col-12 col-md-6" onclick="showSection('section-parte')">
             <div class="menu-card">
                 <i class="bi bi-clipboard-check-fill fs-1 text-warning mb-2 d-block"></i>
@@ -95,7 +101,7 @@
         </div>
     </div>
 
-    <div id="section-parte" class="d-none">
+    <div id="section-parte" class="d-none" style="max-width: 900px; margin: auto;">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h3 class="text-warning fw-bold m-0 fs-4">Parte de Trabajo</h3>
             <button class="btn btn-outline-secondary btn-sm px-3" onclick="showSection('home-menu')">Atrás</button>
@@ -181,13 +187,43 @@
 
     <div id="section-agenda" class="d-none">
         <div class="d-flex justify-content-between mb-3 align-items-center">
-            <h3 class="text-white fs-4 m-0">Calendario</h3>
+            <h3 class="text-white fs-4 m-0">Calendario & Tareas</h3>
             <div>
                 <button class="btn btn-primary btn-sm me-1" onclick="openCitaModal('{{ today_date }}')"><i class="bi bi-plus-lg"></i> Cita</button>
                 <button class="btn btn-outline-secondary btn-sm" onclick="showSection('home-menu')">Atrás</button>
             </div>
         </div>
-        <div id="calendar"></div>
+        
+        <div class="row g-3">
+            <div class="col-lg-8">
+                <div id="calendar"></div>
+            </div>
+            
+            <div class="col-lg-4">
+                <div class="bg-dark border border-secondary rounded p-3 h-100">
+                    <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
+                        <h5 class="m-0 text-white">Lista de Tareas</h5>
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-outline-light dropdown-toggle" type="button" data-bs-toggle="dropdown">Ordenar</button>
+                            <ul class="dropdown-menu dropdown-menu-dark">
+                                <li><a class="dropdown-item" href="#" onclick="sortTasks('date')">Por Fecha</a></li>
+                                <li><a class="dropdown-item" href="#" onclick="sortTasks('alpha')">Alfabéticamente</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2 mb-3">
+                         <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="toggleCompleted" onchange="renderTaskListFromCache()">
+                            <label class="form-check-label small" for="toggleCompleted">Mostrar Terminadas</label>
+                        </div>
+                    </div>
+
+                    <div id="taskList" class="task-list-container">
+                        <div class="text-center text-muted py-3">Cargando tareas...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -240,7 +276,6 @@
     </div>
 </div>
 
-
 <div class="modal fade" id="modalEditAppointmentTech" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <form action="/edit_appointment/0" method="POST" id="formEditApptTech" class="modal-content bg-dark border-warning text-white">
@@ -273,11 +308,15 @@
     let calendar;
     const modalCita = new bootstrap.Modal(document.getElementById('modalCita'));
     const modalAction = new bootstrap.Modal(document.getElementById('modalEventAction'));
+    
+    // Almacén local de tareas para la lista
+    let cachedTasks = [];
+    let currentSort = 'date'; // 'date' | 'alpha'
 
     function showSection(id) {
         ['home-menu', 'section-parte', 'section-agenda'].forEach(el => document.getElementById(el).classList.add('d-none'));
         document.getElementById(id).classList.remove('d-none');
-        if(id === 'section-agenda') setTimeout(() => { if(!calendar) initCalendar(); else calendar.render(); }, 150);
+        if(id === 'section-agenda') setTimeout(() => { if(!calendar) initCalendar(); else { calendar.refetchEvents(); calendar.render(); } }, 150);
     }
 
     function fillFromTask(select) {
@@ -303,7 +342,17 @@
             },
             height: isMobile ? 'auto' : 600,
             contentHeight: 'auto',
-            events: '/api/tasks', 
+            
+            // Obtener eventos y actualizar lista lateral
+            events: function(info, successCallback, failureCallback) {
+                fetch('/api/tasks')
+                    .then(response => response.json())
+                    .then(data => {
+                        cachedTasks = data; // Guardamos para la lista
+                        renderTaskListFromCache(); // Renderizamos la lista
+                        successCallback(data); // Renderizamos calendario
+                    });
+            },
             
             dateClick: function(info) { openCitaModal(info.dateStr); },
             
@@ -316,7 +365,6 @@
                 
                 const statusSpan = document.getElementById('evtStatus');
                 statusSpan.innerText = props.status;
-                
                 const btnComplete = document.getElementById('btnComplete');
                 
                 if(props.status === 'Completado') {
@@ -326,11 +374,90 @@
                     statusSpan.className = 'badge bg-primary';
                     btnComplete.style.display = 'inline-block';
                 }
-                
                 modalAction.show();
             }
         });
         calendar.render();
+    }
+
+    // --- LÓGICA DE LISTA DE TAREAS ---
+    function sortTasks(criteria) {
+        currentSort = criteria;
+        renderTaskListFromCache();
+    }
+
+    function renderTaskListFromCache() {
+        const container = document.getElementById('taskList');
+        const showCompleted = document.getElementById('toggleCompleted').checked;
+        
+        // 1. Filtrar
+        let filtered = cachedTasks.filter(t => {
+            if(showCompleted) return true;
+            return t.extendedProps.status !== 'Completado';
+        });
+
+        // 2. Ordenar
+        filtered.sort((a, b) => {
+            if (currentSort === 'alpha') {
+                return a.title.localeCompare(b.title);
+            } else {
+                return new Date(a.start) - new Date(b.start);
+            }
+        });
+
+        // 3. Renderizar HTML
+        container.innerHTML = '';
+        if(filtered.length === 0) {
+            container.innerHTML = '<div class="text-muted text-center py-3">No hay tareas pendientes.</div>';
+            return;
+        }
+
+        filtered.forEach(t => {
+            const isDone = t.extendedProps.status === 'Completado';
+            const dateStr = t.start.split('T')[0];
+            const timeStr = t.start.includes('T') ? t.start.split('T')[1].substring(0,5) : '';
+            
+            const div = document.createElement('div');
+            div.className = `task-item status-${t.extendedProps.status} d-flex justify-content-between align-items-center`;
+            div.innerHTML = `
+                <div style="cursor:pointer;" onclick="focusCalendarEvent('${t.id}')">
+                    <div class="fw-bold text-white">${t.extendedProps.client}</div>
+                    <div class="small text-secondary">
+                        <i class="bi bi-calendar-event me-1"></i>${dateStr} ${timeStr ? '| '+timeStr : ''}
+                        <br>
+                        <span class="badge ${isDone ? 'bg-success' : 'bg-warning text-dark'}">${t.extendedProps.status}</span>
+                    </div>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-secondary" onclick="openEditFromList('${t.id}')"><i class="bi bi-pencil"></i></button>
+                    ${isDone ? `<button class="btn btn-sm btn-outline-danger" onclick="deleteFromList('${t.id}')"><i class="bi bi-trash"></i></button>` : ''}
+                </div>
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    function deleteFromList(id) {
+        if(!confirm('¿Eliminar esta tarea terminada?')) return;
+        fetch(`/api/task_action/${id}/delete`, { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+            if(data.success) calendar.refetchEvents(); // Esto recargará lista y calendario
+        });
+    }
+    
+    // Función auxiliar para editar desde la lista
+    function openEditFromList(id) {
+         document.getElementById('evtId').value = id; // Necesario para openEditTechModal
+         openEditTechModal(); // Usa la función existente
+    }
+
+    function focusCalendarEvent(id) {
+        // En móvil quizas ir a fecha?
+        let task = cachedTasks.find(t => t.id == id);
+        if(task) {
+            calendar.gotoDate(task.start);
+        }
     }
 
     function openCitaModal(dateStr) { document.getElementById('modalDateInput').value = dateStr; modalCita.show(); }
@@ -356,7 +483,7 @@
         const input = document.getElementById(inputId);
         const list = document.getElementById(listId);
         
-        if (!input || !list) return; // Safety check
+        if (!input || !list) return;
 
         input.addEventListener('input', function() {
             const val = this.value;
@@ -389,7 +516,6 @@
                 });
         });
 
-        // Ocultar si clic fuera
         document.addEventListener('click', function(e) {
             if(e.target !== input && e.target !== list) {
                 list.style.display = 'none';
@@ -398,8 +524,8 @@
     }
 
     // Activar autocompletado en los campos
-    setupAutocomplete('fieldClient', 'listClient'); // Formulario parte
-    setupAutocomplete('modalFieldClient', 'modalListClient'); // Modal cita
+    setupAutocomplete('fieldClient', 'listClient'); 
+    setupAutocomplete('modalFieldClient', 'modalListClient'); 
 
     // Función para editar cita (Tech)
     function openEditTechModal() {
@@ -416,7 +542,6 @@
                     document.getElementById('formEditApptTech').action = `/edit_appointment/${taskId}`;
                     modalAction.hide();
                     new bootstrap.Modal(document.getElementById('modalEditAppointmentTech')).show();
-                    // Setup autocomplete for edit modal
                     setupAutocomplete('editTechClientInput', 'editTechClientList');
                 }
             });

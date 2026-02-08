@@ -18,7 +18,7 @@
         .nav-link.active { color: var(--osla-orange) !important; background: transparent !important; border-bottom: 3px solid var(--osla-orange) !important; }
         .table-dark { --bs-table-bg: #161616; color: #f1f1f1; border-radius: 10px; overflow: hidden; }
         .card-emp { background: var(--osla-card); border: 1px solid #333; border-radius: 15px; padding: 20px; text-align: center; }
-        #calendarAdmin { background: #fff; color: #000; padding: 10px; border-radius: 10px; min-height: 400px; }
+        #calendarAdmin, #calendarGlobal { background: #fff; color: #000; padding: 10px; border-radius: 10px; min-height: 500px; }
         
         /* Autocomplete Styles */
         .suggestions-list {
@@ -27,14 +27,17 @@
             background: #1f1f1f; border: 1px solid #444; border-radius: 0 0 8px 8px;
             z-index: 1050; display: none;
         }
-        /* FIX: Asegurar color blanco para legibilidad */
         .suggestion-item { padding: 10px 15px; cursor: pointer; border-bottom: 1px solid #333; color: #fff; }
         .suggestion-item:hover { background: var(--osla-orange); color: white; }
 
+        /* Filtros Calendario */
+        .btn-check:checked + .btn-outline-warning { background-color: var(--osla-orange); border-color: var(--osla-orange); color: white; }
+        .filter-group { background: #1f1f1f; padding: 10px; border-radius: 10px; border: 1px solid #333; }
+
         /* Mobile overrides */
         @media(max-width: 768px) {
-            .nav-tabs { display: flex; justify-content: space-around; }
-            .nav-item { flex: 1; text-align: center; }
+            .nav-tabs { display: flex; justify-content: space-around; flex-wrap: wrap; }
+            .nav-item { flex: 1 1 45%; text-align: center; }
             .fc-header-toolbar { flex-direction: column; font-size: 0.8em; }
         }
     </style>
@@ -56,6 +59,7 @@
 
     <ul class="nav nav-tabs mb-4 border-0 bg-dark sticky-top pt-2" style="top:55px; z-index:900;" role="tablist">
         <li class="nav-item"><button class="nav-link active w-100" data-bs-toggle="tab" data-bs-target="#team">EQUIPO</button></li>
+        <li class="nav-item"><button class="nav-link w-100" data-bs-toggle="tab" data-bs-target="#global-agenda" id="tabGlobalBtn">AGENDA GLOBAL</button></li>
         <li class="nav-item"><button class="nav-link w-100" data-bs-toggle="tab" data-bs-target="#data">INFORMES</button></li>
         <li class="nav-item"><button class="nav-link w-100" data-bs-toggle="tab" data-bs-target="#stock">STOCK</button></li>
         <li class="nav-item"><button class="nav-link w-100" data-bs-toggle="tab" data-bs-target="#clients">CLIENTES</button></li>
@@ -78,6 +82,31 @@
                 </div>
                 {% else %}<div class="col-12 text-center py-5 text-muted">No hay técnicos registrados.</div>{% endfor %}
             </div>
+        </div>
+
+        <div class="tab-pane fade" id="global-agenda">
+            <div class="filter-group mb-3 d-flex gap-2 flex-wrap align-items-center justify-content-center">
+                <span class="text-white fw-bold me-2 small">FILTRAR TIPO:</span>
+                
+                <input type="checkbox" class="btn-check filter-cb" id="f-rev" value="Revisión" checked onchange="updateGlobalFilters()">
+                <label class="btn btn-sm btn-outline-warning rounded-pill px-3" for="f-rev">Revisión</label>
+                
+                <input type="checkbox" class="btn-check filter-cb" id="f-inst" value="Instalación" checked onchange="updateGlobalFilters()">
+                <label class="btn btn-sm btn-outline-warning rounded-pill px-3" for="f-inst">Instalación</label>
+                
+                <input type="checkbox" class="btn-check filter-cb" id="f-urg" value="Urgencia" checked onchange="updateGlobalFilters()">
+                <label class="btn btn-sm btn-outline-warning rounded-pill px-3" for="f-urg">Urgencia</label>
+                
+                <input type="checkbox" class="btn-check filter-cb" id="f-ave" value="Avería" checked onchange="updateGlobalFilters()">
+                <label class="btn btn-sm btn-outline-warning rounded-pill px-3" for="f-ave">Avería</label>
+                
+                <input type="checkbox" class="btn-check filter-cb" id="f-mant" value="Mantenimiento" checked onchange="updateGlobalFilters()">
+                <label class="btn btn-sm btn-outline-warning rounded-pill px-3" for="f-mant">Mantenimiento</label>
+                
+                <input type="checkbox" class="btn-check filter-cb" id="f-otro" value="Otro" checked onchange="updateGlobalFilters()">
+                <label class="btn btn-sm btn-outline-warning rounded-pill px-3" for="f-otro">Otro</label>
+            </div>
+            <div id="calendarGlobal"></div>
         </div>
 
         <div class="tab-pane fade" id="data">
@@ -217,7 +246,7 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content bg-dark border-secondary text-white">
             <div class="modal-header border-0 pb-0">
-                <h5 class="modal-title">Gestionar Cita</h5>
+                <h5 class="modal-title">Gestionar Cita <span id="evtTechBadge" class="badge bg-secondary ms-2" style="font-size:0.6em"></span></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
@@ -225,6 +254,10 @@
                 <span id="evtStatus" class="badge mb-3"></span>
                 <p class="small text-muted border p-2 rounded border-secondary bg-black" id="evtDesc"></p>
                 <input type="hidden" id="evtId">
+                
+                <div id="btnViewReportContainer" class="mt-3 text-center d-none">
+                    <a href="#" id="btnViewReport" target="_blank" class="btn btn-light btn-sm w-100"><i class="bi bi-file-earmark-pdf text-danger"></i> Ver Informe PDF</a>
+                </div>
             </div>
             <div class="modal-footer border-0 pt-0">
                 <button type="button" class="btn btn-outline-warning btn-sm" onclick="openEditAdminModal()">Editar</button>
@@ -349,8 +382,49 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
     let calendar;
+    let calendarGlobalInstance;
     const modalActionAdmin = new bootstrap.Modal(document.getElementById('modalEventActionAdmin'));
 
+    // --- FUNCIÓN COMÚN PARA CLIC EN EVENTO (PARA AMBOS CALENDARIOS) ---
+    function handleEventClick(info) {
+        const props = info.event.extendedProps;
+        document.getElementById('evtId').value = info.event.id;
+        document.getElementById('evtClient').innerText = props.client;
+        document.getElementById('evtDesc').innerText = props.desc;
+        
+        // Mostrar técnico si existe (Agenda Global)
+        const techBadge = document.getElementById('evtTechBadge');
+        if(props.tech_name) {
+            techBadge.innerText = props.tech_name;
+            techBadge.style.display = 'inline-block';
+        } else {
+            techBadge.style.display = 'none';
+        }
+
+        const statusSpan = document.getElementById('evtStatus');
+        statusSpan.innerText = props.status;
+        const btnComplete = document.getElementById('btnCompleteAdmin');
+        
+        // Lógica de Informe PDF
+        const btnReportContainer = document.getElementById('btnViewReportContainer');
+        const btnReport = document.getElementById('btnViewReport');
+
+        if(props.status === 'Completado') {
+            statusSpan.className = 'badge bg-success';
+            btnComplete.style.display = 'none';
+            
+            // Mostrar enlace al informe
+            btnReportContainer.classList.remove('d-none');
+            btnReport.href = `/print_report/${info.event.id}`;
+        } else {
+            statusSpan.className = 'badge bg-primary';
+            btnComplete.style.display = 'inline-block';
+            btnReportContainer.classList.add('d-none');
+        }
+        modalActionAdmin.show();
+    }
+
+    // --- AGENDA INDIVIDUAL ---
     function verAgenda(id, name) {
         document.getElementById('techName').innerText = name.toUpperCase();
         document.getElementById('formTechId').value = id;
@@ -375,38 +449,77 @@
                 
                 dateClick: function(info) {
                     const dateInput = document.querySelector('#modalCale input[name="date"]');
-                    if(dateInput) {
-                        dateInput.value = info.dateStr;
-                    }
+                    if(dateInput) dateInput.value = info.dateStr;
                 },
                 
-                eventClick: function(info) {
-                    const props = info.event.extendedProps;
-                    document.getElementById('evtId').value = info.event.id;
-                    document.getElementById('evtClient').innerText = props.client;
-                    document.getElementById('evtDesc').innerText = props.desc;
-                    
-                    const statusSpan = document.getElementById('evtStatus');
-                    statusSpan.innerText = props.status;
-                    const btnComplete = document.getElementById('btnCompleteAdmin');
-                    
-                    if(props.status === 'Completado') {
-                        statusSpan.className = 'badge bg-success';
-                        btnComplete.style.display = 'none';
-                    } else {
-                        statusSpan.className = 'badge bg-primary';
-                        btnComplete.style.display = 'inline-block';
-                    }
-                    modalActionAdmin.show();
-                }
+                eventClick: handleEventClick
             });
             calendar.render();
-            
             setupAutocomplete('adminClientInput', 'adminClientList');
 
         }, { once: true });
     }
     
+    // --- AGENDA GLOBAL ---
+    // Inicializar cuando se muestra la pestaña
+    document.getElementById('tabGlobalBtn').addEventListener('shown.bs.tab', function() {
+        if(calendarGlobalInstance) {
+            calendarGlobalInstance.render();
+            return;
+        }
+
+        var calendarEl = document.getElementById('calendarGlobal');
+        var isMobile = window.innerWidth < 768;
+
+        calendarGlobalInstance = new FullCalendar.Calendar(calendarEl, {
+            initialView: isMobile ? 'listWeek' : 'dayGridMonth',
+            locale: 'es',
+            headerToolbar: { 
+                left: 'prev,next', 
+                center: 'title', 
+                right: 'dayGridMonth,timeGridWeek,listWeek' 
+            },
+            height: 'auto',
+            events: '/api/admin/all_tasks',
+            
+            // Renderizado personalizado para mostrar nombre del técnico
+            eventContent: function(arg) {
+                let techName = arg.event.extendedProps.tech_name || '';
+                let title = arg.event.title;
+                return { html: `<div class="fc-content overflow-hidden text-truncate"><small class="fw-bold bg-dark text-warning px-1 rounded me-1">${techName}</small> ${title}</div>` };
+            },
+
+            // Lógica de filtrado en renderizado
+            eventDidMount: function(info) {
+                const type = info.event.extendedProps.service_type;
+                if (!isTypeActive(type)) {
+                    info.el.style.display = 'none';
+                }
+            },
+
+            eventClick: handleEventClick
+        });
+        calendarGlobalInstance.render();
+    });
+
+    // Lógica de Filtros
+    function isTypeActive(type) {
+        // Mapear el tipo del evento a los checkboxes
+        // (Asumimos que el valor del checkbox coincide con el texto del servicio)
+        const checkboxes = document.querySelectorAll('.filter-cb');
+        for (let cb of checkboxes) {
+            if (cb.value === type) return cb.checked;
+        }
+        return true; // Si no hay filtro específico, mostrar
+    }
+
+    function updateGlobalFilters() {
+        if(calendarGlobalInstance) {
+            // Forzar re-renderizado de eventos para aplicar el display:none
+            calendarGlobalInstance.render(); 
+        }
+    }
+
     function performAdminTaskAction(action) {
         const id = document.getElementById('evtId').value;
         if(!confirm('¿Confirmar acción administrativa?')) return;
@@ -415,7 +528,8 @@
         .then(res => res.json())
         .then(data => {
             if(data.success) {
-                calendar.refetchEvents();
+                if(calendar) calendar.refetchEvents();
+                if(calendarGlobalInstance) calendarGlobalInstance.refetchEvents();
                 modalActionAdmin.hide();
             } else {
                 alert('Error: ' + data.msg);
@@ -423,6 +537,7 @@
         });
     }
 
+    // Funciones Helper (Stock, Clientes, Autocomplete) - Mantenidas
     function ajustarStock(id, name) {
         document.getElementById('adjId').value = id;
         document.getElementById('adjName').innerText = name;
@@ -443,11 +558,9 @@
         new bootstrap.Modal(document.getElementById('modalEditClient')).show();
     }
 
-    // --- AUTOCOMPLETE LOGIC ---
     function setupAutocomplete(inputId, listId) {
         const input = document.getElementById(inputId);
         const list = document.getElementById(listId);
-        
         if(!input) return;
 
         input.addEventListener('input', function() {
@@ -457,7 +570,6 @@
                 list.style.display = 'none';
                 return;
             }
-            
             fetch(`/api/clients_search?q=${encodeURIComponent(val)}`)
                 .then(res => res.json())
                 .then(data => {
@@ -488,14 +600,12 @@
         });
     }
 
-    // Filtro para la tabla de Clientes
     function filterClientsTable() {
         var input, filter, table, tr, td, i, txtValue;
         input = document.getElementById("clientSearchInput");
         filter = input.value.toUpperCase();
         table = document.getElementById("clientsTable");
         tr = table.getElementsByTagName("tr");
-
         for (i = 0; i < tr.length; i++) {
             td = tr[i].getElementsByClassName("client-name-cell")[0];
             if (td) {
@@ -509,7 +619,6 @@
         }
     }
 
-    // Función para editar cita (Admin)
     function openEditAdminModal() {
         const taskId = document.getElementById('evtId').value;
         fetch(`/api/get_task/${taskId}`)
@@ -524,7 +633,6 @@
                     document.getElementById('formEditApptAdmin').action = `/edit_appointment/${taskId}`;
                     modalActionAdmin.hide();
                     new bootstrap.Modal(document.getElementById('modalEditAppointmentAdmin')).show();
-                    // Setup autocomplete for the edit modal
                     setupAutocomplete('editAdminClientInput', 'editAdminClientList');
                 }
             });

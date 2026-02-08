@@ -493,11 +493,24 @@ def get_admin_tasks(user_id):
     tasks = Task.query.filter_by(tech_id=user_id).all()
     return format_events(tasks)
 
+# Nueva ruta para el calendario general
+@app.route('/api/admin/all_tasks')
+@login_required
+def get_all_admin_tasks():
+    if current_user.role != 'admin':
+        return jsonify([])
+    tasks = Task.query.all()
+    return format_events(tasks)
+
 def format_events(tasks):
     events = []
     for t in tasks:
         color = '#28a745' if t.status == 'Completado' else '#0d6efd'
+        # Mostramos el nombre del cliente y el tipo
         title = f"{t.client_name} ({t.service_type})"
+        
+        # Para el admin, puede ser útil saber quién es el técnico en el título si no se usa extendedProps
+        # Pero lo mandaremos en extendedProps para renderizarlo mejor
         
         events.append({
             'id': t.id,
@@ -508,7 +521,9 @@ def format_events(tasks):
             'extendedProps': {
                 'status': t.status,
                 'client': t.client_name,
-                'desc': t.description
+                'desc': t.description,
+                'tech_name': t.tech.username.upper(),
+                'service_type': t.service_type # Para filtrado
             }
         })
     return jsonify(events)
