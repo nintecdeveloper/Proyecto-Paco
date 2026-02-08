@@ -493,7 +493,7 @@ def print_report(task_id):
             </div>
             <div class="col-6">
                 <div class="label">TÉCNICO</div>
-                <div class="value">{task.tech.username.upper()}</div>
+                <div class="value">{task.tech.username.upper() if task.tech else 'SIN TÉCNICO'}</div>
             </div>
         </div>
         
@@ -556,32 +556,29 @@ def get_all_admin_tasks():
     return format_events(tasks)
 
 def format_events(tasks):
-    # Cargar tipos de la BD y mapear nombre -> color
     all_types = ServiceType.query.all()
     type_colors = {s.name: s.color for s in all_types}
-    
+
     events = []
     for t in tasks:
-        # Asignar color según el tipo en BD, por defecto Gris (#6c757d)
-        color = type_colors.get(t.service_type, '#6c757d')
-        
-        title = f"{t.client_name} ({t.service_type})"
-        
+        start = f"{t.date}T{t.start_time}" if t.start_time else str(t.date)
+
         events.append({
             'id': t.id,
-            'title': title,
-            'start': f"{t.date}T{t.start_time}" if t.start_time else str(t.date),
-            'color': color,
+            'title': f"{t.client_name} ({t.service_type})",
+            'start': start,
+            'color': type_colors.get(t.service_type, '#6c757d'),
             'allDay': False if t.start_time else True,
             'extendedProps': {
                 'status': t.status,
                 'client': t.client_name,
                 'desc': t.description,
-                'tech_name': t.tech.username.upper(),
+                'tech_name': t.tech.username.upper() if t.tech else 'SIN TÉCNICO',
                 'service_type': t.service_type
             }
         })
     return jsonify(events)
+
 
 @app.route('/logout')
 def logout():
