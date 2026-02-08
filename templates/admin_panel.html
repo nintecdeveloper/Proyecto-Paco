@@ -204,81 +204,99 @@
                         <i class="bi bi-person-plus-fill me-1"></i> Nuevo Usuario
                     </button>
                 </div>
+
                 <div class="row g-3">
-                    {% for emp in empleados %}
-                    <div class="col-12 col-md-4">
-                        <div class="card-emp shadow-sm">
-                            <form action="/manage_users" method="POST" class="d-inline" onsubmit="return confirm('¿Eliminar usuario y todos sus datos asignados?');">
-                                <input type="hidden" name="action" value="delete">
-                                <input type="hidden" name="user_id" value="{{ emp.id }}">
-                                <button type="submit" class="btn-delete-user" title="Eliminar Usuario"><i class="bi bi-trash-fill"></i></button>
-                            </form>
-                            
-                            <div class="d-flex align-items-center justify-content-center gap-3 mb-3">
-                                <i class="bi bi-person-badge-fill fs-1 text-warning"></i>
-                                <h4 class="fw-bold text-white m-0">{{ emp.username|upper }}</h4>
-                            </div>
-                            <button class="btn btn-outline-warning w-100 py-2"
-                                onclick="verAgenda('{{ emp.id }}', '{{ emp.username }}')">
-                                <i class="bi bi-calendar3 me-2"></i>Gestionar Agenda
+                    {% for u in empleados %}
+                    <div class="col-12 col-sm-6 col-md-4">
+                        <div class="card-emp">
+                            <button class="btn-delete-user" 
+                                data-bs-toggle="modal"
+                                data-user-id="{{ u.id }}"
+                                onclick="document.getElementById('deleteUserId').value=this.dataset.userId;"
+                                data-bs-target="#modalDeleteUser"><i class="bi bi-x-circle-fill fs-4"></i></button>
+                            <i class="bi bi-person-circle fs-1 mb-2 text-warning"></i>
+                            <h5 class="mb-1 text-white fw-bold">{{ u.username }}</h5>
+                            <small class="text-muted">ID: #{{ u.id }}</small>
+                            <hr class="my-3" style="border-color:#333;">
+                            <button class="btn btn-sm btn-primary w-100" 
+                                data-user-id="{{ u.id }}"
+                                onclick="loadEmployeeCalendar(this.dataset.userId)">
+                                <i class="bi bi-calendar-check-fill me-1"></i> Ver Calendario
                             </button>
                         </div>
                     </div>
-                    {% else %}<div class="col-12 text-center py-5 text-muted">No hay técnicos registrados.</div>{%
-                    endfor %}
+                    {% endfor %}
+                </div>
+
+                <div id="calendarAdminContainer" class="mt-4" style="display:none;">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="text-white fw-bold m-0" id="empCalendarTitle">Calendario de Empleado</h5>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="closeEmployeeCalendar()">
+                            <i class="bi bi-x-circle me-1"></i> Cerrar
+                        </button>
+                    </div>
+                    <div id="calendarAdmin"></div>
                 </div>
             </div>
 
             <div class="tab-pane fade" id="global-agenda">
-                <div class="filter-group mb-3">
-                    <div class="d-flex gap-2 flex-wrap align-items-center justify-content-center">
-                        <span class="text-white fw-bold me-2 small">FILTRAR TAREAS:</span>
-                        
-                        <button class="btn btn-sm btn-light fw-bold px-3 rounded-pill" onclick="checkAllFilters()">
-                            <i class="bi bi-check-all me-1"></i>TODAS
-                        </button>
-                        <div class="vr bg-secondary mx-2"></div>
+                <div class="d-flex justify-content-between mb-3 align-items-center flex-wrap">
+                    <h4 class="fw-bold text-white fs-5 m-0">Agenda Global de Tareas</h4>
+                    <button class="btn btn-warning btn-sm fw-bold" data-bs-toggle="modal"
+                        data-bs-target="#modalScheduleAppointment">
+                        <i class="bi bi-calendar-plus-fill me-1"></i> Nueva Cita
+                    </button>
+                </div>
 
-                        {% for s in all_service_types %}
-                        <input type="checkbox" class="btn-check filter-cb" id="f-{{s.id}}" value="{{ s.name }}" checked
-                            onchange="updateGlobalFilters()">
-                        <label class="btn btn-sm btn-outline-custom rounded-pill px-3" for="f-{{s.id}}"
-                            style="--bg-color: {{ s.color|default('#6c757d') }}; background-color: var(--bg-color); border-color: var(--bg-color); color: white;">
-                            {{ s.name }}
+                <!-- FILTROS DINÁMICOS POR TIPO -->
+                <div class="filter-group mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <small class="text-muted fw-bold">FILTRAR POR TIPO</small>
+                        <button class="btn btn-outline-light btn-sm" onclick="checkAllFilters()">
+                            <i class="bi bi-check-all me-1"></i> Todos
+                        </button>
+                    </div>
+                    <div class="btn-group-sm d-flex flex-wrap gap-2" role="group">
+                        {% for svc in all_service_types %}
+                        <input type="checkbox" class="btn-check filter-cb" id="filter-{{ svc.id }}" value="{{ svc.name }}" checked onchange="updateGlobalFilters()">
+                        <label class="btn btn-outline-custom flex-grow-1" for="filter-{{ svc.id }}" data-color="{{ svc.color }}">
+                            {{ svc.name }}
                         </label>
                         {% endfor %}
                     </div>
                 </div>
+
                 <div id="calendarGlobal"></div>
             </div>
 
             <div class="tab-pane fade" id="data">
+                <h4 class="fw-bold text-white fs-5 mb-3">Informes Técnicos Completados</h4>
                 <div class="table-responsive">
-                    <table class="table table-dark table-hover align-middle small text-nowrap">
+                    <table class="table table-dark table-sm">
                         <thead>
                             <tr>
+                                <th>ID</th>
+                                <th>Cliente</th>
+                                <th>Servicio</th>
                                 <th>Fecha</th>
                                 <th>Técnico</th>
-                                <th>Cliente</th>
-                                <th>Detalles</th>
                                 <th>Acción</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {% for inf in informes %}
+                            {% for r in informes %}
                             <tr>
-                                <td>{{ inf.date.strftime('%d/%m') }}</td>
-                                <td class="text-white fw-bold">{{ inf.tech.username }}</td>
+                                <td>{{ r.id }}</td>
+                                <td>{{ r.client_name }}</td>
+                                <td>{{ r.service_type }}</td>
+                                <td>{{ r.date.strftime('%d/%m/%Y') }}</td>
+                                <td>{{ r.tech.username if r.tech else 'Sin técnico' }}</td>
                                 <td>
-                                    <div class="fw-bold text-warning text-truncate" style="max-width: 120px;">{{
-                                        inf.client_name }}</div>
-                                    <small class="d-block">{{ inf.service_type }}</small>
+                                    <a href="/print_report/{{ r.id }}" target="_blank"
+                                        class="btn btn-sm btn-outline-warning">
+                                        <i class="bi bi-printer-fill"></i>
+                                    </a>
                                 </td>
-                                <td>
-                                    <div class="text-truncate" style="max-width: 150px;">{{ inf.description }}</div>
-                                </td>
-                                <td><a href="/print_report/{{ inf.id }}" target="_blank" class="btn btn-sm btn-light"><i
-                                            class="bi bi-printer"></i></a></td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -288,41 +306,55 @@
 
             <div class="tab-pane fade" id="stock">
                 <div class="d-flex justify-content-between mb-3 align-items-center">
-                    <h4 class="fw-bold text-white fs-5 m-0">Inventario</h4>
-                    <button class="btn btn-success btn-sm px-3" data-bs-toggle="modal"
-                        data-bs-target="#modalAddStock"><i class="bi bi-plus-lg"></i> Item</button>
+                    <h4 class="fw-bold text-white fs-5 m-0">Gestión de Inventario</h4>
+                    <button class="btn btn-warning btn-sm fw-bold" data-bs-toggle="modal"
+                        data-bs-target="#modalAddStock">
+                        <i class="bi bi-plus-circle-fill me-1"></i> Nuevo Artículo
+                    </button>
                 </div>
+
                 <div class="table-responsive">
-                    <table class="table table-dark table-hover align-middle small">
+                    <table class="table table-dark table-sm">
                         <thead>
                             <tr>
-                                <th>Item</th>
-                                <th class="d-none d-sm-table-cell">Cat.</th>
-                                <th class="text-center">Cant.</th>
-                                <th class="text-end">Gestión</th>
+                                <th>Artículo</th>
+                                <th>Categoría</th>
+                                <th>Cantidad</th>
+                                <th>Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {% for item in inventory %}
+                            {% for i in inventory %}
                             <tr>
+                                <td>{{ i.name }}</td>
+                                <td>{{ i.category }}</td>
                                 <td>
-                                    <div class="fw-bold text-white">{{ item.name }}</div>
-                                    <small class="d-block d-sm-none text-muted">{{ item.category }}</small>
+                                    <span class="badge {% if i.quantity < 5 %}bg-danger{% else %}bg-success{% endif %}">
+                                        {{ i.quantity }}
+                                    </span>
                                 </td>
-                                <td class="d-none d-sm-table-cell">{{ item.category }}</td>
-                                <td class="text-center fs-5 text-warning">{{ item.quantity }}</td>
-                                <td class="text-end">
-                                    <button class="btn btn-sm btn-outline-warning mb-1"
-                                        onclick="openEditStockModal('{{item.id}}', '{{item.name}}', '{{item.category}}', '{{item.quantity}}')">
+                                <td>
+                                    <button class="btn btn-sm btn-outline-info"
+                                        data-item-id="{{ i.id }}"
+                                        data-item-name="{{ i.name }}"
+                                        onclick="ajustarStock(this.dataset.itemId, this.dataset.itemName)">
+                                        <i class="bi bi-arrow-repeat"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-warning"
+                                        data-item-id="{{ i.id }}"
+                                        data-item-name="{{ i.name }}"
+                                        data-item-category="{{ i.category }}"
+                                        data-item-quantity="{{ i.quantity }}"
+                                        onclick="openEditStockModal(this.dataset.itemId, this.dataset.itemName, this.dataset.itemCategory, this.dataset.itemQuantity)">
                                         <i class="bi bi-pencil-fill"></i>
                                     </button>
-                                    <button class="btn btn-sm btn-outline-light mb-1"
-                                        onclick="ajustarStock('{{ item.id }}', '{{ item.name }}')">+/-</button>
-                                    <form action="/manage_stock" method="POST" class="d-inline">
+                                    <form method="POST" action="/manage_stock" class="d-inline">
                                         <input type="hidden" name="action" value="delete">
-                                        <input type="hidden" name="item_id" value="{{ item.id }}">
-                                        <button class="btn btn-sm btn-outline-danger ms-1 mb-1"><i
-                                                class="bi bi-trash"></i></button>
+                                        <input type="hidden" name="item_id" value="{{ i.id }}">
+                                        <button class="btn btn-sm btn-outline-danger"
+                                            onclick="return confirm('¿Eliminar este artículo?')">
+                                            <i class="bi bi-trash-fill"></i>
+                                        </button>
                                     </form>
                                 </td>
                             </tr>
@@ -334,44 +366,53 @@
 
             <div class="tab-pane fade" id="clients">
                 <div class="d-flex justify-content-between mb-3 align-items-center flex-wrap gap-2">
-                    <h4 class="fw-bold text-white fs-5 m-0">Cartera Clientes</h4>
+                    <h4 class="fw-bold text-white fs-5 m-0">Gestión de Clientes</h4>
                     <div class="d-flex gap-2">
-                        <a href="/export_clients" class="btn btn-success btn-sm"><i class="bi bi-download"></i>
-                            Exportar</a>
-                        <button class="btn btn-info btn-sm" data-bs-toggle="modal"
-                            data-bs-target="#modalImportClients"><i class="bi bi-upload"></i> Importar</button>
-                        <button class="btn btn-primary btn-sm px-3" data-bs-toggle="modal"
-                            data-bs-target="#modalAddClient"><i class="bi bi-person-plus-fill"></i> Nuevo</button>
+                        <button class="btn btn-warning btn-sm fw-bold" data-bs-toggle="modal"
+                            data-bs-target="#modalAddClient">
+                            <i class="bi bi-person-plus-fill me-1"></i> Nuevo Cliente
+                        </button>
+                        <a href="/export_clients" class="btn btn-outline-success btn-sm">
+                            <i class="bi bi-download me-1"></i> Exportar
+                        </a>
+                        <button class="btn btn-outline-info btn-sm" data-bs-toggle="modal"
+                            data-bs-target="#modalImportClients">
+                            <i class="bi bi-upload me-1"></i> Importar
+                        </button>
                     </div>
                 </div>
-                <div class="mb-3">
-                    <input type="text" id="clientSearchInput" class="form-control bg-dark text-white border-secondary"
-                        placeholder="Buscar cliente en la lista..." onkeyup="filterClientsTable()">
-                </div>
+
+                <input type="text" id="clientSearchInput" class="form-control mb-3"
+                    placeholder="🔍 Buscar cliente..." onkeyup="filterClientsTable()">
 
                 <div class="table-responsive">
-                    <table class="table table-dark table-hover align-middle small" id="clientsTable">
+                    <table class="table table-dark table-sm" id="clientsTable">
                         <thead>
                             <tr>
-                                <th>Nombre Cliente</th>
-                                <th class="text-end">Acciones</th>
+                                <th>ID</th>
+                                <th>Nombre</th>
+                                <th>Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {% for client in clients %}
+                            {% for c in clients %}
                             <tr>
-                                <td class="fw-bold text-white client-name-cell">{{ client.name }}</td>
-                                <td class="text-end">
-                                    <button class="btn btn-sm btn-outline-warning me-1"
-                                        onclick="openEditClientModal('{{client.id}}', '{{client.name}}')">
+                                <td>{{ c.id }}</td>
+                                <td class="client-name-cell">{{ c.name }}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-warning"
+                                        data-client-id="{{ c.id }}"
+                                        data-client-name="{{ c.name }}"
+                                        onclick="openEditClientModal(this.dataset.clientId, this.dataset.clientName)">
                                         <i class="bi bi-pencil-fill"></i>
                                     </button>
-                                    <form action="/manage_clients" method="POST" class="d-inline">
+                                    <form method="POST" action="/manage_clients" class="d-inline">
                                         <input type="hidden" name="action" value="delete">
-                                        <input type="hidden" name="client_id" value="{{ client.id }}">
+                                        <input type="hidden" name="client_id" value="{{ c.id }}">
                                         <button class="btn btn-sm btn-outline-danger"
-                                            onclick="return confirm('¿Borrar cliente?')"><i
-                                                class="bi bi-trash"></i></button>
+                                            onclick="return confirm('¿Eliminar este cliente?')">
+                                            <i class="bi bi-trash-fill"></i>
+                                        </button>
                                     </form>
                                 </td>
                             </tr>
@@ -382,479 +423,506 @@
             </div>
 
             <div class="tab-pane fade" id="config">
-                <div class="d-flex justify-content-between mb-3 align-items-center">
-                    <h4 class="fw-bold text-white fs-5 m-0">Tipos de Tareas y Servicios</h4>
-                    <button class="btn btn-primary btn-sm px-3" data-bs-toggle="modal"
-                        data-bs-target="#modalAddService"><i class="bi bi-plus-lg"></i> Crear Nuevo</button>
-                </div>
-                <div class="alert alert-dark small text-muted">
-                    <i class="bi bi-info-circle"></i> Estos tipos aparecerán en los desplegables de "Nueva Cita",
-                    "Editar Cita" y en los filtros del calendario.
-                </div>
-                <div class="table-responsive">
-                    <table class="table table-dark table-hover align-middle small">
-                        <thead>
-                            <tr>
-                                <th>Nombre del Servicio</th>
-                                <th>Color Etiqueta</th>
-                                <th class="text-end">Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for s in all_service_types %}
-                            <tr>
-                                <td>
-                                    <span class="badge rounded-pill"
-                                        style="--svc-color: {{ s.color|default('#6c757d') }}; background-color: var(--svc-color); color: white; border: 1px solid rgba(255,255,255,0.2);">
-                                        {{ s.name }}
-                                    </span>
-                                </td>
-                                <td>
-                                    <code class="text-white-50">{{ s.color|default('#6c757d') }}</code>
-                                </td>
-                                <td class="text-end">
-                                    <button class="btn btn-sm btn-outline-light me-1"
-                                        onclick="openEditServiceModal('{{s.id}}', '{{s.name}}', '{{s.color}}')">
-                                        <i class="bi bi-pencil-fill"></i>
-                                    </button>
-                                    <form action="/manage_services" method="POST" class="d-inline">
-                                        <input type="hidden" name="action" value="delete">
-                                        <input type="hidden" name="service_id" value="{{ s.id }}">
-                                        <button class="btn btn-sm btn-outline-danger"
-                                            onclick="return confirm('¿Borrar este tipo de servicio?')"><i
-                                                class="bi bi-trash"></i></button>
-                                    </form>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+                <h4 class="fw-bold text-white fs-5 mb-3">Configuración del Sistema</h4>
 
-        </div>
-    </div>
-
-    <div class="modal fade" id="modalCale" tabindex="-1">
-        <div class="modal-dialog modal-xl modal-fullscreen-lg-down">
-            <div class="modal-content bg-dark border-warning p-0">
-                <div class="modal-header border-bottom border-secondary py-2">
-                    <h6 class="text-white m-0">Agenda: <span id="techName" class="text-warning"></span></h6>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body p-0">
-                    <div class="row g-0">
-                        <div
-                            class="col-lg-8 border-bottom border-lg-end border-secondary p-2 bg-white order-2 order-lg-1">
-                            <div id="calendarAdmin"></div>
-                        </div>
-                        <div class="col-lg-4 p-3 order-1 order-lg-2 bg-dark">
-                            <h5 class="text-warning mb-3">Nueva Cita</h5>
-                            <form action="/schedule_appointment" method="POST">
-                                <input type="hidden" name="tech_id" id="formTechId">
-                                <div class="mb-2 position-relative">
-                                    <input type="text" name="client_name" id="adminClientInput" class="form-control"
-                                        placeholder="Buscar Cliente..." required autocomplete="off">
-                                    <div id="adminClientList" class="suggestions-list"></div>
-                                </div>
-                                <div class="row g-2 mb-2">
-                                    <div class="col-7"><input type="date" name="date" class="form-control" required>
-                                    </div>
-                                    <div class="col-5"><input type="time" name="time" class="form-control"></div>
-                                </div>
-                                <div class="mb-2">
-                                    <select name="service_type" class="form-select">
-                                        {% for s in all_service_types %}
-                                        <option value="{{ s.name }}">{{ s.name }}</option>
-                                        {% endfor %}
-                                    </select>
-                                </div>
-                                <div class="mb-3"><textarea name="notes" class="form-control" rows="2"
-                                        placeholder="Notas..."></textarea></div>
-                                <button type="submit" class="btn btn-warning w-100 fw-bold">AGENDAR</button>
-                            </form>
-                        </div>
+                <div class="card bg-dark text-white p-3 mb-3 border border-secondary">
+                    <h6 class="fw-bold mb-3"><i class="bi bi-wrench-adjustable-circle-fill me-2 text-warning"></i>
+                        Tipos de Servicio</h6>
+                    <button class="btn btn-sm btn-warning mb-3" data-bs-toggle="modal"
+                        data-bs-target="#modalAddService">
+                        <i class="bi bi-plus-circle-fill me-1"></i> Añadir Tipo de Servicio
+                    </button>
+                    <div class="table-responsive">
+                        <table class="table table-dark table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Nombre</th>
+                                    <th>Color</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for s in services %}
+                                <tr>
+                                    <td>{{ s.name }}</td>
+                                    <td><span class="badge service-color-badge" data-bg-color="{{ s.color }}">{{ s.color }}</span></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-warning"
+                                            data-service-id="{{ s.id }}"
+                                            data-service-name="{{ s.name }}"
+                                            data-service-color="{{ s.color }}"
+                                            onclick="openEditServiceModal(this.dataset.serviceId, this.dataset.serviceName, this.dataset.serviceColor)">
+                                            <i class="bi bi-pencil-fill"></i>
+                                        </button>
+                                        <form method="POST" action="/manage_services" class="d-inline">
+                                            <input type="hidden" name="action" value="delete">
+                                            <input type="hidden" name="service_id" value="{{ s.id }}">
+                                            <button class="btn btn-sm btn-outline-danger"
+                                                onclick="return confirm('¿Eliminar este tipo de servicio?')">
+                                                <i class="bi bi-trash-fill"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="modal fade" id="modalEventActionAdmin" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content bg-dark border-secondary text-white">
-                <div class="modal-header border-0 pb-0">
-                    <h5 class="modal-title">Gestionar Cita <span id="evtTechBadge" class="badge bg-secondary ms-2"
-                            style="font-size:0.6em"></span></h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <h5 id="evtClient" class="text-warning fw-bold"></h5>
-                    <span id="evtStatus" class="badge mb-3"></span>
-                    <p class="small text-muted border p-2 rounded border-secondary bg-black" id="evtDesc"></p>
-                    <input type="hidden" id="evtId">
-
-                    <div id="btnViewReportContainer" class="mt-3 text-center d-none">
-                        <a href="#" id="btnViewReport" target="_blank" class="btn btn-light btn-sm w-100"><i
-                                class="bi bi-file-earmark-pdf text-danger"></i> Ver Informe PDF</a>
-                    </div>
-                </div>
-                <div class="modal-footer border-0 pt-0">
-                    <button type="button" class="btn btn-outline-warning btn-sm"
-                        onclick="openEditAdminModal()">Editar</button>
-                    <button type="button" class="btn btn-outline-danger btn-sm"
-                        onclick="performAdminTaskAction('delete')">Eliminar</button>
-                    <button type="button" class="btn btn-success btn-sm" id="btnCompleteAdmin"
-                        onclick="performAdminTaskAction('complete')">Marcar Hecha</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="modal fade" id="modalEditAppointmentAdmin" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
-            <form action="/edit_appointment/0" method="POST" id="formEditApptAdmin"
-                class="modal-content bg-dark border-warning text-white">
-                <div class="modal-header border-0">
-                    <h5>Editar Cita</h5><button type="button" class="btn-close btn-close-white"
-                        data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="mb-3 position-relative">
-                        <label class="form-label">Cliente</label>
-                        <input type="text" name="client_name" id="editAdminClientInput" class="form-control" required
-                            autocomplete="off">
-                        <div id="editAdminClientList" class="suggestions-list"></div>
-                    </div>
-                    <div class="row g-2 mb-3">
-                        <div class="col-7"><label class="form-label">Fecha</label><input type="date" name="date"
-                                id="editAdminDate" class="form-control" required></div>
-                        <div class="col-5"><label class="form-label">Hora</label><input type="time" name="time"
-                                id="editAdminTime" class="form-control"></div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Tipo Servicio</label>
-                        <select name="service_type" id="editAdminService" class="form-select">
-                            {% for s in all_service_types %}
-                            <option value="{{ s.name }}">{{ s.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="mb-3"><label class="form-label">Notas</label><textarea name="notes" id="editAdminNotes"
-                            class="form-control" rows="3"></textarea></div>
-                </div>
-                <div class="modal-footer border-0"><button type="submit" class="btn btn-warning w-100">Guardar
-                        Cambios</button></div>
-            </form>
-        </div>
-    </div>
-
+    <!-- MODALES -->
+    <!-- Modal: Añadir Usuario -->
     <div class="modal fade" id="modalAddUser" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
-            <form action="/manage_users" method="POST" class="modal-content bg-dark border-warning">
-                <div class="modal-header border-0">
-                    <h5 class="text-white">Nuevo Usuario / Técnico</h5><button type="button" class="btn-close btn-close-white"
-                        data-bs-dismiss="modal"></button>
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">Nuevo Usuario</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body">
-                    <input type="hidden" name="action" value="add">
-                    <div class="mb-3">
+                <form method="POST" action="/manage_users">
+                    <div class="modal-body">
+                        <input type="hidden" name="action" value="add">
                         <label class="form-label">Usuario</label>
-                        <input name="username" class="form-control" placeholder="Ej: tecnico1" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Contraseña Inicial</label>
-                        <input name="password" class="form-control" placeholder="Ej: pass123" required>
-                    </div>
-                    <div class="mb-3">
+                        <input type="text" name="username" class="form-control mb-2" required>
+                        <label class="form-label">Contraseña</label>
+                        <input type="password" name="password" class="form-control mb-2" required>
                         <label class="form-label">Rol</label>
-                        <select name="role" class="form-select">
+                        <select name="role" class="form-select" required>
                             <option value="tech">Técnico</option>
-                            <option value="admin">Administrador</option>
+                            <option value="admin">Admin</option>
                         </select>
                     </div>
-                </div>
-                <div class="modal-footer border-0"><button type="submit" class="btn btn-warning w-100">Crear Usuario</button></div>
-            </form>
+                    <div class="modal-footer border-secondary">
+                        <button type="submit" class="btn btn-warning">Crear</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 
-    <div class="modal fade" id="modalChangePassword" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
-            <form action="/change_password" method="POST" class="modal-content bg-dark border-light">
-                <div class="modal-header border-0">
-                    <h5 class="text-white">Cambiar Mi Contraseña</h5><button type="button" class="btn-close btn-close-white"
-                        data-bs-dismiss="modal"></button>
+    <!-- Modal: Eliminar Usuario -->
+    <div class="modal fade" id="modalDeleteUser" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title text-danger">Confirmar Eliminación</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label">Contraseña Actual</label>
-                        <input type="password" name="current_password" class="form-control" required>
+                <form method="POST" action="/manage_users">
+                    <div class="modal-body">
+                        <input type="hidden" name="action" value="delete">
+                        <input type="hidden" name="user_id" id="deleteUserId">
+                        <p>¿Seguro que deseas eliminar este usuario? Todas sus tareas también serán eliminadas.</p>
                     </div>
-                    <div class="mb-3">
+                    <div class="modal-footer border-secondary">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-danger">Eliminar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Cambiar Contraseña -->
+    <div class="modal fade" id="modalChangePassword" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">Cambiar Contraseña</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="/change_password">
+                    <div class="modal-body">
+                        <label class="form-label">Contraseña Actual</label>
+                        <input type="password" name="current_password" class="form-control mb-2" required>
                         <label class="form-label">Nueva Contraseña</label>
                         <input type="password" name="new_password" class="form-control" required>
                     </div>
-                </div>
-                <div class="modal-footer border-0"><button type="submit" class="btn btn-light w-100 fw-bold">Actualizar</button></div>
-            </form>
+                    <div class="modal-footer border-secondary">
+                        <button type="submit" class="btn btn-warning">Actualizar</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 
+    <!-- Modal: Añadir Stock -->
     <div class="modal fade" id="modalAddStock" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
-            <form action="/manage_stock" method="POST" class="modal-content bg-dark border-success">
-                <div class="modal-header border-0">
-                    <h5 class="text-white">Nuevo Artículo</h5><button type="button" class="btn-close btn-close-white"
-                        data-bs-dismiss="modal"></button>
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">Nuevo Artículo de Stock</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body">
-                    <input type="hidden" name="action" value="add">
-                    <div class="mb-3"><label class="form-label">Nombre</label><input name="name" class="form-control"
-                            required></div>
-                    <div class="mb-3"><label class="form-label">Categoría</label><select name="category"
-                            class="form-select">
-                            <option>Consumible</option>
-                            <option>Pieza</option>
-                        </select></div>
-                    <div class="mb-3"><label class="form-label">Cant. Inicial</label><input type="number"
-                            name="quantity" class="form-control" value="1" required></div>
-                </div>
-                <div class="modal-footer border-0"><button type="submit" class="btn btn-success w-100">Guardar</button>
-                </div>
-            </form>
+                <form method="POST" action="/manage_stock">
+                    <div class="modal-body">
+                        <input type="hidden" name="action" value="add">
+                        <label class="form-label">Nombre del Artículo</label>
+                        <input type="text" name="name" class="form-control mb-2" required>
+                        <label class="form-label">Categoría</label>
+                        <input type="text" name="category" class="form-control mb-2" required>
+                        <label class="form-label">Cantidad Inicial</label>
+                        <input type="number" name="quantity" class="form-control" value="0" required>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="submit" class="btn btn-warning">Añadir</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 
-    <div class="modal fade" id="modalEditStock" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
-            <form action="/manage_stock" method="POST" class="modal-content bg-dark border-warning">
-                <div class="modal-header border-0">
-                    <h5 class="text-white">Editar Producto</h5><button type="button" class="btn-close btn-close-white"
-                        data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <input type="hidden" name="action" value="edit_full">
-                    <input type="hidden" name="item_id" id="editFullId">
-                    <div class="mb-3"><label class="form-label">Nombre</label><input name="name" id="editFullName"
-                            class="form-control" required></div>
-                    <div class="mb-3"><label class="form-label">Categoría</label><select name="category"
-                            id="editFullCat" class="form-select">
-                            <option>Consumible</option>
-                            <option>Pieza</option>
-                        </select></div>
-                    <div class="mb-3"><label class="form-label">Cantidad (Total)</label><input type="number"
-                            name="quantity" id="editFullQty" class="form-control" required></div>
-                </div>
-                <div class="modal-footer border-0"><button type="submit" class="btn btn-warning w-100">Guardar
-                        Cambios</button></div>
-            </form>
-        </div>
-    </div>
-
+    <!-- Modal: Ajustar Stock -->
     <div class="modal fade" id="modalAdjustStock" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
-            <form action="/manage_stock" method="POST" class="modal-content bg-dark border-info">
-                <div class="modal-header border-0">
-                    <h5 class="text-white">Ajustar: <span id="adjName" class="text-info"></span></h5><button
-                        type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">Ajustar Cantidad</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body">
-                    <input type="hidden" name="action" value="update"><input type="hidden" name="item_id" id="adjId">
-                    <label class="form-label">Variación (+/-)</label><input type="number" name="quantity"
-                        class="form-control" placeholder="Ej: -1 para restar" required>
-                </div>
-                <div class="modal-footer border-0"><button type="submit" class="btn btn-info w-100">Aplicar</button>
-                </div>
-            </form>
+                <form method="POST" action="/manage_stock">
+                    <div class="modal-body">
+                        <input type="hidden" name="action" value="adjust">
+                        <input type="hidden" name="item_id" id="adjId">
+                        <p>Artículo: <strong id="adjName"></strong></p>
+                        <label class="form-label">Cantidad a Añadir/Restar (use - para restar)</label>
+                        <input type="number" name="adjust_qty" class="form-control" required>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="submit" class="btn btn-warning">Ajustar</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 
+    <!-- Modal: Editar Stock Completo -->
+    <div class="modal fade" id="modalEditStock" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">Editar Artículo</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="/manage_stock">
+                    <div class="modal-body">
+                        <input type="hidden" name="action" value="edit">
+                        <input type="hidden" name="item_id" id="editFullId">
+                        <label class="form-label">Nombre</label>
+                        <input type="text" name="name" id="editFullName" class="form-control mb-2" required>
+                        <label class="form-label">Categoría</label>
+                        <input type="text" name="category" id="editFullCat" class="form-control mb-2" required>
+                        <label class="form-label">Cantidad</label>
+                        <input type="number" name="quantity" id="editFullQty" class="form-control" required>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="submit" class="btn btn-warning">Guardar Cambios</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Añadir Cliente -->
     <div class="modal fade" id="modalAddClient" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
-            <form action="/manage_clients" method="POST" class="modal-content bg-dark border-primary">
-                <div class="modal-header border-0">
-                    <h5 class="text-white">Nuevo Cliente</h5><button type="button" class="btn-close btn-close-white"
-                        data-bs-dismiss="modal"></button>
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">Nuevo Cliente</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body">
-                    <input type="hidden" name="action" value="add">
-                    <div class="mb-3"><label class="form-label">Nombre Empresa / Particular</label><input name="name"
-                            class="form-control" required></div>
-                </div>
-                <div class="modal-footer border-0"><button type="submit" class="btn btn-primary w-100">Añadir
-                        Cliente</button></div>
-            </form>
+                <form method="POST" action="/manage_clients">
+                    <div class="modal-body">
+                        <input type="hidden" name="action" value="add">
+                        <label class="form-label">Nombre del Cliente</label>
+                        <input type="text" name="name" class="form-control" required>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="submit" class="btn btn-warning">Añadir</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 
+    <!-- Modal: Editar Cliente -->
     <div class="modal fade" id="modalEditClient" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
-            <form action="/manage_clients" method="POST" class="modal-content bg-dark border-warning">
-                <div class="modal-header border-0">
-                    <h5 class="text-white">Editar Cliente</h5><button type="button" class="btn-close btn-close-white"
-                        data-bs-dismiss="modal"></button>
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">Editar Cliente</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body">
-                    <input type="hidden" name="action" value="edit">
-                    <input type="hidden" name="client_id" id="editClientId">
-                    <div class="mb-3"><label class="form-label">Nombre</label><input name="name" id="editClientName"
-                            class="form-control" required></div>
-                </div>
-                <div class="modal-footer border-0"><button type="submit"
-                        class="btn btn-warning w-100">Actualizar</button></div>
-            </form>
+                <form method="POST" action="/manage_clients">
+                    <div class="modal-body">
+                        <input type="hidden" name="action" value="edit">
+                        <input type="hidden" name="client_id" id="editClientId">
+                        <label class="form-label">Nombre del Cliente</label>
+                        <input type="text" name="name" id="editClientName" class="form-control" required>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="submit" class="btn btn-warning">Guardar Cambios</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 
+    <!-- Modal: Importar Clientes -->
     <div class="modal fade" id="modalImportClients" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
-            <form action="/import_clients" method="POST" enctype="multipart/form-data"
-                class="modal-content bg-dark border-info">
-                <div class="modal-header border-0">
-                    <h5 class="text-white">Importar Clientes JSON</h5><button type="button"
-                        class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">Importar Clientes (JSON)</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body">
-                    <div class="alert alert-info small">Formato: <code>[{"name": "Cliente 1"}]</code></div>
-                    <div class="mb-3"><label class="form-label">Archivo JSON</label><input type="file" name="file"
-                            class="form-control" accept=".json" required></div>
-                </div>
-                <div class="modal-footer border-0"><button type="submit" class="btn btn-info w-100">Importar</button>
-                </div>
-            </form>
+                <form method="POST" action="/import_clients" enctype="multipart/form-data">
+                    <div class="modal-body">
+                        <label class="form-label">Archivo JSON</label>
+                        <input type="file" name="file" class="form-control" accept=".json" required>
+                        <small class="text-muted">Formato esperado: [{"name": "Cliente1"}, {"name":
+                            "Cliente2"}]</small>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="submit" class="btn btn-info">Importar</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 
+    <!-- Modal: Añadir Tipo de Servicio -->
     <div class="modal fade" id="modalAddService" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
-            <form action="/manage_services" method="POST" class="modal-content bg-dark border-primary">
-                <div class="modal-header border-0">
-                    <h5 class="text-white">Nuevo Tipo de Servicio</h5><button type="button"
-                        class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">Nuevo Tipo de Servicio</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body">
-                    <input type="hidden" name="action" value="add">
-                    <div class="mb-3">
+                <form method="POST" action="/manage_services">
+                    <div class="modal-body">
+                        <input type="hidden" name="action" value="add">
                         <label class="form-label">Nombre</label>
-                        <input name="name" class="form-control" placeholder="Ej: Consultoría" required>
+                        <input type="text" name="name" class="form-control mb-2" required>
+                        <label class="form-label">Color (Hex)</label>
+                        <input type="color" name="color" class="form-control" value="#6c757d" required>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Color Etiqueta</label>
-                        <input type="color" name="color" class="form-control form-control-color w-100" value="#563d7c"
-                            title="Elige un color">
+                    <div class="modal-footer border-secondary">
+                        <button type="submit" class="btn btn-warning">Añadir</button>
                     </div>
-                </div>
-                <div class="modal-footer border-0"><button type="submit" class="btn btn-primary w-100">Crear
-                        Servicio</button></div>
-            </form>
+                </form>
+            </div>
         </div>
     </div>
 
+    <!-- Modal: Editar Tipo de Servicio -->
     <div class="modal fade" id="modalEditService" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
-            <form action="/manage_services" method="POST" class="modal-content bg-dark border-warning">
-                <div class="modal-header border-0">
-                    <h5 class="text-white">Editar Servicio</h5><button type="button" class="btn-close btn-close-white"
-                        data-bs-dismiss="modal"></button>
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">Editar Tipo de Servicio</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="/manage_services">
+                    <div class="modal-body">
+                        <input type="hidden" name="action" value="edit">
+                        <input type="hidden" name="service_id" id="editServiceId">
+                        <label class="form-label">Nombre</label>
+                        <input type="text" name="name" id="editServiceName" class="form-control mb-2" required>
+                        <label class="form-label">Color (Hex)</label>
+                        <input type="color" name="color" id="editServiceColor" class="form-control" required>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="submit" class="btn btn-warning">Guardar Cambios</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Agendar Cita -->
+    <div class="modal fade" id="modalScheduleAppointment" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">Agendar Nueva Cita</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="/schedule_appointment">
+                    <div class="modal-body">
+                        <label class="form-label">Técnico</label>
+                        <select name="tech_id" class="form-select mb-2" required>
+                            {% for u in empleados %}
+                            <option value="{{ u.id }}">{{ u.username }}</option>
+                            {% endfor %}
+                        </select>
+                        <label class="form-label">Cliente</label>
+                        <div class="position-relative mb-2">
+                            <input type="text" name="client_name" id="scheduleClientInput" class="form-control"
+                                required autocomplete="off">
+                            <div id="scheduleClientList" class="suggestions-list"></div>
+                        </div>
+                        <label class="form-label">Fecha</label>
+                        <input type="date" name="date" class="form-control mb-2" required>
+                        <label class="form-label">Hora</label>
+                        <input type="time" name="time" class="form-control mb-2" required>
+                        <label class="form-label">Tipo de Servicio</label>
+                        <select name="service_type" class="form-select mb-2" required>
+                            {% for svc in all_service_types %}
+                            <option value="{{ svc.name }}">{{ svc.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <label class="form-label">Notas</label>
+                        <textarea name="notes" class="form-control" rows="3"></textarea>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="submit" class="btn btn-warning">Agendar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Editar Cita desde Admin -->
+    <div class="modal fade" id="modalEditAppointmentAdmin" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">Editar Cita</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" id="formEditApptAdmin">
+                    <div class="modal-body">
+                        <label class="form-label">Cliente</label>
+                        <div class="position-relative mb-2">
+                            <input type="text" name="client_name" id="editAdminClientInput" class="form-control"
+                                required autocomplete="off">
+                            <div id="editAdminClientList" class="suggestions-list"></div>
+                        </div>
+                        <label class="form-label">Fecha</label>
+                        <input type="date" name="date" id="editAdminDate" class="form-control mb-2" required>
+                        <label class="form-label">Hora</label>
+                        <input type="time" name="time" id="editAdminTime" class="form-control mb-2" required>
+                        <label class="form-label">Tipo de Servicio</label>
+                        <select name="service_type" id="editAdminService" class="form-select mb-2" required>
+                            {% for svc in all_service_types %}
+                            <option value="{{ svc.name }}">{{ svc.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <label class="form-label">Notas</label>
+                        <textarea name="notes" id="editAdminNotes" class="form-control" rows="3"></textarea>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="submit" class="btn btn-warning">Guardar Cambios</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Acciones Tarea Admin -->
+    <div class="modal fade" id="modalActionAdmin" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">Acciones sobre la Tarea</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <input type="hidden" name="action" value="edit">
-                    <input type="hidden" name="service_id" id="editServiceId">
-                    <div class="mb-3">
-                        <label class="form-label">Nombre</label>
-                        <input name="name" id="editServiceName" class="form-control" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Color Etiqueta</label>
-                        <input type="color" name="color" id="editServiceColor"
-                            class="form-control form-control-color w-100">
+                    <input type="hidden" id="evtId">
+                    <p><strong>Cliente:</strong> <span id="evtClient"></span></p>
+                    <p><strong>Técnico:</strong> <span id="evtTech"></span></p>
+                    <p><strong>Servicio:</strong> <span id="evtService"></span></p>
+                    <p><strong>Estado:</strong> <span id="evtStatus"></span></p>
+                    <p><strong>Descripción:</strong><br><span id="evtDesc"></span></p>
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-warning" onclick="openEditAdminModal()">
+                            <i class="bi bi-pencil-fill me-1"></i> Editar Cita
+                        </button>
+                        <button class="btn btn-success" onclick="performAdminTaskAction('complete')">
+                            <i class="bi bi-check-circle-fill me-1"></i> Marcar Completado
+                        </button>
+                        <button class="btn btn-danger" onclick="performAdminTaskAction('delete')">
+                            <i class="bi bi-trash-fill me-1"></i> Eliminar Tarea
+                        </button>
                     </div>
                 </div>
-                <div class="modal-footer border-0"><button type="submit"
-                        class="btn btn-warning w-100">Actualizar</button></div>
-            </form>
+            </div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        let calendar;
-        let calendarGlobalInstance;
-        const modalActionAdmin = new bootstrap.Modal(document.getElementById('modalEventActionAdmin'));
+        var calendar = null;
+        var calendarGlobalInstance = null;
+        var modalActionAdmin = new bootstrap.Modal(document.getElementById('modalActionAdmin'));
+        var currentEmployeeId = null;
 
-        // --- MANEJO DE EVENTOS (COMÚN) ---
+        // Aplicar colores dinámicos a los labels de filtros
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('label[data-color]').forEach(function(label) {
+                const color = label.dataset.color;
+                label.style.borderColor = color;
+                label.style.color = color;
+            });
+        });
+
+        setupAutocomplete('scheduleClientInput', 'scheduleClientList');
+
+        function loadEmployeeCalendar(userId) {
+            currentEmployeeId = userId;
+            document.getElementById('calendarAdminContainer').style.display = 'block';
+            document.getElementById('empCalendarTitle').innerText = `Calendario de Empleado #${userId}`;
+
+            if (calendar) {
+                calendar.destroy();
+            }
+
+            var calendarEl = document.getElementById('calendarAdmin');
+            var isMobile = window.innerWidth < 768;
+
+            calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: isMobile ? 'listWeek' : 'dayGridMonth',
+                locale: 'es',
+                headerToolbar: {
+                    left: 'prev,next',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek,listWeek'
+                },
+                height: 'auto',
+                events: `/api/admin/tasks/${userId}`,
+                eventClick: handleEventClick,
+                eventContent: function (arg) {
+                    let statusIcon = arg.event.extendedProps.status === 'Completado' ? '✅' : '⏳';
+                    return { html: `<div class="fc-content overflow-hidden text-truncate">${statusIcon} ${arg.event.title}</div>` };
+                }
+            });
+            calendar.render();
+        }
+
+        function closeEmployeeCalendar() {
+            document.getElementById('calendarAdminContainer').style.display = 'none';
+            if (calendar) {
+                calendar.destroy();
+                calendar = null;
+            }
+        }
+
         function handleEventClick(info) {
-            const props = info.event.extendedProps;
             document.getElementById('evtId').value = info.event.id;
-            document.getElementById('evtClient').innerText = props.client;
-            document.getElementById('evtDesc').innerText = props.desc;
-
-            const techBadge = document.getElementById('evtTechBadge');
-            if (props.tech_name) {
-                techBadge.innerText = props.tech_name;
-                techBadge.style.display = 'inline-block';
-            } else {
-                techBadge.style.display = 'none';
-            }
-
-            const statusSpan = document.getElementById('evtStatus');
-            statusSpan.innerText = props.status;
-            const btnComplete = document.getElementById('btnCompleteAdmin');
-
-            const btnReportContainer = document.getElementById('btnViewReportContainer');
-            const btnReport = document.getElementById('btnViewReport');
-
-            if (props.status === 'Completado') {
-                statusSpan.className = 'badge bg-success';
-                btnComplete.style.display = 'none';
-                btnReportContainer.classList.remove('d-none');
-                btnReport.href = `/print_report/${info.event.id}`;
-            } else {
-                statusSpan.className = 'badge bg-primary';
-                btnComplete.style.display = 'inline-block';
-                btnReportContainer.classList.add('d-none');
-            }
+            document.getElementById('evtClient').innerText = info.event.extendedProps.client;
+            document.getElementById('evtTech').innerText = info.event.extendedProps.tech_name;
+            document.getElementById('evtService').innerText = info.event.extendedProps.service_type;
+            document.getElementById('evtStatus').innerText = info.event.extendedProps.status;
+            document.getElementById('evtDesc').innerText = info.event.extendedProps.desc || '(Sin descripción)';
             modalActionAdmin.show();
         }
 
-        // --- AGENDA INDIVIDUAL ---
-        function verAgenda(id, name) {
-            document.getElementById('techName').innerText = name.toUpperCase();
-            document.getElementById('formTechId').value = id;
-            const modal = new bootstrap.Modal(document.getElementById('modalCale'));
-            modal.show();
-
-            document.getElementById('modalCale').addEventListener('shown.bs.modal', function () {
-                if (calendar) calendar.destroy();
-                var calendarEl = document.getElementById('calendarAdmin');
-                var isMobile = window.innerWidth < 992;
-
-                calendar = new FullCalendar.Calendar(calendarEl, {
-                    initialView: isMobile ? 'listWeek' : 'dayGridMonth',
-                    locale: 'es',
-                    headerToolbar: {
-                        left: 'prev,next',
-                        center: 'title',
-                        right: isMobile ? 'today' : 'dayGridMonth,listWeek'
-                    },
-                    height: isMobile ? 350 : 500,
-                    events: '/api/admin/tasks/' + id,
-
-                    dateClick: function (info) {
-                        const dateInput = document.querySelector('#modalCale input[name="date"]');
-                        if (dateInput) dateInput.value = info.dateStr;
-                    },
-                    eventClick: handleEventClick
-                });
-                calendar.render();
-                setupAutocomplete('adminClientInput', 'adminClientList');
-
-            }, { once: true });
-        }
-
-        // --- AGENDA GLOBAL ---
-        document.getElementById('tabGlobalBtn').addEventListener('shown.bs.tab', function () {
+        // CALENDARIO GLOBAL
+        document.getElementById('tabGlobalBtn').addEventListener('click', function () {
             if (calendarGlobalInstance) {
                 calendarGlobalInstance.render();
                 updateGlobalFilters();
@@ -924,10 +992,9 @@
 
         function updateGlobalFilters() {
             if (!calendarGlobalInstance) return;
-            const activeTypes = getActiveFilters();
             
-            // Re-renderizamos para que eventDidMount vuelva a ejecutarse y filtre
-            calendarGlobalInstance.render();
+            // Refrescamos los eventos para que se vuelva a ejecutar eventDidMount
+            calendarGlobalInstance.refetchEvents();
         }
 
         // --- GESTIÓN DE ACCIONES ---

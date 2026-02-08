@@ -207,57 +207,33 @@ def save_report():
         stock_id = request.form.get('stock_item')
         qty = int(request.form.get('stock_qty', 0))
         action = request.form.get('stock_action', 'used')
-        linked_task_id = request.form.get('linked_task_id')
-
+        
+        nueva = Task(
+            tech_id=current_user.id,
+            client_name=request.form['client_name'],
+            description=request.form['description'],
+            date=nueva_fecha,
+            start_time=request.form['start_time'],
+            end_time=request.form['end_time'],
+            service_type=request.form['service_type'],
+            parts_text=request.form.get('parts_text', ''),
+            stock_item_id=int(stock_id) if stock_id else None,
+            stock_quantity_used=qty,
+            stock_action=action,
+            status='Completado'
+        )
+        
         if stock_id and qty > 0:
-            item = Stock.query.get(stock_id)
+            item = Stock.query.get(int(stock_id))
             if item:
                 if action == 'used':
-                    if item.quantity >= qty:
-                        item.quantity -= qty
-                    else:
-                        flash(f'Error: Stock insuficiente de {item.name}', 'danger')
-                        return redirect(url_for('dashboard'))
-                elif action == 'retrieved':
-                    item.quantity += qty
-            
-        if linked_task_id and linked_task_id != 'none':
-            task = Task.query.get(linked_task_id)
-            if task and task.tech_id == current_user.id:
-                task.date = nueva_fecha
-                task.start_time = request.form['entry_time']
-                task.end_time = request.form['exit_time']
-                nota_previa = task.description.replace("Cita Agendada: ", "")
-                task.description = f"{request.form['description']} (Nota Cita: {nota_previa})"
-                task.service_type = request.form['service_type']
-                task.parts_text = request.form['parts_removed']
-                task.stock_item_id = stock_id if (stock_id and qty > 0) else None
-                task.stock_quantity_used = qty if (stock_id and qty > 0) else 0
-                task.stock_action = action
-                task.status = 'Completado'
-                flash('Cita del calendario completada y parte generado.', 'success')
-            else:
-                flash('Error al vincular con la cita.', 'danger')
-        else:
-            new_task = Task(
-                tech_id=current_user.id,
-                client_name=request.form['client_name'],
-                service_type=request.form['service_type'],
-                date=nueva_fecha,
-                start_time=request.form['entry_time'],
-                end_time=request.form['exit_time'],
-                description=request.form['description'],
-                parts_text=request.form['parts_removed'], 
-                stock_item_id=stock_id if (stock_id and qty > 0) else None,
-                stock_quantity_used=qty if (stock_id and qty > 0) else 0,
-                stock_action=action,
-                status='Completado'
-            )
-            db.session.add(new_task)
-            flash('Parte nuevo guardado correctamente.', 'success')
-
+                    item.quantity -= qty
+                elif action == 'removed':
+                    item.quantity -= qty
+                    
+        db.session.add(nueva)
         db.session.commit()
-        
+        flash('Informe guardado correctamente.', 'success')
     except Exception as e:
         flash(f'Error al guardar: {str(e)}', 'danger')
         
@@ -266,133 +242,132 @@ def save_report():
 @app.route('/schedule_appointment', methods=['POST'])
 @login_required
 def schedule_appointment():
+    if current_user.role != 'admin':
+        return redirect(url_for('dashboard'))
+    
     try:
-        target_tech_id = current_user.id
-        if current_user.role == 'admin' and request.form.get('tech_id'):
-            target_tech_id = int(request.form.get('tech_id'))
-
-        nueva_fecha = datetime.strptime(request.form['date'], '%Y-%m-%d').date()
-        hora = request.form.get('time', '')
+        tech_id = int(request.form['tech_id'])
+        appt_date = datetime.strptime(request.form['date'], '%Y-%m-%d').date()
+        appt_time = request.form['time']
         
-        new_appt = Task(
-            tech_id=target_tech_id,
+        nueva = Task(
+            tech_id=tech_id,
             client_name=request.form['client_name'],
+            description=request.form['notes'],
+            date=appt_date,
+            start_time=appt_time,
             service_type=request.form['service_type'],
-            date=nueva_fecha,
-            start_time=hora,
-            description="Cita Agendada: " + request.form.get('notes', ''),
             status='Pendiente'
         )
-        db.session.add(new_appt)
+        
+        db.session.add(nueva)
         db.session.commit()
-        flash('Cita agendada correctamente.', 'info')
+        flash('Cita agendada correctamente.', 'success')
     except Exception as e:
         flash(f'Error al agendar: {str(e)}', 'danger')
+        
     return redirect(url_for('dashboard'))
 
 @app.route('/edit_appointment/<int:task_id>', methods=['POST'])
 @login_required
 def edit_appointment(task_id):
-    try:
-        task = Task.query.get_or_404(task_id)
-        
-        if current_user.role != 'admin' and task.tech_id != current_user.id:
-            return jsonify({'success': False, 'msg': 'No autorizado'}), 403
-        
-        task.client_name = request.form.get('client_name')
-        task.service_type = request.form.get('service_type')
-        task.date = datetime.strptime(request.form['date'], '%Y-%m-%d').date()
-        task.start_time = request.form.get('time', '')
-        
-        notes = request.form.get('notes', '')
-        if notes:
-            if "Cita Agendada:" in task.description:
-                task.description = "Cita Agendada: " + notes
-            else:
-                task.description = notes
-        
-        db.session.commit()
-        flash('Cita modificada correctamente.', 'success')
-        
-    except Exception as e:
-        flash(f'Error al modificar: {str(e)}', 'danger')
-    
-    return redirect(url_for('dashboard'))
-
-@app.route('/api/task_action/<int:task_id>/<action>', methods=['POST'])
-@login_required
-def task_action(task_id, action):
     task = Task.query.get_or_404(task_id)
     
-    if current_user.role != 'admin' and task.tech_id != current_user.id:
-        return jsonify({'success': False, 'msg': 'No autorizado'}), 403
-
-    if action == 'delete':
-        db.session.delete(task)
-        msg = 'Tarea eliminada del calendario.'
-    elif action == 'complete':
-        task.status = 'Completado'
-        if not task.start_time: task.start_time = "09:00"
-        if not task.end_time: task.end_time = "10:00"
-        msg = 'Tarea marcada como completada.'
-    else:
-        return jsonify({'success': False, 'msg': 'Acción inválida'}), 400
-
-    db.session.commit()
-    return jsonify({'success': True, 'msg': msg})
+    # Solo admin o el técnico asignado puede editar
+    if current_user.role != 'admin' and current_user.id != task.tech_id:
+        flash('No tienes permisos para editar esta tarea.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    try:
+        task.client_name = request.form['client_name']
+        task.date = datetime.strptime(request.form['date'], '%Y-%m-%d').date()
+        task.start_time = request.form['time']
+        task.service_type = request.form['service_type']
+        task.description = request.form['notes']
+        
+        db.session.commit()
+        flash('Cita actualizada correctamente.', 'success')
+    except Exception as e:
+        flash(f'Error al actualizar: {str(e)}', 'danger')
+        
+    return redirect(url_for('dashboard'))
 
 @app.route('/api/get_task/<int:task_id>')
 @login_required
 def get_task(task_id):
-    task = Task.query.get_or_404(task_id)
-    
-    if current_user.role != 'admin' and task.tech_id != current_user.id:
-        return jsonify({'success': False, 'msg': 'No autorizado'}), 403
-    
-    notes = task.description
-    if "Cita Agendada: " in notes:
-        notes = notes.replace("Cita Agendada: ", "")
+    task = Task.query.get(task_id)
+    if not task:
+        return jsonify({'success': False, 'msg': 'Tarea no encontrada'})
     
     return jsonify({
         'success': True,
         'data': {
-            'id': task.id,
             'client_name': task.client_name,
-            'service_type': task.service_type,
             'date': task.date.strftime('%Y-%m-%d'),
             'time': task.start_time or '',
-            'notes': notes,
-            'status': task.status
+            'service_type': task.service_type,
+            'notes': task.description or ''
         }
     })
+
+@app.route('/api/task_action/<int:task_id>/<action>', methods=['POST'])
+@login_required
+def task_action(task_id, action):
+    task = Task.query.get(task_id)
+    if not task:
+        return jsonify({'success': False, 'msg': 'Tarea no encontrada'})
+    
+    if action == 'complete':
+        task.status = 'Completado'
+        db.session.commit()
+        return jsonify({'success': True, 'msg': 'Tarea marcada como completada'})
+        
+    elif action == 'delete':
+        db.session.delete(task)
+        db.session.commit()
+        return jsonify({'success': True, 'msg': 'Tarea eliminada'})
+        
+    return jsonify({'success': False, 'msg': 'Acción no válida'})
 
 @app.route('/manage_stock', methods=['POST'])
 @login_required
 def manage_stock():
     if current_user.role != 'admin': return redirect(url_for('dashboard'))
     
-    action = request.form['action']
+    action = request.form.get('action')
     
     if action == 'add':
-        db.session.add(Stock(name=request.form['name'], category=request.form['category'], quantity=int(request.form['quantity'])))
-        flash('Artículo añadido.', 'success')
-    elif action == 'update':
+        existing = Stock.query.filter_by(name=request.form['name']).first()
+        if not existing:
+            db.session.add(Stock(
+                name=request.form['name'],
+                category=request.form['category'],
+                quantity=int(request.form['quantity'])
+            ))
+            flash('Artículo añadido al inventario.', 'success')
+        else:
+            flash('Ese artículo ya existe en inventario.', 'warning')
+            
+    elif action == 'adjust':
         item = Stock.query.get(request.form['item_id'])
         if item:
-            item.quantity += int(request.form['quantity'])
-            if item.quantity < 0: item.quantity = 0
-            flash(f'Stock ajustado: {item.name}', 'success')
-    elif action == 'edit_full':
+            item.quantity += int(request.form['adjust_qty'])
+            flash('Cantidad ajustada.', 'success')
+            
+    elif action == 'edit':
         item = Stock.query.get(request.form['item_id'])
         if item:
             item.name = request.form['name']
             item.category = request.form['category']
             item.quantity = int(request.form['quantity'])
-            flash(f'Artículo editado: {item.name}', 'success')
+            flash('Artículo actualizado.', 'success')
+            
     elif action == 'delete':
-        Stock.query.filter_by(id=request.form['item_id']).delete()
-        flash('Artículo eliminado.', 'warning')
-
+        item = Stock.query.get(request.form['item_id'])
+        if item:
+            db.session.delete(item)
+            flash('Artículo eliminado del inventario.', 'warning')
+            
     db.session.commit()
     return redirect(url_for('dashboard'))
 
@@ -407,20 +382,22 @@ def manage_clients():
         existing = Client.query.filter_by(name=request.form['name']).first()
         if not existing:
             db.session.add(Client(name=request.form['name']))
-            flash('Cliente añadido a la base de datos.', 'success')
+            flash('Cliente añadido.', 'success')
         else:
-            flash('Este cliente ya existe.', 'warning')
+            flash('Ese cliente ya existe.', 'warning')
             
     elif action == 'edit':
         client = Client.query.get(request.form['client_id'])
         if client:
             client.name = request.form['name']
-            flash('Nombre de cliente actualizado.', 'success')
+            flash('Cliente actualizado.', 'success')
             
     elif action == 'delete':
-        Client.query.filter_by(id=request.form['client_id']).delete()
-        flash('Cliente eliminado.', 'warning')
-        
+        client = Client.query.get(request.form['client_id'])
+        if client:
+            db.session.delete(client)
+            flash('Cliente eliminado.', 'warning')
+            
     db.session.commit()
     return redirect(url_for('dashboard'))
 
@@ -428,30 +405,27 @@ def manage_clients():
 @login_required
 def export_clients():
     if current_user.role != 'admin':
-        flash('No autorizado', 'danger')
         return redirect(url_for('dashboard'))
     
-    clients = Client.query.all()
-    clients_data = [{'id': c.id, 'name': c.name} for c in clients]
+    clients = Client.query.order_by(Client.name).all()
+    data = [{'name': c.name} for c in clients]
     
-    json_data = json.dumps(clients_data, ensure_ascii=False, indent=2)
-    
-    mem_file = io.BytesIO()
-    mem_file.write(json_data.encode('utf-8'))
-    mem_file.seek(0)
+    json_str = json.dumps(data, indent=2, ensure_ascii=False)
+    buffer = io.BytesIO()
+    buffer.write(json_str.encode('utf-8'))
+    buffer.seek(0)
     
     return send_file(
-        mem_file,
-        mimetype='application/json',
+        buffer,
         as_attachment=True,
-        download_name=f'clientes_oslaprint_{date.today().strftime("%Y%m%d")}.json'
+        download_name='clientes_oslaprint.json',
+        mimetype='application/json'
     )
 
 @app.route('/import_clients', methods=['POST'])
 @login_required
 def import_clients():
     if current_user.role != 'admin':
-        flash('No autorizado', 'danger')
         return redirect(url_for('dashboard'))
     
     if 'file' not in request.files:
