@@ -625,19 +625,20 @@ def init_db():
 
 init_db()
 
-# --- INICIO DE LA APLICACIÓN ---
+# --- INICIALIZACIÓN Y ARRANQUE ---
 if __name__ == '__main__':
     with app.app_context():
-        # ESTA LÍNEA ES LA MÁS IMPORTANTE PARA RENDER
+        # 1. Crea las tablas si no existen (incluyendo la de servicios/colores)
         db.create_all() 
         
-        # Crear usuario admin si no existe
+        # 2. Usuarios base
         if not User.query.filter_by(username='admin').first():
             db.session.add(User(username='admin', role='admin', password_hash=generate_password_hash('admin123')))
+            db.session.add(User(username='tech', role='tech', password_hash=generate_password_hash('tech123')))
         
-        # Tipos de Servicio iniciales (Para que el panel de admin no cargue vacío)
+        # 3. Servicios con colores (Esto es lo que hacía fallar el Admin)
         if not ServiceType.query.first():
-            initial_services = [
+            servicios = [
                 {'name': 'Revisión', 'color': '#0d6efd'},
                 {'name': 'Instalación', 'color': '#6f42c1'},
                 {'name': 'Urgencia', 'color': '#dc3545'},
@@ -645,9 +646,9 @@ if __name__ == '__main__':
                 {'name': 'Mantenimiento', 'color': '#20c997'},
                 {'name': 'Otro', 'color': '#adb5bd'}
             ]
-            for s in initial_services:
+            for s in servicios:
                 db.session.add(ServiceType(name=s['name'], color=s['color']))
         
         db.session.commit()
-        
+    
     app.run(debug=True)
