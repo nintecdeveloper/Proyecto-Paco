@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <title>OSLAPRINT | Admin</title>
@@ -8,670 +9,963 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js'></script>
     <style>
-        :root { --osla-orange: #f37021; --osla-dark: #0a0a0a; --osla-card: #161616; }
-        body { background-color: var(--osla-dark); color: #fff; font-family: 'Segoe UI', sans-serif; margin: 0; padding-bottom: 60px; }
-        .navbar { background: #000; border-bottom: 2px solid var(--osla-orange); padding: 0.8rem 1rem; }
-        
-        .text-muted { color: #d1d1d1 !important; }
-        .form-label, label { color: #f8f9fa !important; font-weight: 500; }
-        .nav-link { color: #d1d1d1; font-weight: 600; border: none !important; font-size: 0.9rem; }
-        .nav-link.active { color: var(--osla-orange) !important; background: transparent !important; border-bottom: 3px solid var(--osla-orange) !important; }
-        .table-dark { --bs-table-bg: #161616; color: #f1f1f1; border-radius: 10px; overflow: hidden; }
-        .card-emp { background: var(--osla-card); border: 1px solid #333; border-radius: 15px; padding: 20px; text-align: center; }
-        #calendarAdmin, #calendarGlobal { background: #fff; color: #000; padding: 10px; border-radius: 10px; min-height: 500px; }
-        
+        :root {
+            --osla-orange: #f37021;
+            --osla-dark: #0a0a0a;
+            --osla-card: #161616;
+        }
+
+        body {
+            background-color: var(--osla-dark);
+            color: #fff;
+            font-family: 'Segoe UI', sans-serif;
+            margin: 0;
+            padding-bottom: 60px;
+        }
+
+        .navbar {
+            background: #000;
+            border-bottom: 2px solid var(--osla-orange);
+            padding: 0.8rem 1rem;
+        }
+
+        .text-muted {
+            color: #d1d1d1 !important;
+        }
+
+        .form-label,
+        label {
+            color: #f8f9fa !important;
+            font-weight: 500;
+        }
+
+        .nav-link {
+            color: #d1d1d1;
+            font-weight: 600;
+            border: none !important;
+            font-size: 0.9rem;
+        }
+
+        .nav-link.active {
+            color: var(--osla-orange) !important;
+            background: transparent !important;
+            border-bottom: 3px solid var(--osla-orange) !important;
+        }
+
+        .table-dark {
+            --bs-table-bg: #161616;
+            color: #f1f1f1;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .card-emp {
+            background: var(--osla-card);
+            border: 1px solid #333;
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        #calendarAdmin,
+        #calendarGlobal {
+            background: #fff;
+            color: #000;
+            padding: 10px;
+            border-radius: 10px;
+            min-height: 500px;
+        }
+
         /* Autocomplete Styles */
         .suggestions-list {
             position: absolute;
-            top: 100%; left: 0; width: 100%; max-height: 200px; overflow-y: auto;
-            background: #1f1f1f; border: 1px solid #444; border-radius: 0 0 8px 8px;
-            z-index: 1050; display: none;
+            top: 100%;
+            left: 0;
+            width: 100%;
+            max-height: 200px;
+            overflow-y: auto;
+            background: #1f1f1f;
+            border: 1px solid #444;
+            border-radius: 0 0 8px 8px;
+            z-index: 1050;
+            display: none;
         }
-        .suggestion-item { padding: 10px 15px; cursor: pointer; border-bottom: 1px solid #333; color: #fff; }
-        .suggestion-item:hover { background: var(--osla-orange); color: white; }
 
-        /* Filtros Calendario */
-        .btn-check:checked + .btn-outline-custom { color: white; border-width: 2px; }
-        .filter-group { background: #1f1f1f; padding: 10px; border-radius: 10px; border: 1px solid #333; }
-        
-        /* Colores de botones de filtro para coincidir con el calendario */
-        .btn-check:checked + .btn-rev { background-color: #0d6efd; border-color: #0d6efd; }
-        .btn-check:checked + .btn-inst { background-color: #6f42c1; border-color: #6f42c1; }
-        .btn-check:checked + .btn-urg { background-color: #dc3545; border-color: #dc3545; }
-        .btn-check:checked + .btn-ave { background-color: #fd7e14; border-color: #fd7e14; }
-        .btn-check:checked + .btn-mant { background-color: #20c997; border-color: #20c997; }
-        .btn-check:checked + .btn-otro { background-color: #adb5bd; border-color: #adb5bd; }
-        
-        .btn-outline-custom { color: #bbb; border-color: #555; }
-        .btn-outline-custom:hover { color: #fff; background-color: #333; }
+        .suggestion-item {
+            padding: 10px 15px;
+            cursor: pointer;
+            border-bottom: 1px solid #333;
+            color: #fff;
+        }
+
+        .suggestion-item:hover {
+            background: var(--osla-orange);
+            color: white;
+        }
+
+        /* Filtros Calendario Dinámicos */
+        .btn-check:checked+.btn-outline-custom {
+            color: white;
+            border-width: 2px;
+            opacity: 1;
+        }
+
+        .btn-outline-custom {
+            color: #bbb;
+            border-color: #555;
+            opacity: 0.7;
+        }
+
+        .btn-outline-custom:hover {
+            opacity: 1;
+            filter: brightness(1.2);
+        }
+
+        .filter-group {
+            background: #1f1f1f;
+            padding: 10px;
+            border-radius: 10px;
+            border: 1px solid #333;
+        }
 
         /* Mobile overrides */
         @media(max-width: 768px) {
-            .nav-tabs { display: flex; justify-content: space-around; flex-wrap: wrap; }
-            .nav-item { flex: 1 1 45%; text-align: center; }
-            .fc-header-toolbar { flex-direction: column; font-size: 0.8em; }
+            .nav-tabs {
+                display: flex;
+                justify-content: space-around;
+                flex-wrap: wrap;
+            }
+
+            .nav-item {
+                flex: 1 1 30%;
+                text-align: center;
+                font-size: 0.8em;
+            }
+
+            .fc-header-toolbar {
+                flex-direction: column;
+                font-size: 0.8em;
+            }
         }
     </style>
 </head>
+
 <body>
 
-<nav class="navbar d-flex justify-content-between sticky-top">
-    <span class="fw-bold fs-5 text-white">OSLA<span style="color:var(--osla-orange)">PRINT</span> <small class="badge bg-secondary ms-1" style="font-size: 0.6em;">ADMIN</small></span>
-    <div class="d-flex align-items-center gap-2">
-        <span class="text-white fw-bold me-2">Hola {{ current_user.username }}</span>
-        <a href="/logout" class="btn btn-outline-danger btn-sm"><i class="bi bi-power"></i></a>
-    </div>
-</nav>
+    <nav class="navbar d-flex justify-content-between sticky-top">
+        <span class="fw-bold fs-5 text-white">OSLA<span style="color:var(--osla-orange)">PRINT</span> <small
+                class="badge bg-secondary ms-1" style="font-size: 0.6em;">ADMIN</small></span>
+        <div class="d-flex align-items-center gap-2">
+            <span class="text-white fw-bold me-2">Hola {{ current_user.username }}</span>
+            <a href="/logout" class="btn btn-outline-danger btn-sm"><i class="bi bi-power"></i></a>
+        </div>
+    </nav>
 
-<div class="container mt-3 pb-5">
-    {% with messages = get_flashed_messages() %}
-        {% if messages %}{% for m in messages %}<div class="alert alert-info py-2 small">{{ m }}</div>{% endfor %}{% endif %}
-    {% endwith %}
+    <div class="container mt-3 pb-5">
+        {% with messages = get_flashed_messages() %}
+        {% if messages %}{% for m in messages %}<div class="alert alert-info py-2 small">{{ m }}</div>{% endfor %}{%
+        endif %}
+        {% endwith %}
 
-    <ul class="nav nav-tabs mb-4 border-0 bg-dark sticky-top pt-2" style="top:55px; z-index:900;" role="tablist">
-        <li class="nav-item"><button class="nav-link active w-100" data-bs-toggle="tab" data-bs-target="#team">EQUIPO</button></li>
-        <li class="nav-item"><button class="nav-link w-100" data-bs-toggle="tab" data-bs-target="#global-agenda" id="tabGlobalBtn">AGENDA GLOBAL</button></li>
-        <li class="nav-item"><button class="nav-link w-100" data-bs-toggle="tab" data-bs-target="#data">INFORMES</button></li>
-        <li class="nav-item"><button class="nav-link w-100" data-bs-toggle="tab" data-bs-target="#stock">STOCK</button></li>
-        <li class="nav-item"><button class="nav-link w-100" data-bs-toggle="tab" data-bs-target="#clients">CLIENTES</button></li>
-    </ul>
+        <ul class="nav nav-tabs mb-4 border-0 bg-dark sticky-top pt-2" style="top:55px; z-index:900;" role="tablist">
+            <li class="nav-item"><button class="nav-link active w-100" data-bs-toggle="tab"
+                    data-bs-target="#team">EQUIPO</button></li>
+            <li class="nav-item"><button class="nav-link w-100" data-bs-toggle="tab" data-bs-target="#global-agenda"
+                    id="tabGlobalBtn">AGENDA GLOBAL</button></li>
+            <li class="nav-item"><button class="nav-link w-100" data-bs-toggle="tab"
+                    data-bs-target="#data">INFORMES</button></li>
+            <li class="nav-item"><button class="nav-link w-100" data-bs-toggle="tab"
+                    data-bs-target="#stock">STOCK</button></li>
+            <li class="nav-item"><button class="nav-link w-100" data-bs-toggle="tab"
+                    data-bs-target="#clients">CLIENTES</button></li>
+            <li class="nav-item"><button class="nav-link w-100" data-bs-toggle="tab"
+                    data-bs-target="#config">CONFIGURACIÓN</button></li>
+        </ul>
 
-    <div class="tab-content">
-        <div class="tab-pane fade show active" id="team">
-            <div class="row g-3">
-                {% for emp in empleados %}
-                <div class="col-12 col-md-4">
-                    <div class="card-emp shadow-sm">
-                        <div class="d-flex align-items-center justify-content-center gap-3 mb-3">
-                            <i class="bi bi-person-badge-fill fs-1 text-warning"></i>
-                            <h4 class="fw-bold text-white m-0">{{ emp.username|upper }}</h4>
+        <div class="tab-content">
+            <div class="tab-pane fade show active" id="team">
+                <div class="row g-3">
+                    {% for emp in empleados %}
+                    <div class="col-12 col-md-4">
+                        <div class="card-emp shadow-sm">
+                            <div class="d-flex align-items-center justify-content-center gap-3 mb-3">
+                                <i class="bi bi-person-badge-fill fs-1 text-warning"></i>
+                                <h4 class="fw-bold text-white m-0">{{ emp.username|upper }}</h4>
+                            </div>
+                            <button class="btn btn-outline-warning w-100 py-2"
+                                onclick="verAgenda('{{ emp.id }}', '{{ emp.username }}')">
+                                <i class="bi bi-calendar3 me-2"></i>Gestionar Agenda
+                            </button>
                         </div>
-                        <button class="btn btn-outline-warning w-100 py-2" onclick="verAgenda('{{ emp.id }}', '{{ emp.username }}')">
-                            <i class="bi bi-calendar3 me-2"></i>Gestionar Agenda
-                        </button>
                     </div>
+                    {% else %}<div class="col-12 text-center py-5 text-muted">No hay técnicos registrados.</div>{%
+                    endfor %}
                 </div>
-                {% else %}<div class="col-12 text-center py-5 text-muted">No hay técnicos registrados.</div>{% endfor %}
             </div>
-        </div>
 
-        <div class="tab-pane fade" id="global-agenda">
-            <div class="filter-group mb-3 d-flex gap-2 flex-wrap align-items-center justify-content-center">
-                <span class="text-white fw-bold me-2 small">MOSTRAR:</span>
-                
-                <input type="checkbox" class="btn-check filter-cb" id="f-rev" value="Revisión" checked onchange="updateGlobalFilters()">
-                <label class="btn btn-sm btn-outline-custom btn-rev rounded-pill px-3" for="f-rev">Revisión</label>
-                
-                <input type="checkbox" class="btn-check filter-cb" id="f-inst" value="Instalación" checked onchange="updateGlobalFilters()">
-                <label class="btn btn-sm btn-outline-custom btn-inst rounded-pill px-3" for="f-inst">Instalación</label>
-                
-                <input type="checkbox" class="btn-check filter-cb" id="f-urg" value="Urgencia" checked onchange="updateGlobalFilters()">
-                <label class="btn btn-sm btn-outline-custom btn-urg rounded-pill px-3" for="f-urg">Urgencia</label>
-                
-                <input type="checkbox" class="btn-check filter-cb" id="f-ave" value="Avería" checked onchange="updateGlobalFilters()">
-                <label class="btn btn-sm btn-outline-custom btn-ave rounded-pill px-3" for="f-ave">Avería</label>
-                
-                <input type="checkbox" class="btn-check filter-cb" id="f-mant" value="Mantenimiento" checked onchange="updateGlobalFilters()">
-                <label class="btn btn-sm btn-outline-custom btn-mant rounded-pill px-3" for="f-mant">Mantenimiento</label>
-                
-                <input type="checkbox" class="btn-check filter-cb" id="f-otro" value="Otro" checked onchange="updateGlobalFilters()">
-                <label class="btn btn-sm btn-outline-custom btn-otro rounded-pill px-3" for="f-otro">Otro</label>
+            <div class="tab-pane fade" id="global-agenda">
+                <div class="filter-group mb-3 d-flex gap-2 flex-wrap align-items-center justify-content-center">
+                    <span class="text-white fw-bold me-2 small">MOSTRAR:</span>
+                    {% for s in all_service_types %}
+                    {% for s in all_service_types %}
+                    <input type="checkbox" class="btn-check filter-cb" id="f-{{s.id}}" value="{{ s.name }}" checked
+                        onchange="updateGlobalFilters()">
+                    <label class="btn btn-sm btn-outline-custom rounded-pill px-3" for="f-{{s.id}}"
+                        style="--bg-color: {{ s.color|default('#6c757d') }}; background-color: var(--bg-color); border-color: var(--bg-color); color: white;">
+                        {{ s.name }}
+                    </label>
+                    {% endfor %}
+                </div>
+                <div id="calendarGlobal"></div>
             </div>
-            <div id="calendarGlobal"></div>
-        </div>
 
-        <div class="tab-pane fade" id="data">
-            <div class="table-responsive">
-                <table class="table table-dark table-hover align-middle small text-nowrap">
-                    <thead><tr><th>Fecha</th><th>Técnico</th><th>Cliente</th><th>Detalles</th><th>Acción</th></tr></thead>
-                    <tbody>
-                        {% for inf in informes %}
-                        <tr>
-                            <td>{{ inf.date.strftime('%d/%m') }}</td>
-                            <td class="text-white fw-bold">{{ inf.tech.username }}</td>
-                            <td>
-                                <div class="fw-bold text-warning text-truncate" style="max-width: 120px;">{{ inf.client_name }}</div>
-                                <small class="d-block">{{ inf.service_type }}</small>
-                            </td>
-                            <td><div class="text-truncate" style="max-width: 150px;">{{ inf.description }}</div></td>
-                            <td><a href="/print_report/{{ inf.id }}" target="_blank" class="btn btn-sm btn-light"><i class="bi bi-printer"></i></a></td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+            <div class="tab-pane fade" id="data">
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover align-middle small text-nowrap">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Técnico</th>
+                                <th>Cliente</th>
+                                <th>Detalles</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for inf in informes %}
+                            <tr>
+                                <td>{{ inf.date.strftime('%d/%m') }}</td>
+                                <td class="text-white fw-bold">{{ inf.tech.username }}</td>
+                                <td>
+                                    <div class="fw-bold text-warning text-truncate" style="max-width: 120px;">{{
+                                        inf.client_name }}</div>
+                                    <small class="d-block">{{ inf.service_type }}</small>
+                                </td>
+                                <td>
+                                    <div class="text-truncate" style="max-width: 150px;">{{ inf.description }}</div>
+                                </td>
+                                <td><a href="/print_report/{{ inf.id }}" target="_blank" class="btn btn-sm btn-light"><i
+                                            class="bi bi-printer"></i></a></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
-        </div>
 
-        <div class="tab-pane fade" id="stock">
-            <div class="d-flex justify-content-between mb-3 align-items-center">
-                <h4 class="fw-bold text-white fs-5 m-0">Inventario</h4>
-                <button class="btn btn-success btn-sm px-3" data-bs-toggle="modal" data-bs-target="#modalAddStock"><i class="bi bi-plus-lg"></i> Item</button>
-            </div>
-            <div class="table-responsive">
-                <table class="table table-dark table-hover align-middle small">
-                    <thead><tr><th>Item</th><th class="d-none d-sm-table-cell">Cat.</th><th class="text-center">Cant.</th><th class="text-end">Gestión</th></tr></thead>
-                    <tbody>
-                        {% for item in inventory %}
-                        <tr>
-                            <td>
-                                <div class="fw-bold text-white">{{ item.name }}</div>
-                                <small class="d-block d-sm-none text-muted">{{ item.category }}</small>
-                            </td>
-                            <td class="d-none d-sm-table-cell">{{ item.category }}</td>
-                            <td class="text-center fs-5 text-warning">{{ item.quantity }}</td>
-                            <td class="text-end">
-                                <button class="btn btn-sm btn-outline-warning mb-1" 
+            <div class="tab-pane fade" id="stock">
+                <div class="d-flex justify-content-between mb-3 align-items-center">
+                    <h4 class="fw-bold text-white fs-5 m-0">Inventario</h4>
+                    <button class="btn btn-success btn-sm px-3" data-bs-toggle="modal"
+                        data-bs-target="#modalAddStock"><i class="bi bi-plus-lg"></i> Item</button>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover align-middle small">
+                        <thead>
+                            <tr>
+                                <th>Item</th>
+                                <th class="d-none d-sm-table-cell">Cat.</th>
+                                <th class="text-center">Cant.</th>
+                                <th class="text-end">Gestión</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in inventory %}
+                            <tr>
+                                <td>
+                                    <div class="fw-bold text-white">{{ item.name }}</div>
+                                    <small class="d-block d-sm-none text-muted">{{ item.category }}</small>
+                                </td>
+                                <td class="d-none d-sm-table-cell">{{ item.category }}</td>
+                                <td class="text-center fs-5 text-warning">{{ item.quantity }}</td>
+                                <td class="text-end">
+                                    <button class="btn btn-sm btn-outline-warning mb-1"
                                         onclick="openEditStockModal('{{item.id}}', '{{item.name}}', '{{item.category}}', '{{item.quantity}}')">
-                                    <i class="bi bi-pencil-fill"></i>
-                                </button>
-                                <button class="btn btn-sm btn-outline-light mb-1" onclick="ajustarStock('{{ item.id }}', '{{ item.name }}')">+/-</button>
-                                <form action="/manage_stock" method="POST" class="d-inline">
-                                    <input type="hidden" name="action" value="delete">
-                                    <input type="hidden" name="item_id" value="{{ item.id }}">
-                                    <button class="btn btn-sm btn-outline-danger ms-1 mb-1"><i class="bi bi-trash"></i></button>
-                                </form>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <div class="tab-pane fade" id="clients">
-            <div class="d-flex justify-content-between mb-3 align-items-center flex-wrap gap-2">
-                <h4 class="fw-bold text-white fs-5 m-0">Cartera Clientes</h4>
-                <div class="d-flex gap-2">
-                    <a href="/export_clients" class="btn btn-success btn-sm"><i class="bi bi-download"></i> Exportar</a>
-                    <button class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#modalImportClients"><i class="bi bi-upload"></i> Importar</button>
-                    <button class="btn btn-primary btn-sm px-3" data-bs-toggle="modal" data-bs-target="#modalAddClient"><i class="bi bi-person-plus-fill"></i> Nuevo</button>
+                                        <i class="bi bi-pencil-fill"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-light mb-1"
+                                        onclick="ajustarStock('{{ item.id }}', '{{ item.name }}')">+/-</button>
+                                    <form action="/manage_stock" method="POST" class="d-inline">
+                                        <input type="hidden" name="action" value="delete">
+                                        <input type="hidden" name="item_id" value="{{ item.id }}">
+                                        <button class="btn btn-sm btn-outline-danger ms-1 mb-1"><i
+                                                class="bi bi-trash"></i></button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
             </div>
-            <div class="mb-3">
-                <input type="text" id="clientSearchInput" class="form-control bg-dark text-white border-secondary" placeholder="Buscar cliente en la lista..." onkeyup="filterClientsTable()">
-            </div>
-            
-            <div class="table-responsive">
-                <table class="table table-dark table-hover align-middle small" id="clientsTable">
-                    <thead><tr><th>Nombre Cliente</th><th class="text-end">Acciones</th></tr></thead>
-                    <tbody>
-                        {% for client in clients %}
-                        <tr>
-                            <td class="fw-bold text-white client-name-cell">{{ client.name }}</td>
-                            <td class="text-end">
-                                <button class="btn btn-sm btn-outline-warning me-1" 
-                                        onclick="openEditClientModal('{{client.id}}', '{{client.name}}')">
-                                    <i class="bi bi-pencil-fill"></i>
-                                </button>
-                                <form action="/manage_clients" method="POST" class="d-inline">
-                                    <input type="hidden" name="action" value="delete">
-                                    <input type="hidden" name="client_id" value="{{ client.id }}">
-                                    <button class="btn btn-sm btn-outline-danger" onclick="return confirm('¿Borrar cliente?')"><i class="bi bi-trash"></i></button>
-                                </form>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-</div>
 
-<div class="modal fade" id="modalCale" tabindex="-1">
-    <div class="modal-dialog modal-xl modal-fullscreen-lg-down">
-        <div class="modal-content bg-dark border-warning p-0">
-            <div class="modal-header border-bottom border-secondary py-2">
-                <h6 class="text-white m-0">Agenda: <span id="techName" class="text-warning"></span></h6>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body p-0">
-                <div class="row g-0">
-                    <div class="col-lg-8 border-bottom border-lg-end border-secondary p-2 bg-white order-2 order-lg-1">
-                        <div id="calendarAdmin"></div>
+            <div class="tab-pane fade" id="clients">
+                <div class="d-flex justify-content-between mb-3 align-items-center flex-wrap gap-2">
+                    <h4 class="fw-bold text-white fs-5 m-0">Cartera Clientes</h4>
+                    <div class="d-flex gap-2">
+                        <a href="/export_clients" class="btn btn-success btn-sm"><i class="bi bi-download"></i>
+                            Exportar</a>
+                        <button class="btn btn-info btn-sm" data-bs-toggle="modal"
+                            data-bs-target="#modalImportClients"><i class="bi bi-upload"></i> Importar</button>
+                        <button class="btn btn-primary btn-sm px-3" data-bs-toggle="modal"
+                            data-bs-target="#modalAddClient"><i class="bi bi-person-plus-fill"></i> Nuevo</button>
                     </div>
-                    <div class="col-lg-4 p-3 order-1 order-lg-2 bg-dark">
-                        <h5 class="text-warning mb-3">Nueva Cita</h5>
-                        <form action="/schedule_appointment" method="POST">
-                            <input type="hidden" name="tech_id" id="formTechId">
-                            <div class="mb-2 position-relative">
-                                <input type="text" name="client_name" id="adminClientInput" class="form-control" placeholder="Buscar Cliente..." required autocomplete="off">
-                                <div id="adminClientList" class="suggestions-list"></div>
-                            </div>
-                            <div class="row g-2 mb-2">
-                                <div class="col-7"><input type="date" name="date" class="form-control" required></div>
-                                <div class="col-5"><input type="time" name="time" class="form-control"></div>
-                            </div>
-                            <div class="mb-2"><select name="service_type" class="form-select"><option>Revisión</option><option>Instalación</option><option>Urgencia</option></select></div>
-                            <div class="mb-3"><textarea name="notes" class="form-control" rows="2" placeholder="Notas..."></textarea></div>
-                            <button type="submit" class="btn btn-warning w-100 fw-bold">AGENDAR</button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="modal fade" id="modalEventActionAdmin" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content bg-dark border-secondary text-white">
-            <div class="modal-header border-0 pb-0">
-                <h5 class="modal-title">Gestionar Cita <span id="evtTechBadge" class="badge bg-secondary ms-2" style="font-size:0.6em"></span></h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <h5 id="evtClient" class="text-warning fw-bold"></h5>
-                <span id="evtStatus" class="badge mb-3"></span>
-                <p class="small text-muted border p-2 rounded border-secondary bg-black" id="evtDesc"></p>
-                <input type="hidden" id="evtId">
-                
-                <div id="btnViewReportContainer" class="mt-3 text-center d-none">
-                    <a href="#" id="btnViewReport" target="_blank" class="btn btn-light btn-sm w-100"><i class="bi bi-file-earmark-pdf text-danger"></i> Ver Informe PDF</a>
-                </div>
-            </div>
-            <div class="modal-footer border-0 pt-0">
-                <button type="button" class="btn btn-outline-warning btn-sm" onclick="openEditAdminModal()">Editar</button>
-                <button type="button" class="btn btn-outline-danger btn-sm" onclick="performAdminTaskAction('delete')">Eliminar</button>
-                <button type="button" class="btn btn-success btn-sm" id="btnCompleteAdmin" onclick="performAdminTaskAction('complete')">Marcar Hecha</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="modal fade" id="modalAddStock" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <form action="/manage_stock" method="POST" class="modal-content bg-dark border-success">
-            <div class="modal-header border-0"><h5 class="text-white">Nuevo Artículo</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
-            <div class="modal-body">
-                <input type="hidden" name="action" value="add">
-                <div class="mb-3"><label class="form-label">Nombre</label><input name="name" class="form-control" required></div>
-                <div class="mb-3"><label class="form-label">Categoría</label><select name="category" class="form-select"><option>Consumible</option><option>Pieza</option></select></div>
-                <div class="mb-3"><label class="form-label">Cant. Inicial</label><input type="number" name="quantity" class="form-control" value="1" required></div>
-            </div>
-            <div class="modal-footer border-0"><button type="submit" class="btn btn-success w-100">Guardar</button></div>
-        </form>
-    </div>
-</div>
-
-<div class="modal fade" id="modalEditStock" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <form action="/manage_stock" method="POST" class="modal-content bg-dark border-warning">
-            <div class="modal-header border-0"><h5 class="text-white">Editar Producto</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
-            <div class="modal-body">
-                <input type="hidden" name="action" value="edit_full">
-                <input type="hidden" name="item_id" id="editFullId">
-                <div class="mb-3"><label class="form-label">Nombre</label><input name="name" id="editFullName" class="form-control" required></div>
-                <div class="mb-3"><label class="form-label">Categoría</label><select name="category" id="editFullCat" class="form-select"><option>Consumible</option><option>Pieza</option></select></div>
-                <div class="mb-3"><label class="form-label">Cantidad (Total)</label><input type="number" name="quantity" id="editFullQty" class="form-control" required></div>
-            </div>
-            <div class="modal-footer border-0"><button type="submit" class="btn btn-warning w-100">Guardar Cambios</button></div>
-        </form>
-    </div>
-</div>
-
-<div class="modal fade" id="modalAdjustStock" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <form action="/manage_stock" method="POST" class="modal-content bg-dark border-info">
-            <div class="modal-header border-0"><h5 class="text-white">Ajustar: <span id="adjName" class="text-info"></span></h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
-            <div class="modal-body">
-                <input type="hidden" name="action" value="update"><input type="hidden" name="item_id" id="adjId">
-                <label class="form-label">Variación (+/-)</label><input type="number" name="quantity" class="form-control" placeholder="Ej: -1 para restar" required>
-            </div>
-            <div class="modal-footer border-0"><button type="submit" class="btn btn-info w-100">Aplicar</button></div>
-        </form>
-    </div>
-</div>
-
-<div class="modal fade" id="modalAddClient" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <form action="/manage_clients" method="POST" class="modal-content bg-dark border-primary">
-            <div class="modal-header border-0"><h5 class="text-white">Nuevo Cliente</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
-            <div class="modal-body">
-                <input type="hidden" name="action" value="add">
-                <div class="mb-3"><label class="form-label">Nombre Empresa / Particular</label><input name="name" class="form-control" required></div>
-            </div>
-            <div class="modal-footer border-0"><button type="submit" class="btn btn-primary w-100">Añadir Cliente</button></div>
-        </form>
-    </div>
-</div>
-
-<div class="modal fade" id="modalEditClient" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <form action="/manage_clients" method="POST" class="modal-content bg-dark border-warning">
-            <div class="modal-header border-0"><h5 class="text-white">Editar Cliente</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
-            <div class="modal-body">
-                <input type="hidden" name="action" value="edit">
-                <input type="hidden" name="client_id" id="editClientId">
-                <div class="mb-3"><label class="form-label">Nombre</label><input name="name" id="editClientName" class="form-control" required></div>
-            </div>
-            <div class="modal-footer border-0"><button type="submit" class="btn btn-warning w-100">Actualizar</button></div>
-        </form>
-    </div>
-</div>
-
-<div class="modal fade" id="modalImportClients" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <form action="/import_clients" method="POST" enctype="multipart/form-data" class="modal-content bg-dark border-info">
-            <div class="modal-header border-0"><h5 class="text-white">Importar Clientes JSON</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
-            <div class="modal-body">
-                <div class="alert alert-info small">Formato: <code>[{"name": "Cliente 1"}]</code></div>
-                <div class="mb-3"><label class="form-label">Archivo JSON</label><input type="file" name="file" class="form-control" accept=".json" required></div>
-            </div>
-            <div class="modal-footer border-0"><button type="submit" class="btn btn-info w-100">Importar</button></div>
-        </form>
-    </div>
-</div>
-
-<div class="modal fade" id="modalEditAppointmentAdmin" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <form action="/edit_appointment/0" method="POST" id="formEditApptAdmin" class="modal-content bg-dark border-warning text-white">
-            <div class="modal-header border-0"><h5>Editar Cita</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
-            <div class="modal-body">
-                <div class="mb-3 position-relative">
-                    <label class="form-label">Cliente</label>
-                    <input type="text" name="client_name" id="editAdminClientInput" class="form-control" required autocomplete="off">
-                    <div id="editAdminClientList" class="suggestions-list"></div>
-                </div>
-                <div class="row g-2 mb-3">
-                    <div class="col-7"><label class="form-label">Fecha</label><input type="date" name="date" id="editAdminDate" class="form-control" required></div>
-                    <div class="col-5"><label class="form-label">Hora</label><input type="time" name="time" id="editAdminTime" class="form-control"></div>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">Tipo Servicio</label>
-                    <select name="service_type" id="editAdminService" class="form-select">
-                        <option>Revisión</option><option>Instalación</option><option>Urgencia</option><option>Avería</option><option>Mantenimiento</option><option>Otro</option>
-                    </select>
+                    <input type="text" id="clientSearchInput" class="form-control bg-dark text-white border-secondary"
+                        placeholder="Buscar cliente en la lista..." onkeyup="filterClientsTable()">
                 </div>
-                <div class="mb-3"><label class="form-label">Notas</label><textarea name="notes" id="editAdminNotes" class="form-control" rows="3"></textarea></div>
+
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover align-middle small" id="clientsTable">
+                        <thead>
+                            <tr>
+                                <th>Nombre Cliente</th>
+                                <th class="text-end">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for client in clients %}
+                            <tr>
+                                <td class="fw-bold text-white client-name-cell">{{ client.name }}</td>
+                                <td class="text-end">
+                                    <button class="btn btn-sm btn-outline-warning me-1"
+                                        onclick="openEditClientModal('{{client.id}}', '{{client.name}}')">
+                                        <i class="bi bi-pencil-fill"></i>
+                                    </button>
+                                    <form action="/manage_clients" method="POST" class="d-inline">
+                                        <input type="hidden" name="action" value="delete">
+                                        <input type="hidden" name="client_id" value="{{ client.id }}">
+                                        <button class="btn btn-sm btn-outline-danger"
+                                            onclick="return confirm('¿Borrar cliente?')"><i
+                                                class="bi bi-trash"></i></button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
-            <div class="modal-footer border-0"><button type="submit" class="btn btn-warning w-100">Guardar Cambios</button></div>
-        </form>
+
+            <div class="tab-pane fade" id="config">
+                <div class="d-flex justify-content-between mb-3 align-items-center">
+                    <h4 class="fw-bold text-white fs-5 m-0">Tipos de Tareas y Servicios</h4>
+                    <button class="btn btn-primary btn-sm px-3" data-bs-toggle="modal"
+                        data-bs-target="#modalAddService"><i class="bi bi-plus-lg"></i> Crear Nuevo</button>
+                </div>
+                <div class="alert alert-dark small text-muted">
+                    <i class="bi bi-info-circle"></i> Estos tipos aparecerán en los desplegables de "Nueva Cita",
+                    "Editar Cita" y en los filtros del calendario.
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover align-middle small">
+                        <thead>
+                            <tr>
+                                <th>Nombre del Servicio</th>
+                                <th>Color Etiqueta</th>
+                                <th class="text-end">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for s in services %}
+                            <tr>
+                                <td>
+                                    <span class="badge rounded-pill"
+                                        style="--svc-color: {{ s.color|default('#6c757d') }}; background-color: var(--svc-color); color: white; border: 1px solid rgba(255,255,255,0.2);">
+                                        {{ s.name }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <code class="text-white-50">{{ s.color|default('#6c757d') }}</code>
+                                </td>
+                                <button class="btn btn-sm btn-outline-light me-1"
+                                    onclick="openEditServiceModal('{{s.id}}', '{{s.name}}', '{{s.color}}')">
+                                    <i class="bi bi-pencil-fill"></i>
+                                </button>
+                                <form action="/manage_services" method="POST" class="d-inline">
+                                    <input type="hidden" name="action" value="delete">
+                                    <input type="hidden" name="service_id" value="{{ s.id }}">
+                                    <button class="btn btn-sm btn-outline-danger"
+                                        onclick="return confirm('¿Borrar este tipo de servicio?')"><i
+                                            class="bi bi-trash"></i></button>
+                                </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
     </div>
-</div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-    let calendar;
-    let calendarGlobalInstance;
-    const modalActionAdmin = new bootstrap.Modal(document.getElementById('modalEventActionAdmin'));
+    <div class="modal fade" id="modalCale" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-fullscreen-lg-down">
+            <div class="modal-content bg-dark border-warning p-0">
+                <div class="modal-header border-bottom border-secondary py-2">
+                    <h6 class="text-white m-0">Agenda: <span id="techName" class="text-warning"></span></h6>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <div class="row g-0">
+                        <div
+                            class="col-lg-8 border-bottom border-lg-end border-secondary p-2 bg-white order-2 order-lg-1">
+                            <div id="calendarAdmin"></div>
+                        </div>
+                        <div class="col-lg-4 p-3 order-1 order-lg-2 bg-dark">
+                            <h5 class="text-warning mb-3">Nueva Cita</h5>
+                            <form action="/schedule_appointment" method="POST">
+                                <input type="hidden" name="tech_id" id="formTechId">
+                                <div class="mb-2 position-relative">
+                                    <input type="text" name="client_name" id="adminClientInput" class="form-control"
+                                        placeholder="Buscar Cliente..." required autocomplete="off">
+                                    <div id="adminClientList" class="suggestions-list"></div>
+                                </div>
+                                <div class="row g-2 mb-2">
+                                    <div class="col-7"><input type="date" name="date" class="form-control" required>
+                                    </div>
+                                    <div class="col-5"><input type="time" name="time" class="form-control"></div>
+                                </div>
+                                <div class="mb-2">
+                                    <select name="service_type" class="form-select">
+                                        {% for s in all_service_types %}
+                                        <option value="{{ s.name }}">{{ s.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="mb-3"><textarea name="notes" class="form-control" rows="2"
+                                        placeholder="Notas..."></textarea></div>
+                                <button type="submit" class="btn btn-warning w-100 fw-bold">AGENDAR</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-    // --- FUNCIÓN COMÚN PARA CLIC EN EVENTO (PARA AMBOS CALENDARIOS) ---
-    function handleEventClick(info) {
-        const props = info.event.extendedProps;
-        document.getElementById('evtId').value = info.event.id;
-        document.getElementById('evtClient').innerText = props.client;
-        document.getElementById('evtDesc').innerText = props.desc;
-        
-        // Mostrar técnico si existe (Agenda Global)
-        const techBadge = document.getElementById('evtTechBadge');
-        if(props.tech_name) {
-            techBadge.innerText = props.tech_name;
-            techBadge.style.display = 'inline-block';
-        } else {
-            techBadge.style.display = 'none';
-        }
+    <div class="modal fade" id="modalEventActionAdmin" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content bg-dark border-secondary text-white">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title">Gestionar Cita <span id="evtTechBadge" class="badge bg-secondary ms-2"
+                            style="font-size:0.6em"></span></h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <h5 id="evtClient" class="text-warning fw-bold"></h5>
+                    <span id="evtStatus" class="badge mb-3"></span>
+                    <p class="small text-muted border p-2 rounded border-secondary bg-black" id="evtDesc"></p>
+                    <input type="hidden" id="evtId">
 
-        const statusSpan = document.getElementById('evtStatus');
-        statusSpan.innerText = props.status;
-        const btnComplete = document.getElementById('btnCompleteAdmin');
-        
-        // Lógica de Informe PDF
-        const btnReportContainer = document.getElementById('btnViewReportContainer');
-        const btnReport = document.getElementById('btnViewReport');
+                    <div id="btnViewReportContainer" class="mt-3 text-center d-none">
+                        <a href="#" id="btnViewReport" target="_blank" class="btn btn-light btn-sm w-100"><i
+                                class="bi bi-file-earmark-pdf text-danger"></i> Ver Informe PDF</a>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-outline-warning btn-sm"
+                        onclick="openEditAdminModal()">Editar</button>
+                    <button type="button" class="btn btn-outline-danger btn-sm"
+                        onclick="performAdminTaskAction('delete')">Eliminar</button>
+                    <button type="button" class="btn btn-success btn-sm" id="btnCompleteAdmin"
+                        onclick="performAdminTaskAction('complete')">Marcar Hecha</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
-        if(props.status === 'Completado') {
-            statusSpan.className = 'badge bg-success';
-            btnComplete.style.display = 'none';
-            
-            // Mostrar enlace al informe
-            btnReportContainer.classList.remove('d-none');
-            btnReport.href = `/print_report/${info.event.id}`;
-        } else {
-            statusSpan.className = 'badge bg-primary';
-            btnComplete.style.display = 'inline-block';
-            btnReportContainer.classList.add('d-none');
-        }
-        modalActionAdmin.show();
-    }
+    <div class="modal fade" id="modalEditAppointmentAdmin" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <form action="/edit_appointment/0" method="POST" id="formEditApptAdmin"
+                class="modal-content bg-dark border-warning text-white">
+                <div class="modal-header border-0">
+                    <h5>Editar Cita</h5><button type="button" class="btn-close btn-close-white"
+                        data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3 position-relative">
+                        <label class="form-label">Cliente</label>
+                        <input type="text" name="client_name" id="editAdminClientInput" class="form-control" required
+                            autocomplete="off">
+                        <div id="editAdminClientList" class="suggestions-list"></div>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-7"><label class="form-label">Fecha</label><input type="date" name="date"
+                                id="editAdminDate" class="form-control" required></div>
+                        <div class="col-5"><label class="form-label">Hora</label><input type="time" name="time"
+                                id="editAdminTime" class="form-control"></div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Tipo Servicio</label>
+                        <select name="service_type" id="editAdminService" class="form-select">
+                            {% for s in all_service_types %}
+                            <option value="{{ s.name }}">{{ s.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3"><label class="form-label">Notas</label><textarea name="notes" id="editAdminNotes"
+                            class="form-control" rows="3"></textarea></div>
+                </div>
+                <div class="modal-footer border-0"><button type="submit" class="btn btn-warning w-100">Guardar
+                        Cambios</button></div>
+            </form>
+        </div>
+    </div>
 
-    // --- AGENDA INDIVIDUAL ---
-    function verAgenda(id, name) {
-        document.getElementById('techName').innerText = name.toUpperCase();
-        document.getElementById('formTechId').value = id;
-        const modal = new bootstrap.Modal(document.getElementById('modalCale'));
-        modal.show();
-        
-        document.getElementById('modalCale').addEventListener('shown.bs.modal', function () {
-            if (calendar) calendar.destroy();
-            var calendarEl = document.getElementById('calendarAdmin');
-            var isMobile = window.innerWidth < 992; 
-            
-            calendar = new FullCalendar.Calendar(calendarEl, {
-                initialView: isMobile ? 'listWeek' : 'dayGridMonth', 
-                locale: 'es',
-                headerToolbar: { 
-                    left: 'prev,next', 
-                    center: 'title', 
-                    right: isMobile ? 'today' : 'dayGridMonth,listWeek' 
-                },
-                height: isMobile ? 350 : 500,
-                events: '/api/admin/tasks/' + id,
-                
-                dateClick: function(info) {
-                    const dateInput = document.querySelector('#modalCale input[name="date"]');
-                    if(dateInput) dateInput.value = info.dateStr;
-                },
-                
-                eventClick: handleEventClick
-            });
-            calendar.render();
-            setupAutocomplete('adminClientInput', 'adminClientList');
+    <div class="modal fade" id="modalAddStock" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <form action="/manage_stock" method="POST" class="modal-content bg-dark border-success">
+                <div class="modal-header border-0">
+                    <h5 class="text-white">Nuevo Artículo</h5><button type="button" class="btn-close btn-close-white"
+                        data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="action" value="add">
+                    <div class="mb-3"><label class="form-label">Nombre</label><input name="name" class="form-control"
+                            required></div>
+                    <div class="mb-3"><label class="form-label">Categoría</label><select name="category"
+                            class="form-select">
+                            <option>Consumible</option>
+                            <option>Pieza</option>
+                        </select></div>
+                    <div class="mb-3"><label class="form-label">Cant. Inicial</label><input type="number"
+                            name="quantity" class="form-control" value="1" required></div>
+                </div>
+                <div class="modal-footer border-0"><button type="submit" class="btn btn-success w-100">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-        }, { once: true });
-    }
-    
-    // --- AGENDA GLOBAL ---
-    // Inicializar cuando se muestra la pestaña
-    document.getElementById('tabGlobalBtn').addEventListener('shown.bs.tab', function() {
-        if(calendarGlobalInstance) {
-            calendarGlobalInstance.render();
-            // Aseguramos que los filtros se apliquen al volver a la pestaña
-            updateGlobalFilters();
-            return;
-        }
+    <div class="modal fade" id="modalEditStock" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <form action="/manage_stock" method="POST" class="modal-content bg-dark border-warning">
+                <div class="modal-header border-0">
+                    <h5 class="text-white">Editar Producto</h5><button type="button" class="btn-close btn-close-white"
+                        data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="action" value="edit_full">
+                    <input type="hidden" name="item_id" id="editFullId">
+                    <div class="mb-3"><label class="form-label">Nombre</label><input name="name" id="editFullName"
+                            class="form-control" required></div>
+                    <div class="mb-3"><label class="form-label">Categoría</label><select name="category"
+                            id="editFullCat" class="form-select">
+                            <option>Consumible</option>
+                            <option>Pieza</option>
+                        </select></div>
+                    <div class="mb-3"><label class="form-label">Cantidad (Total)</label><input type="number"
+                            name="quantity" id="editFullQty" class="form-control" required></div>
+                </div>
+                <div class="modal-footer border-0"><button type="submit" class="btn btn-warning w-100">Guardar
+                        Cambios</button></div>
+            </form>
+        </div>
+    </div>
 
-        var calendarEl = document.getElementById('calendarGlobal');
-        var isMobile = window.innerWidth < 768;
+    <div class="modal fade" id="modalAdjustStock" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <form action="/manage_stock" method="POST" class="modal-content bg-dark border-info">
+                <div class="modal-header border-0">
+                    <h5 class="text-white">Ajustar: <span id="adjName" class="text-info"></span></h5><button
+                        type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="action" value="update"><input type="hidden" name="item_id" id="adjId">
+                    <label class="form-label">Variación (+/-)</label><input type="number" name="quantity"
+                        class="form-control" placeholder="Ej: -1 para restar" required>
+                </div>
+                <div class="modal-footer border-0"><button type="submit" class="btn btn-info w-100">Aplicar</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-        calendarGlobalInstance = new FullCalendar.Calendar(calendarEl, {
-            initialView: isMobile ? 'listWeek' : 'dayGridMonth',
-            locale: 'es',
-            headerToolbar: { 
-                left: 'prev,next', 
-                center: 'title', 
-                right: 'dayGridMonth,timeGridWeek,listWeek' 
-            },
-            height: 'auto',
-            events: '/api/admin/all_tasks',
-            
-            // Personalización visual del evento
-            eventDidMount: function(info) {
-                // Filtramos ANTES de renderizar
-                const type = info.event.extendedProps.service_type;
-                const activeTypes = getActiveFilters();
-                
-                if (!activeTypes.includes(type)) {
-                    info.el.style.display = 'none'; // Ocultar por CSS
-                } else {
-                    info.el.style.display = ''; // Mostrar
-                    
-                    // Opacidad si está completado
-                    if(info.event.extendedProps.status === 'Completado') {
-                        info.el.style.opacity = '0.6';
-                        info.el.style.border = '2px solid white';
-                    }
-                }
-            },
-            
-            // Contenido HTML para mostrar el técnico
-            eventContent: function(arg) {
-                let techName = arg.event.extendedProps.tech_name || '';
-                let title = arg.event.title;
-                // Pequeño badge con el nombre del técnico
-                return { html: `<div class="fc-content overflow-hidden text-truncate"><span class="fw-bold badge bg-dark text-white me-1 border border-secondary">${techName}</span> ${title}</div>` };
-            },
+    <div class="modal fade" id="modalAddClient" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <form action="/manage_clients" method="POST" class="modal-content bg-dark border-primary">
+                <div class="modal-header border-0">
+                    <h5 class="text-white">Nuevo Cliente</h5><button type="button" class="btn-close btn-close-white"
+                        data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="action" value="add">
+                    <div class="mb-3"><label class="form-label">Nombre Empresa / Particular</label><input name="name"
+                            class="form-control" required></div>
+                </div>
+                <div class="modal-footer border-0"><button type="submit" class="btn btn-primary w-100">Añadir
+                        Cliente</button></div>
+            </form>
+        </div>
+    </div>
 
-            eventClick: handleEventClick
-        });
-        calendarGlobalInstance.render();
-    });
+    <div class="modal fade" id="modalEditClient" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <form action="/manage_clients" method="POST" class="modal-content bg-dark border-warning">
+                <div class="modal-header border-0">
+                    <h5 class="text-white">Editar Cliente</h5><button type="button" class="btn-close btn-close-white"
+                        data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="action" value="edit">
+                    <input type="hidden" name="client_id" id="editClientId">
+                    <div class="mb-3"><label class="form-label">Nombre</label><input name="name" id="editClientName"
+                            class="form-control" required></div>
+                </div>
+                <div class="modal-footer border-0"><button type="submit"
+                        class="btn btn-warning w-100">Actualizar</button></div>
+            </form>
+        </div>
+    </div>
 
-    // --- LÓGICA DE FILTRADO CORREGIDA ---
-    
-    // 1. Obtiene un array de los tipos que tienen el checkbox marcado
-    function getActiveFilters() {
-        const activeTypes = [];
-        document.querySelectorAll('.filter-cb:checked').forEach(cb => {
-            activeTypes.push(cb.value);
-        });
-        return activeTypes;
-    }
+    <div class="modal fade" id="modalImportClients" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <form action="/import_clients" method="POST" enctype="multipart/form-data"
+                class="modal-content bg-dark border-info">
+                <div class="modal-header border-0">
+                    <h5 class="text-white">Importar Clientes JSON</h5><button type="button"
+                        class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info small">Formato: <code>[{"name": "Cliente 1"}]</code></div>
+                    <div class="mb-3"><label class="form-label">Archivo JSON</label><input type="file" name="file"
+                            class="form-control" accept=".json" required></div>
+                </div>
+                <div class="modal-footer border-0"><button type="submit" class="btn btn-info w-100">Importar</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-    // 2. Se ejecuta al cambiar cualquier checkbox
-    function updateGlobalFilters() {
-        if(!calendarGlobalInstance) return;
-        
-        const activeTypes = getActiveFilters();
-        const events = calendarGlobalInstance.getEvents();
-        
-        events.forEach(evt => {
-            const type = evt.extendedProps.service_type;
-            if (activeTypes.includes(type)) {
-                evt.setProp('display', 'auto'); // Mostrar
+    <div class="modal fade" id="modalAddService" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <form action="/manage_services" method="POST" class="modal-content bg-dark border-primary">
+                <div class="modal-header border-0">
+                    <h5 class="text-white">Nuevo Tipo de Servicio</h5><button type="button"
+                        class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="action" value="add">
+                    <div class="mb-3">
+                        <label class="form-label">Nombre</label>
+                        <input name="name" class="form-control" placeholder="Ej: Consultoría" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Color Etiqueta</label>
+                        <input type="color" name="color" class="form-control form-control-color w-100" value="#563d7c"
+                            title="Elige un color">
+                    </div>
+                </div>
+                <div class="modal-footer border-0"><button type="submit" class="btn btn-primary w-100">Crear
+                        Servicio</button></div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalEditService" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <form action="/manage_services" method="POST" class="modal-content bg-dark border-warning">
+                <div class="modal-header border-0">
+                    <h5 class="text-white">Editar Servicio</h5><button type="button" class="btn-close btn-close-white"
+                        data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="action" value="edit">
+                    <input type="hidden" name="service_id" id="editServiceId">
+                    <div class="mb-3">
+                        <label class="form-label">Nombre</label>
+                        <input name="name" id="editServiceName" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Color Etiqueta</label>
+                        <input type="color" name="color" id="editServiceColor"
+                            class="form-control form-control-color w-100">
+                    </div>
+                </div>
+                <div class="modal-footer border-0"><button type="submit"
+                        class="btn btn-warning w-100">Actualizar</button></div>
+            </form>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let calendar;
+        let calendarGlobalInstance;
+        const modalActionAdmin = new bootstrap.Modal(document.getElementById('modalEventActionAdmin'));
+
+        // --- MANEJO DE EVENTOS (COMÚN) ---
+        function handleEventClick(info) {
+            const props = info.event.extendedProps;
+            document.getElementById('evtId').value = info.event.id;
+            document.getElementById('evtClient').innerText = props.client;
+            document.getElementById('evtDesc').innerText = props.desc;
+
+            const techBadge = document.getElementById('evtTechBadge');
+            if (props.tech_name) {
+                techBadge.innerText = props.tech_name;
+                techBadge.style.display = 'inline-block';
             } else {
-                evt.setProp('display', 'none'); // Ocultar
+                techBadge.style.display = 'none';
             }
-        });
-    }
 
-    function performAdminTaskAction(action) {
-        const id = document.getElementById('evtId').value;
-        if(!confirm('¿Confirmar acción administrativa?')) return;
+            const statusSpan = document.getElementById('evtStatus');
+            statusSpan.innerText = props.status;
+            const btnComplete = document.getElementById('btnCompleteAdmin');
 
-        fetch(`/api/task_action/${id}/${action}`, { method: 'POST' })
-        .then(res => res.json())
-        .then(data => {
-            if(data.success) {
-                if(calendar) calendar.refetchEvents();
-                if(calendarGlobalInstance) calendarGlobalInstance.refetchEvents();
-                modalActionAdmin.hide();
+            const btnReportContainer = document.getElementById('btnViewReportContainer');
+            const btnReport = document.getElementById('btnViewReport');
+
+            if (props.status === 'Completado') {
+                statusSpan.className = 'badge bg-success';
+                btnComplete.style.display = 'none';
+                btnReportContainer.classList.remove('d-none');
+                btnReport.href = `/print_report/${info.event.id}`;
             } else {
-                alert('Error: ' + data.msg);
+                statusSpan.className = 'badge bg-primary';
+                btnComplete.style.display = 'inline-block';
+                btnReportContainer.classList.add('d-none');
             }
-        });
-    }
+            modalActionAdmin.show();
+        }
 
-    // Funciones Helper (Stock, Clientes, Autocomplete) - Mantenidas
-    function ajustarStock(id, name) {
-        document.getElementById('adjId').value = id;
-        document.getElementById('adjName').innerText = name;
-        new bootstrap.Modal(document.getElementById('modalAdjustStock')).show();
-    }
+        // --- AGENDA INDIVIDUAL ---
+        function verAgenda(id, name) {
+            document.getElementById('techName').innerText = name.toUpperCase();
+            document.getElementById('formTechId').value = id;
+            const modal = new bootstrap.Modal(document.getElementById('modalCale'));
+            modal.show();
 
-    function openEditStockModal(id, name, category, qty) {
-        document.getElementById('editFullId').value = id;
-        document.getElementById('editFullName').value = name;
-        document.getElementById('editFullCat').value = category;
-        document.getElementById('editFullQty').value = qty;
-        new bootstrap.Modal(document.getElementById('modalEditStock')).show();
-    }
+            document.getElementById('modalCale').addEventListener('shown.bs.modal', function () {
+                if (calendar) calendar.destroy();
+                var calendarEl = document.getElementById('calendarAdmin');
+                var isMobile = window.innerWidth < 992;
 
-    function openEditClientModal(id, name) {
-        document.getElementById('editClientId').value = id;
-        document.getElementById('editClientName').value = name;
-        new bootstrap.Modal(document.getElementById('modalEditClient')).show();
-    }
+                calendar = new FullCalendar.Calendar(calendarEl, {
+                    initialView: isMobile ? 'listWeek' : 'dayGridMonth',
+                    locale: 'es',
+                    headerToolbar: {
+                        left: 'prev,next',
+                        center: 'title',
+                        right: isMobile ? 'today' : 'dayGridMonth,listWeek'
+                    },
+                    height: isMobile ? 350 : 500,
+                    events: '/api/admin/tasks/' + id,
 
-    function setupAutocomplete(inputId, listId) {
-        const input = document.getElementById(inputId);
-        const list = document.getElementById(listId);
-        if(!input) return;
+                    dateClick: function (info) {
+                        const dateInput = document.querySelector('#modalCale input[name="date"]');
+                        if (dateInput) dateInput.value = info.dateStr;
+                    },
+                    eventClick: handleEventClick
+                });
+                calendar.render();
+                setupAutocomplete('adminClientInput', 'adminClientList');
 
-        input.addEventListener('input', function() {
-            const val = this.value;
-            if(!val || val.length < 2) {
-                list.innerHTML = '';
-                list.style.display = 'none';
+            }, { once: true });
+        }
+
+        // --- AGENDA GLOBAL ---
+        document.getElementById('tabGlobalBtn').addEventListener('shown.bs.tab', function () {
+            if (calendarGlobalInstance) {
+                calendarGlobalInstance.render();
+                updateGlobalFilters();
                 return;
             }
-            fetch(`/api/clients_search?q=${encodeURIComponent(val)}`)
+
+            var calendarEl = document.getElementById('calendarGlobal');
+            var isMobile = window.innerWidth < 768;
+
+            calendarGlobalInstance = new FullCalendar.Calendar(calendarEl, {
+                initialView: isMobile ? 'listWeek' : 'dayGridMonth',
+                locale: 'es',
+                headerToolbar: {
+                    left: 'prev,next',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek,listWeek'
+                },
+                height: 'auto',
+                events: '/api/admin/all_tasks',
+
+                // FILTRADO DINÁMICO
+                eventDidMount: function (info) {
+                    const type = info.event.extendedProps.service_type;
+                    const activeTypes = getActiveFilters();
+
+                    if (!activeTypes.includes(type)) {
+                        info.el.style.display = 'none';
+                    } else {
+                        info.el.style.display = '';
+                        if (info.event.extendedProps.status === 'Completado') {
+                            info.el.style.opacity = '0.6';
+                            info.el.style.border = '2px solid white';
+                        }
+                    }
+                },
+
+                eventContent: function (arg) {
+                    let techName = arg.event.extendedProps.tech_name || '';
+                    let title = arg.event.title;
+                    return { html: `<div class="fc-content overflow-hidden text-truncate"><span class="fw-bold badge bg-dark text-white me-1 border border-secondary">${techName}</span> ${title}</div>` };
+                },
+
+                eventClick: handleEventClick
+            });
+            calendarGlobalInstance.render();
+        });
+
+        // --- LÓGICA DE FILTRADO DINÁMICO ---
+        function getActiveFilters() {
+            const activeTypes = [];
+            document.querySelectorAll('.filter-cb:checked').forEach(cb => {
+                activeTypes.push(cb.value);
+            });
+            return activeTypes;
+        }
+
+        function updateGlobalFilters() {
+            if (!calendarGlobalInstance) return;
+            const activeTypes = getActiveFilters();
+            const events = calendarGlobalInstance.getEvents();
+
+            events.forEach(evt => {
+                const type = evt.extendedProps.service_type;
+                if (activeTypes.includes(type)) {
+                    evt.setProp('display', 'auto');
+                } else {
+                    evt.setProp('display', 'none');
+                }
+            });
+        }
+
+        // --- GESTIÓN DE ACCIONES ---
+        function performAdminTaskAction(action) {
+            const id = document.getElementById('evtId').value;
+            if (!confirm('¿Confirmar acción administrativa?')) return;
+
+            fetch(`/api/task_action/${id}/${action}`, { method: 'POST' })
                 .then(res => res.json())
                 .then(data => {
-                    list.innerHTML = '';
-                    if (data.length > 0) {
-                        list.style.display = 'block';
-                        data.forEach(item => {
-                            const div = document.createElement('div');
-                            div.className = 'suggestion-item';
-                            div.innerText = item.name;
-                            div.onclick = function() {
-                                input.value = item.name;
-                                list.innerHTML = '';
-                                list.style.display = 'none';
-                            };
-                            list.appendChild(div);
-                        });
+                    if (data.success) {
+                        if (calendar) calendar.refetchEvents();
+                        if (calendarGlobalInstance) calendarGlobalInstance.refetchEvents();
+                        modalActionAdmin.hide();
                     } else {
-                        list.style.display = 'none';
+                        alert('Error: ' + data.msg);
                     }
                 });
-        });
+        }
 
-        document.addEventListener('click', function(e) {
-            if(e.target !== input && e.target !== list) {
-                list.style.display = 'none';
-            }
-        });
-    }
+        // --- HELPERS Y MODALES ---
+        function ajustarStock(id, name) {
+            document.getElementById('adjId').value = id;
+            document.getElementById('adjName').innerText = name;
+            new bootstrap.Modal(document.getElementById('modalAdjustStock')).show();
+        }
 
-    function filterClientsTable() {
-        var input, filter, table, tr, td, i, txtValue;
-        input = document.getElementById("clientSearchInput");
-        filter = input.value.toUpperCase();
-        table = document.getElementById("clientsTable");
-        tr = table.getElementsByTagName("tr");
-        for (i = 0; i < tr.length; i++) {
-            td = tr[i].getElementsByClassName("client-name-cell")[0];
-            if (td) {
-                txtValue = td.textContent || td.innerText;
-                if (txtValue.toUpperCase().indexOf(filter) > -1) {
-                    tr[i].style.display = "";
-                } else {
-                    tr[i].style.display = "none";
+        function openEditStockModal(id, name, category, qty) {
+            document.getElementById('editFullId').value = id;
+            document.getElementById('editFullName').value = name;
+            document.getElementById('editFullCat').value = category;
+            document.getElementById('editFullQty').value = qty;
+            new bootstrap.Modal(document.getElementById('modalEditStock')).show();
+        }
+
+        function openEditClientModal(id, name) {
+            document.getElementById('editClientId').value = id;
+            document.getElementById('editClientName').value = name;
+            new bootstrap.Modal(document.getElementById('modalEditClient')).show();
+        }
+
+        function openEditServiceModal(id, name, color) {
+            document.getElementById('editServiceId').value = id;
+            document.getElementById('editServiceName').value = name;
+            document.getElementById('editServiceColor').value = color;
+            new bootstrap.Modal(document.getElementById('modalEditService')).show();
+        }
+
+        function setupAutocomplete(inputId, listId) {
+            const input = document.getElementById(inputId);
+            const list = document.getElementById(listId);
+            if (!input) return;
+
+            input.addEventListener('input', function () {
+                const val = this.value;
+                if (!val || val.length < 2) {
+                    list.innerHTML = '';
+                    list.style.display = 'none';
+                    return;
+                }
+                fetch(`/api/clients_search?q=${encodeURIComponent(val)}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        list.innerHTML = '';
+                        if (data.length > 0) {
+                            list.style.display = 'block';
+                            data.forEach(item => {
+                                const div = document.createElement('div');
+                                div.className = 'suggestion-item';
+                                div.innerText = item.name;
+                                div.onclick = function () {
+                                    input.value = item.name;
+                                    list.innerHTML = '';
+                                    list.style.display = 'none';
+                                };
+                                list.appendChild(div);
+                            });
+                        } else {
+                            list.style.display = 'none';
+                        }
+                    });
+            });
+
+            document.addEventListener('click', function (e) {
+                if (e.target !== input && e.target !== list) {
+                    list.style.display = 'none';
+                }
+            });
+        }
+
+        function filterClientsTable() {
+            var input, filter, table, tr, td, i, txtValue;
+            input = document.getElementById("clientSearchInput");
+            filter = input.value.toUpperCase();
+            table = document.getElementById("clientsTable");
+            tr = table.getElementsByTagName("tr");
+            for (i = 0; i < tr.length; i++) {
+                td = tr[i].getElementsByClassName("client-name-cell")[0];
+                if (td) {
+                    txtValue = td.textContent || td.innerText;
+                    if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                        tr[i].style.display = "";
+                    } else {
+                        tr[i].style.display = "none";
+                    }
                 }
             }
         }
-    }
 
-    function openEditAdminModal() {
-        const taskId = document.getElementById('evtId').value;
-        fetch(`/api/get_task/${taskId}`)
-            .then(res => res.json())
-            .then(data => {
-                if(data.success) {
-                    document.getElementById('editAdminClientInput').value = data.data.client_name;
-                    document.getElementById('editAdminDate').value = data.data.date;
-                    document.getElementById('editAdminTime').value = data.data.time;
-                    document.getElementById('editAdminService').value = data.data.service_type;
-                    document.getElementById('editAdminNotes').value = data.data.notes;
-                    document.getElementById('formEditApptAdmin').action = `/edit_appointment/${taskId}`;
-                    modalActionAdmin.hide();
-                    new bootstrap.Modal(document.getElementById('modalEditAppointmentAdmin')).show();
-                    setupAutocomplete('editAdminClientInput', 'editAdminClientList');
-                }
-            });
-    }
-</script>
+        function openEditAdminModal() {
+            const taskId = document.getElementById('evtId').value;
+            fetch(`/api/get_task/${taskId}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('editAdminClientInput').value = data.data.client_name;
+                        document.getElementById('editAdminDate').value = data.data.date;
+                        document.getElementById('editAdminTime').value = data.data.time;
+                        document.getElementById('editAdminService').value = data.data.service_type;
+                        document.getElementById('editAdminNotes').value = data.data.notes;
+                        document.getElementById('formEditApptAdmin').action = `/edit_appointment/${taskId}`;
+                        modalActionAdmin.hide();
+                        new bootstrap.Modal(document.getElementById('modalEditAppointmentAdmin')).show();
+                        setupAutocomplete('editAdminClientInput', 'editAdminClientList');
+                    }
+                });
+        }
+    </script>
 </body>
+
 </html>

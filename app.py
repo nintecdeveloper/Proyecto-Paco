@@ -5,7 +5,6 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.utils import secure_filename
 import io
 
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -29,6 +28,11 @@ class User(UserMixin, db.Model):
 class Client(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
+
+class ServiceType(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), unique=True, nullable=False)
+    color = db.Column(db.String(7), default='#6c757d') # Hex code color
 
 class Stock(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -62,6 +66,12 @@ class Task(db.Model):
 def load_user(id):
     return User.query.get(int(id))
 
+# --- CONTEXT PROCESSOR ---
+# Esto hace que 'all_service_types' esté disponible en TODOS los templates HTML automáticamente
+@app.context_processor
+def inject_globals():
+    return dict(all_service_types=ServiceType.query.all())
+
 # --- RUTAS PRINCIPALES ---
 @app.route('/')
 def index():
@@ -85,15 +95,50 @@ def dashboard():
         informes = Task.query.filter_by(status='Completado').order_by(Task.date.desc()).all()
         inventory = Stock.query.order_by(Stock.name).all()
         clients = Client.query.order_by(Client.name).all()
-        return render_template('admin_panel.html', empleados=empleados, informes=informes, inventory=inventory, clients=clients)
+        services = ServiceType.query.order_by(ServiceType.name).all()
+        return render_template('admin_panel.html', empleados=empleados, informes=informes, inventory=inventory, clients=clients, services=services)
     
     stock_items = Stock.query.all()
     pending_tasks = Task.query.filter_by(tech_id=current_user.id, status='Pendiente').order_by(Task.date).all()
     
+    # Nota: tech_panel.html también tendrá acceso a 'all_service_types' gracias al context_processor
     return render_template('tech_panel.html', 
                            today_date=date.today().strftime('%Y-%m-%d'), 
                            stock_items=stock_items,
                            pending_tasks=pending_tasks)
+
+@app.route('/manage_services', methods=['POST'])
+@login_required
+def manage_services():
+    if current_user.role != 'admin': return redirect(url_for('dashboard'))
+    
+    action = request.form.get('action')
+    
+    if action == 'add':
+        existing = ServiceType.query.filter_by(name=request.form['name']).first()
+        if not existing:
+            db.session.add(ServiceType(name=request.form['name'], color=request.form['color']))
+            flash('Tipo de servicio añadido.', 'success')
+        else:
+            flash('Ese servicio ya existe.', 'warning')
+            
+    elif action == 'edit':
+        svc = ServiceType.query.get(request.form['service_id'])
+        if svc:
+            svc.name = request.form['name']
+            svc.color = request.form['color']
+            flash('Servicio actualizado.', 'success')
+            
+    elif action == 'delete':
+        svc = ServiceType.query.get(request.form['service_id'])
+        if svc:
+            # Opcional: Podrías querer migrar las tareas viejas a otro tipo, 
+            # pero por ahora simplemente las dejamos con el nombre antiguo (texto)
+            db.session.delete(svc)
+            flash('Tipo de servicio eliminado.', 'warning')
+            
+    db.session.commit()
+    return redirect(url_for('dashboard'))
 
 @app.route('/save_report', methods=['POST'])
 @login_required
@@ -502,20 +547,13 @@ def get_all_admin_tasks():
     return format_events(tasks)
 
 def format_events(tasks):
-    events = []
+    # Cargar tipos de la BD y mapear nombre -> color
+    all_types = ServiceType.query.all()
+    type_colors = {s.name: s.color for s in all_types}
     
-    # Mapa de colores por TIPO de tarea para diferenciarlas visualmente
-    type_colors = {
-        'Revisión': '#0d6efd',    # Azul
-        'Instalación': '#6f42c1', # Morado
-        'Urgencia': '#dc3545',    # Rojo
-        'Avería': '#fd7e14',      # Naranja
-        'Mantenimiento': '#20c997', # Verde agua
-        'Otro': '#adb5bd'         # Gris
-    }
-
+    events = []
     for t in tasks:
-        # Asignar color según el tipo, por defecto Gris si no coincide
+        # Asignar color según el tipo en BD, por defecto Gris (#6c757d)
         color = type_colors.get(t.service_type, '#6c757d')
         
         title = f"{t.client_name} ({t.service_type})"
@@ -545,6 +583,7 @@ def init_db():
     with app.app_context():
         db.create_all()
         
+        # Usuarios Base
         if not User.query.filter_by(username='admin').first():
             db.session.add(User(username='admin', role='admin', password_hash=generate_password_hash('admin123')))
         if not User.query.filter_by(username='tech').first():
@@ -554,10 +593,25 @@ def init_db():
         if not User.query.filter_by(username='maria').first():
             db.session.add(User(username='maria', role='tech', password_hash=generate_password_hash('maria123')))
         
+        # Tipos de Servicio por Defecto (Carga inicial)
+        if not ServiceType.query.first():
+            initial_services = [
+                {'name': 'Revisión', 'color': '#0d6efd'},
+                {'name': 'Instalación', 'color': '#6f42c1'},
+                {'name': 'Urgencia', 'color': '#dc3545'},
+                {'name': 'Avería', 'color': '#fd7e14'},
+                {'name': 'Mantenimiento', 'color': '#20c997'},
+                {'name': 'Otro', 'color': '#adb5bd'}
+            ]
+            for s in initial_services:
+                db.session.add(ServiceType(name=s['name'], color=s['color']))
+
+        # Stock Base
         if not Stock.query.first():
             db.session.add(Stock(name='Toner Genérico', category='Consumible', quantity=10))
             db.session.add(Stock(name='Fusor HP 4000', category='Pieza', quantity=2))
         
+        # Clientes Base
         if not Client.query.first():
             sample_clients = [
                 'Oficinas Centrales Bankia', 'Talleres Manolo S.L.', 'Colegio San José', 
