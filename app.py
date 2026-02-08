@@ -70,7 +70,16 @@ def load_user(id):
 # Esto hace que 'all_service_types' esté disponible en TODOS los templates HTML automáticamente
 @app.context_processor
 def inject_globals():
-    return dict(all_service_types=ServiceType.query.all())
+    try:
+        return {
+            'all_service_types': ServiceType.query.all()
+        }
+    except Exception as e:
+        print("ERROR context_processor:", e)
+        return {
+            'all_service_types': []
+        }
+
 
 # --- RUTAS PRINCIPALES ---
 @app.route('/')
@@ -579,50 +588,6 @@ def logout():
     logout_user()
     return redirect(url_for('login'))
 
-def init_db():
-    with app.app_context():
-        db.create_all()
-        
-        # Usuarios Base
-        if not User.query.filter_by(username='admin').first():
-            db.session.add(User(username='admin', role='admin', password_hash=generate_password_hash('admin123')))
-        if not User.query.filter_by(username='tech').first():
-            db.session.add(User(username='tech', role='tech', password_hash=generate_password_hash('tech123')))
-        if not User.query.filter_by(username='carlos').first():
-            db.session.add(User(username='carlos', role='tech', password_hash=generate_password_hash('carlos123')))
-        if not User.query.filter_by(username='maria').first():
-            db.session.add(User(username='maria', role='tech', password_hash=generate_password_hash('maria123')))
-        
-        # Tipos de Servicio por Defecto (Carga inicial)
-        if not ServiceType.query.first():
-            initial_services = [
-                {'name': 'Revisión', 'color': '#0d6efd'},
-                {'name': 'Instalación', 'color': '#6f42c1'},
-                {'name': 'Urgencia', 'color': '#dc3545'},
-                {'name': 'Avería', 'color': '#fd7e14'},
-                {'name': 'Mantenimiento', 'color': '#20c997'},
-                {'name': 'Otro', 'color': '#adb5bd'}
-            ]
-            for s in initial_services:
-                db.session.add(ServiceType(name=s['name'], color=s['color']))
-
-        # Stock Base
-        if not Stock.query.first():
-            db.session.add(Stock(name='Toner Genérico', category='Consumible', quantity=10))
-            db.session.add(Stock(name='Fusor HP 4000', category='Pieza', quantity=2))
-        
-        # Clientes Base
-        if not Client.query.first():
-            sample_clients = [
-                'Oficinas Centrales Bankia', 'Talleres Manolo S.L.', 'Colegio San José', 
-                'Hospital General', 'Gestoría López', 'Restaurante El Puerto', 
-                'Inmobiliaria Sol', 'Centro Deportivo Municipal', 'Librería Cervantes'
-            ]
-            for c in sample_clients:
-                db.session.add(Client(name=c))
-                
-        db.session.commit()
-
 # --- BLOQUE DE INICIALIZACIÓN UNIFICADO ---
 with app.app_context():
     # Primero creamos las tablas (la estructura)
@@ -657,4 +622,4 @@ with app.app_context():
 
 # --- ARRANQUE ---
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run()
