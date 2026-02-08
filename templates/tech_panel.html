@@ -40,10 +40,12 @@
             z-index: 1050;
             display: none;
         }
+        /* FIX: Asegurar color blanco para legibilidad */
         .suggestion-item {
             padding: 10px 15px;
             cursor: pointer;
             border-bottom: 1px solid #333;
+            color: #fff;
         }
         .suggestion-item:hover { background: var(--osla-orange); color: white; }
         
@@ -232,13 +234,13 @@
             <div class="modal-footer border-0 pt-0">
                 <button type="button" class="btn btn-outline-danger flex-grow-1" onclick="performTaskAction('delete')">Eliminar</button>
                 <button type="button" class="btn btn-success flex-grow-1" id="btnComplete" onclick="performTaskAction('complete')">Marcar Hecha</button>
+                <button type="button" class="btn btn-outline-warning flex-grow-1" onclick="openEditTechModal()">Editar</button>
             </div>
         </div>
     </div>
 </div>
 
 
-<!-- Modal Editar Cita Tech -->
 <div class="modal fade" id="modalEditAppointmentTech" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <form action="/edit_appointment/0" method="POST" id="formEditApptTech" class="modal-content bg-dark border-warning text-white">
@@ -354,6 +356,8 @@
         const input = document.getElementById(inputId);
         const list = document.getElementById(listId);
         
+        if (!input || !list) return; // Safety check
+
         input.addEventListener('input', function() {
             const val = this.value;
             if(!val || val.length < 2) {
@@ -412,6 +416,7 @@
                     document.getElementById('formEditApptTech').action = `/edit_appointment/${taskId}`;
                     modalAction.hide();
                     new bootstrap.Modal(document.getElementById('modalEditAppointmentTech')).show();
+                    // Setup autocomplete for edit modal
                     setupAutocomplete('editTechClientInput', 'editTechClientList');
                 }
             });
