@@ -31,8 +31,19 @@
         .suggestion-item:hover { background: var(--osla-orange); color: white; }
 
         /* Filtros Calendario */
-        .btn-check:checked + .btn-outline-warning { background-color: var(--osla-orange); border-color: var(--osla-orange); color: white; }
+        .btn-check:checked + .btn-outline-custom { color: white; border-width: 2px; }
         .filter-group { background: #1f1f1f; padding: 10px; border-radius: 10px; border: 1px solid #333; }
+        
+        /* Colores de botones de filtro para coincidir con el calendario */
+        .btn-check:checked + .btn-rev { background-color: #0d6efd; border-color: #0d6efd; }
+        .btn-check:checked + .btn-inst { background-color: #6f42c1; border-color: #6f42c1; }
+        .btn-check:checked + .btn-urg { background-color: #dc3545; border-color: #dc3545; }
+        .btn-check:checked + .btn-ave { background-color: #fd7e14; border-color: #fd7e14; }
+        .btn-check:checked + .btn-mant { background-color: #20c997; border-color: #20c997; }
+        .btn-check:checked + .btn-otro { background-color: #adb5bd; border-color: #adb5bd; }
+        
+        .btn-outline-custom { color: #bbb; border-color: #555; }
+        .btn-outline-custom:hover { color: #fff; background-color: #333; }
 
         /* Mobile overrides */
         @media(max-width: 768px) {
@@ -86,25 +97,25 @@
 
         <div class="tab-pane fade" id="global-agenda">
             <div class="filter-group mb-3 d-flex gap-2 flex-wrap align-items-center justify-content-center">
-                <span class="text-white fw-bold me-2 small">FILTRAR TIPO:</span>
+                <span class="text-white fw-bold me-2 small">MOSTRAR:</span>
                 
                 <input type="checkbox" class="btn-check filter-cb" id="f-rev" value="Revisión" checked onchange="updateGlobalFilters()">
-                <label class="btn btn-sm btn-outline-warning rounded-pill px-3" for="f-rev">Revisión</label>
+                <label class="btn btn-sm btn-outline-custom btn-rev rounded-pill px-3" for="f-rev">Revisión</label>
                 
                 <input type="checkbox" class="btn-check filter-cb" id="f-inst" value="Instalación" checked onchange="updateGlobalFilters()">
-                <label class="btn btn-sm btn-outline-warning rounded-pill px-3" for="f-inst">Instalación</label>
+                <label class="btn btn-sm btn-outline-custom btn-inst rounded-pill px-3" for="f-inst">Instalación</label>
                 
                 <input type="checkbox" class="btn-check filter-cb" id="f-urg" value="Urgencia" checked onchange="updateGlobalFilters()">
-                <label class="btn btn-sm btn-outline-warning rounded-pill px-3" for="f-urg">Urgencia</label>
+                <label class="btn btn-sm btn-outline-custom btn-urg rounded-pill px-3" for="f-urg">Urgencia</label>
                 
                 <input type="checkbox" class="btn-check filter-cb" id="f-ave" value="Avería" checked onchange="updateGlobalFilters()">
-                <label class="btn btn-sm btn-outline-warning rounded-pill px-3" for="f-ave">Avería</label>
+                <label class="btn btn-sm btn-outline-custom btn-ave rounded-pill px-3" for="f-ave">Avería</label>
                 
                 <input type="checkbox" class="btn-check filter-cb" id="f-mant" value="Mantenimiento" checked onchange="updateGlobalFilters()">
-                <label class="btn btn-sm btn-outline-warning rounded-pill px-3" for="f-mant">Mantenimiento</label>
+                <label class="btn btn-sm btn-outline-custom btn-mant rounded-pill px-3" for="f-mant">Mantenimiento</label>
                 
                 <input type="checkbox" class="btn-check filter-cb" id="f-otro" value="Otro" checked onchange="updateGlobalFilters()">
-                <label class="btn btn-sm btn-outline-warning rounded-pill px-3" for="f-otro">Otro</label>
+                <label class="btn btn-sm btn-outline-custom btn-otro rounded-pill px-3" for="f-otro">Otro</label>
             </div>
             <div id="calendarGlobal"></div>
         </div>
@@ -465,6 +476,8 @@
     document.getElementById('tabGlobalBtn').addEventListener('shown.bs.tab', function() {
         if(calendarGlobalInstance) {
             calendarGlobalInstance.render();
+            // Aseguramos que los filtros se apliquen al volver a la pestaña
+            updateGlobalFilters();
             return;
         }
 
@@ -482,19 +495,31 @@
             height: 'auto',
             events: '/api/admin/all_tasks',
             
-            // Renderizado personalizado para mostrar nombre del técnico
+            // Personalización visual del evento
+            eventDidMount: function(info) {
+                // Filtramos ANTES de renderizar
+                const type = info.event.extendedProps.service_type;
+                const activeTypes = getActiveFilters();
+                
+                if (!activeTypes.includes(type)) {
+                    info.el.style.display = 'none'; // Ocultar por CSS
+                } else {
+                    info.el.style.display = ''; // Mostrar
+                    
+                    // Opacidad si está completado
+                    if(info.event.extendedProps.status === 'Completado') {
+                        info.el.style.opacity = '0.6';
+                        info.el.style.border = '2px solid white';
+                    }
+                }
+            },
+            
+            // Contenido HTML para mostrar el técnico
             eventContent: function(arg) {
                 let techName = arg.event.extendedProps.tech_name || '';
                 let title = arg.event.title;
-                return { html: `<div class="fc-content overflow-hidden text-truncate"><small class="fw-bold bg-dark text-warning px-1 rounded me-1">${techName}</small> ${title}</div>` };
-            },
-
-            // Lógica de filtrado en renderizado
-            eventDidMount: function(info) {
-                const type = info.event.extendedProps.service_type;
-                if (!isTypeActive(type)) {
-                    info.el.style.display = 'none';
-                }
+                // Pequeño badge con el nombre del técnico
+                return { html: `<div class="fc-content overflow-hidden text-truncate"><span class="fw-bold badge bg-dark text-white me-1 border border-secondary">${techName}</span> ${title}</div>` };
             },
 
             eventClick: handleEventClick
@@ -502,22 +527,32 @@
         calendarGlobalInstance.render();
     });
 
-    // Lógica de Filtros
-    function isTypeActive(type) {
-        // Mapear el tipo del evento a los checkboxes
-        // (Asumimos que el valor del checkbox coincide con el texto del servicio)
-        const checkboxes = document.querySelectorAll('.filter-cb');
-        for (let cb of checkboxes) {
-            if (cb.value === type) return cb.checked;
-        }
-        return true; // Si no hay filtro específico, mostrar
+    // --- LÓGICA DE FILTRADO CORREGIDA ---
+    
+    // 1. Obtiene un array de los tipos que tienen el checkbox marcado
+    function getActiveFilters() {
+        const activeTypes = [];
+        document.querySelectorAll('.filter-cb:checked').forEach(cb => {
+            activeTypes.push(cb.value);
+        });
+        return activeTypes;
     }
 
+    // 2. Se ejecuta al cambiar cualquier checkbox
     function updateGlobalFilters() {
-        if(calendarGlobalInstance) {
-            // Forzar re-renderizado de eventos para aplicar el display:none
-            calendarGlobalInstance.render(); 
-        }
+        if(!calendarGlobalInstance) return;
+        
+        const activeTypes = getActiveFilters();
+        const events = calendarGlobalInstance.getEvents();
+        
+        events.forEach(evt => {
+            const type = evt.extendedProps.service_type;
+            if (activeTypes.includes(type)) {
+                evt.setProp('display', 'auto'); // Mostrar
+            } else {
+                evt.setProp('display', 'none'); // Ocultar
+            }
+        });
     }
 
     function performAdminTaskAction(action) {
