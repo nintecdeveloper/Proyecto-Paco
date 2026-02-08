@@ -207,7 +207,6 @@
                 <div class="filter-group mb-3 d-flex gap-2 flex-wrap align-items-center justify-content-center">
                     <span class="text-white fw-bold me-2 small">MOSTRAR:</span>
                     {% for s in all_service_types %}
-                    {% for s in all_service_types %}
                     <input type="checkbox" class="btn-check filter-cb" id="f-{{s.id}}" value="{{ s.name }}" checked
                         onchange="updateGlobalFilters()">
                     <label class="btn btn-sm btn-outline-custom rounded-pill px-3" for="f-{{s.id}}"

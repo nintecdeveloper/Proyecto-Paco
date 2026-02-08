@@ -185,6 +185,7 @@ def save_report():
                 task.stock_quantity_used = qty if (stock_id and qty > 0) else 0
                 task.stock_action = action
                 task.status = 'Completado'
+                task.status = 'Completado'
                 flash('Cita del calendario completada y parte generado.', 'success')
             else:
                 flash('Error al vincular con la cita.', 'danger')
@@ -619,4 +620,4 @@ with app.app_context():
 
 # --- ARRANQUE ---
 if __name__ == '__main__':
-    app.run()
+    app.run(host='0.0.0.0', port=5000)
