@@ -623,32 +623,38 @@ def init_db():
                 
         db.session.commit()
 
-init_db()
-
-# --- INICIALIZACIÓN Y ARRANQUE ---
-if __name__ == '__main__':
-    with app.app_context():
-        # 1. Crea las tablas si no existen (incluyendo la de servicios/colores)
-        db.create_all() 
-        
-        # 2. Usuarios base
-        if not User.query.filter_by(username='admin').first():
-            db.session.add(User(username='admin', role='admin', password_hash=generate_password_hash('admin123')))
-            db.session.add(User(username='tech', role='tech', password_hash=generate_password_hash('tech123')))
-        
-        # 3. Servicios con colores (Esto es lo que hacía fallar el Admin)
-        if not ServiceType.query.first():
-            servicios = [
-                {'name': 'Revisión', 'color': '#0d6efd'},
-                {'name': 'Instalación', 'color': '#6f42c1'},
-                {'name': 'Urgencia', 'color': '#dc3545'},
-                {'name': 'Avería', 'color': '#fd7e14'},
-                {'name': 'Mantenimiento', 'color': '#20c997'},
-                {'name': 'Otro', 'color': '#adb5bd'}
-            ]
-            for s in servicios:
-                db.session.add(ServiceType(name=s['name'], color=s['color']))
-        
-        db.session.commit()
+# --- BLOQUE DE INICIALIZACIÓN UNIFICADO ---
+with app.app_context():
+    # Primero creamos las tablas (la estructura)
+    db.create_all()
     
+    # Después llenamos los datos (el contenido)
+    # 1. Usuarios
+    if not User.query.filter_by(username='admin').first():
+        db.session.add(User(username='admin', role='admin', password_hash=generate_password_hash('admin123')))
+        db.session.add(User(username='tech', role='tech', password_hash=generate_password_hash('tech123')))
+    
+    # 2. Tipos de Servicio y Colores (Lo que hacía fallar el admin)
+    if not ServiceType.query.first():
+        servicios = [
+            {'name': 'Revisión', 'color': '#0d6efd'},
+            {'name': 'Instalación', 'color': '#6f42c1'},
+            {'name': 'Urgencia', 'color': '#dc3545'},
+            {'name': 'Avería', 'color': '#fd7e14'},
+            {'name': 'Mantenimiento', 'color': '#20c997'},
+            {'name': 'Otro', 'color': '#adb5bd'}
+        ]
+        for s in servicios:
+            db.session.add(ServiceType(name=s['name'], color=s['color']))
+
+    # 3. Datos de ejemplo
+    if not Stock.query.first():
+        db.session.add(Stock(name='Toner Genérico', category='Consumible', quantity=10))
+    if not Client.query.first():
+        db.session.add(Client(name='Cliente Ejemplo'))
+        
+    db.session.commit()
+
+# --- ARRANQUE ---
+if __name__ == '__main__':
     app.run(debug=True)
