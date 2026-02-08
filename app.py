@@ -625,6 +625,29 @@ def init_db():
 
 init_db()
 
+# --- INICIO DE LA APLICACIÓN ---
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+    with app.app_context():
+        # ESTA LÍNEA ES LA MÁS IMPORTANTE PARA RENDER
+        db.create_all() 
+        
+        # Crear usuario admin si no existe
+        if not User.query.filter_by(username='admin').first():
+            db.session.add(User(username='admin', role='admin', password_hash=generate_password_hash('admin123')))
+        
+        # Tipos de Servicio iniciales (Para que el panel de admin no cargue vacío)
+        if not ServiceType.query.first():
+            initial_services = [
+                {'name': 'Revisión', 'color': '#0d6efd'},
+                {'name': 'Instalación', 'color': '#6f42c1'},
+                {'name': 'Urgencia', 'color': '#dc3545'},
+                {'name': 'Avería', 'color': '#fd7e14'},
+                {'name': 'Mantenimiento', 'color': '#20c997'},
+                {'name': 'Otro', 'color': '#adb5bd'}
+            ]
+            for s in initial_services:
+                db.session.add(ServiceType(name=s['name'], color=s['color']))
+        
+        db.session.commit()
+        
+    app.run(debug=True)
