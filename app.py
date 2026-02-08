@@ -213,8 +213,8 @@ def save_report():
             client_name=request.form['client_name'],
             description=request.form['description'],
             date=nueva_fecha,
-            start_time=request.form['start_time'],
-            end_time=request.form['end_time'],
+            start_time=request.form['entry_time'],
+            end_time=request.form['exit_time'],
             service_type=request.form['service_type'],
             parts_text=request.form.get('parts_text', ''),
             stock_item_id=int(stock_id) if stock_id else None,
@@ -242,18 +242,21 @@ def save_report():
 @app.route('/schedule_appointment', methods=['POST'])
 @login_required
 def schedule_appointment():
-    if current_user.role != 'admin':
-        return redirect(url_for('dashboard'))
-    
     try:
-        tech_id = int(request.form['tech_id'])
+        # Si es técnico, asignar a sí mismo
+        if current_user.role == 'tech':
+            tech_id = current_user.id
+        else:
+            # Si es admin, usar el tech_id del formulario
+            tech_id = int(request.form['tech_id'])
+            
         appt_date = datetime.strptime(request.form['date'], '%Y-%m-%d').date()
         appt_time = request.form['time']
         
         nueva = Task(
             tech_id=tech_id,
             client_name=request.form['client_name'],
-            description=request.form['notes'],
+            description=request.form.get('notes', ''),
             date=appt_date,
             start_time=appt_time,
             service_type=request.form['service_type'],
@@ -283,7 +286,7 @@ def edit_appointment(task_id):
         task.date = datetime.strptime(request.form['date'], '%Y-%m-%d').date()
         task.start_time = request.form['time']
         task.service_type = request.form['service_type']
-        task.description = request.form['notes']
+        task.description = request.form.get('notes', '')
         
         db.session.commit()
         flash('Cita actualizada correctamente.', 'success')
@@ -616,8 +619,8 @@ with app.app_context():
     
     # Después llenamos los datos (el contenido)
     # 1. Usuarios
-    if not User.query.filter_by(username='admin').first():
-        db.session.add(User(username='admin', role='admin', password_hash=generate_password_hash('admin123')))
+    if not User.query.filter_by(username='paco').first():
+        db.session.add(User(username='paco', role='admin', password_hash=generate_password_hash('admin123')))
         db.session.add(User(username='tech', role='tech', password_hash=generate_password_hash('tech123')))
     
     # 2. Tipos de Servicio y Colores
