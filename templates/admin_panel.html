@@ -138,9 +138,13 @@
         </div>
 
         <div class="tab-pane fade" id="clients">
-            <div class="d-flex justify-content-between mb-3 align-items-center">
+            <div class="d-flex justify-content-between mb-3 align-items-center flex-wrap gap-2">
                 <h4 class="fw-bold text-white fs-5 m-0">Cartera Clientes</h4>
-                <button class="btn btn-primary btn-sm px-3" data-bs-toggle="modal" data-bs-target="#modalAddClient"><i class="bi bi-person-plus-fill"></i> Nuevo</button>
+                <div class="d-flex gap-2">
+                    <a href="/export_clients" class="btn btn-success btn-sm"><i class="bi bi-download"></i> Exportar</a>
+                    <button class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#modalImportClients"><i class="bi bi-upload"></i> Importar</button>
+                    <button class="btn btn-primary btn-sm px-3" data-bs-toggle="modal" data-bs-target="#modalAddClient"><i class="bi bi-person-plus-fill"></i> Nuevo</button>
+                </div>
             </div>
             <div class="table-responsive">
                 <table class="table table-dark table-hover align-middle small">
@@ -218,6 +222,7 @@
                 <input type="hidden" id="evtId">
             </div>
             <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-outline-warning btn-sm" onclick="openEditAdminModal()">Editar</button>
                 <button type="button" class="btn btn-outline-danger btn-sm" onclick="performAdminTaskAction('delete')">Eliminar</button>
                 <button type="button" class="btn btn-success btn-sm" id="btnCompleteAdmin" onclick="performAdminTaskAction('complete')">Marcar Hecha</button>
             </div>
@@ -296,6 +301,48 @@
     </div>
 </div>
 
+<!-- Modal Importar Clientes -->
+<div class="modal fade" id="modalImportClients" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <form action="/import_clients" method="POST" enctype="multipart/form-data" class="modal-content bg-dark border-info">
+            <div class="modal-header border-0"><h5 class="text-white">Importar Clientes JSON</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="alert alert-info small">Formato: <code>[{"name": "Cliente 1"}]</code></div>
+                <div class="mb-3"><label class="form-label">Archivo JSON</label><input type="file" name="file" class="form-control" accept=".json" required></div>
+            </div>
+            <div class="modal-footer border-0"><button type="submit" class="btn btn-info w-100">Importar</button></div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Editar Cita Admin -->
+<div class="modal fade" id="modalEditAppointmentAdmin" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <form action="/edit_appointment/0" method="POST" id="formEditApptAdmin" class="modal-content bg-dark border-warning text-white">
+            <div class="modal-header border-0"><h5>Editar Cita</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="mb-3 position-relative">
+                    <label class="form-label">Cliente</label>
+                    <input type="text" name="client_name" id="editAdminClientInput" class="form-control" required autocomplete="off">
+                    <div id="editAdminClientList" class="suggestions-list"></div>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-7"><label class="form-label">Fecha</label><input type="date" name="date" id="editAdminDate" class="form-control" required></div>
+                    <div class="col-5"><label class="form-label">Hora</label><input type="time" name="time" id="editAdminTime" class="form-control"></div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Tipo Servicio</label>
+                    <select name="service_type" id="editAdminService" class="form-select">
+                        <option>Revisión</option><option>Instalación</option><option>Urgencia</option><option>Avería</option><option>Mantenimiento</option><option>Otro</option>
+                    </select>
+                </div>
+                <div class="mb-3"><label class="form-label">Notas</label><textarea name="notes" id="editAdminNotes" class="form-control" rows="3"></textarea></div>
+            </div>
+            <div class="modal-footer border-0"><button type="submit" class="btn btn-warning w-100">Guardar Cambios</button></div>
+        </form>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
     let calendar;
@@ -323,6 +370,13 @@
                 height: isMobile ? 350 : 500,
                 events: '/api/admin/tasks/' + id,
                 
+                dateClick: function(info) {
+                    const dateInput = document.querySelector('#modalCale input[name="date"]');
+                    if(dateInput) {
+                        dateInput.value = info.dateStr;
+                    }
+                },
+                
                 eventClick: function(info) {
                     const props = info.event.extendedProps;
                     document.getElementById('evtId').value = info.event.id;
@@ -345,7 +399,6 @@
             });
             calendar.render();
             
-            // Activar autocomplete en el modal de agenda admin
             setupAutocomplete('adminClientInput', 'adminClientList');
 
         }, { once: true });
@@ -387,12 +440,11 @@
         new bootstrap.Modal(document.getElementById('modalEditClient')).show();
     }
 
-    // --- AUTOCOMPLETE LOGIC ---
     function setupAutocomplete(inputId, listId) {
         const input = document.getElementById(inputId);
         const list = document.getElementById(listId);
         
-        if(!input) return; // Si no existe el elemento, salir
+        if(!input) return;
 
         input.addEventListener('input', function() {
             const val = this.value;
@@ -425,12 +477,31 @@
                 });
         });
 
-        // Ocultar si clic fuera
         document.addEventListener('click', function(e) {
             if(e.target !== input && e.target !== list) {
                 list.style.display = 'none';
             }
         });
+    }
+
+    // Función para editar cita (Admin)
+    function openEditAdminModal() {
+        const taskId = document.getElementById('evtId').value;
+        fetch(`/api/get_task/${taskId}`)
+            .then(res => res.json())
+            .then(data => {
+                if(data.success) {
+                    document.getElementById('editAdminClientInput').value = data.data.client_name;
+                    document.getElementById('editAdminDate').value = data.data.date;
+                    document.getElementById('editAdminTime').value = data.data.time;
+                    document.getElementById('editAdminService').value = data.data.service_type;
+                    document.getElementById('editAdminNotes').value = data.data.notes;
+                    document.getElementById('formEditApptAdmin').action = `/edit_appointment/${taskId}`;
+                    modalActionAdmin.hide();
+                    new bootstrap.Modal(document.getElementById('modalEditAppointmentAdmin')).show();
+                    setupAutocomplete('editAdminClientInput', 'editAdminClientList');
+                }
+            });
     }
 </script>
 </body>

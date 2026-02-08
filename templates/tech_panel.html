@@ -237,6 +237,35 @@
     </div>
 </div>
 
+
+<!-- Modal Editar Cita Tech -->
+<div class="modal fade" id="modalEditAppointmentTech" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <form action="/edit_appointment/0" method="POST" id="formEditApptTech" class="modal-content bg-dark border-warning text-white">
+            <div class="modal-header border-0"><h5>Editar Cita</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="mb-3 position-relative">
+                    <label class="form-label">Cliente</label>
+                    <input type="text" name="client_name" id="editTechClientInput" class="form-control" required autocomplete="off">
+                    <div id="editTechClientList" class="suggestions-list"></div>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-7"><label class="form-label">Fecha</label><input type="date" name="date" id="editTechDate" class="form-control" required></div>
+                    <div class="col-5"><label class="form-label">Hora</label><input type="time" name="time" id="editTechTime" class="form-control"></div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Tipo Servicio</label>
+                    <select name="service_type" id="editTechService" class="form-select">
+                        <option>Avería</option><option>Mantenimiento</option><option>Instalación</option><option>Revisión</option><option>Urgencia</option><option>Otro</option>
+                    </select>
+                </div>
+                <div class="mb-3"><label class="form-label">Notas</label><textarea name="notes" id="editTechNotes" class="form-control" rows="3"></textarea></div>
+            </div>
+            <div class="modal-footer border-0"><button type="submit" class="btn btn-warning w-100">Guardar Cambios</button></div>
+        </form>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
     let calendar;
@@ -367,6 +396,26 @@
     // Activar autocompletado en los campos
     setupAutocomplete('fieldClient', 'listClient'); // Formulario parte
     setupAutocomplete('modalFieldClient', 'modalListClient'); // Modal cita
+
+    // Función para editar cita (Tech)
+    function openEditTechModal() {
+        const taskId = document.getElementById('evtId').value;
+        fetch(`/api/get_task/${taskId}`)
+            .then(res => res.json())
+            .then(data => {
+                if(data.success) {
+                    document.getElementById('editTechClientInput').value = data.data.client_name;
+                    document.getElementById('editTechDate').value = data.data.date;
+                    document.getElementById('editTechTime').value = data.data.time;
+                    document.getElementById('editTechService').value = data.data.service_type;
+                    document.getElementById('editTechNotes').value = data.data.notes;
+                    document.getElementById('formEditApptTech').action = `/edit_appointment/${taskId}`;
+                    modalAction.hide();
+                    new bootstrap.Modal(document.getElementById('modalEditAppointmentTech')).show();
+                    setupAutocomplete('editTechClientInput', 'editTechClientList');
+                }
+            });
+    }
 </script>
 </body>
 </html>

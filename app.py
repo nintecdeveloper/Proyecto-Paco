@@ -1,9 +1,12 @@
 import os
+import json
 from datetime import datetime, date
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_file
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
+import io
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
@@ -26,7 +29,6 @@ class User(UserMixin, db.Model):
 class Client(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
-    # Se pueden añadir más campos (email, tlf) en el futuro
 
 class Stock(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -47,12 +49,11 @@ class Task(db.Model):
     service_type = db.Column(db.String(50)) 
     parts_text = db.Column(db.String(200))  
     
-    # Control de Stock en la Tarea
     stock_item_id = db.Column(db.Integer, db.ForeignKey('stock.id'), nullable=True)
     stock_quantity_used = db.Column(db.Integer, default=0)
-    stock_action = db.Column(db.String(20)) # 'used' (gastado) o 'retrieved' (recuperado)
+    stock_action = db.Column(db.String(20))
 
-    status = db.Column(db.String(20), default='Completado') # 'Pendiente' o 'Completado'
+    status = db.Column(db.String(20), default='Completado')
 
     tech = db.relationship('User', backref='tasks')
     stock_item = db.relationship('Stock', backref='tasks')
@@ -86,9 +87,7 @@ def dashboard():
         clients = Client.query.order_by(Client.name).all()
         return render_template('admin_panel.html', empleados=empleados, informes=informes, inventory=inventory, clients=clients)
     
-    # Lógica Técnico
     stock_items = Stock.query.all()
-    # Enviamos las tareas PENDIENTES de este técnico para el desplegable del parte
     pending_tasks = Task.query.filter_by(tech_id=current_user.id, status='Pendiente').order_by(Task.date).all()
     
     return render_template('tech_panel.html', 
@@ -96,7 +95,6 @@ def dashboard():
                            stock_items=stock_items,
                            pending_tasks=pending_tasks)
 
-# --- LOGICA TÉCNICO: GUARDAR PARTE (NUEVO O VINCULADO) ---
 @app.route('/save_report', methods=['POST'])
 @login_required
 def save_report():
@@ -105,9 +103,8 @@ def save_report():
         stock_id = request.form.get('stock_item')
         qty = int(request.form.get('stock_qty', 0))
         action = request.form.get('stock_action', 'used')
-        linked_task_id = request.form.get('linked_task_id') # ID de la cita del calendario (si existe)
+        linked_task_id = request.form.get('linked_task_id')
 
-        # 1. Gestionar Stock (Común para ambos casos)
         if stock_id and qty > 0:
             item = Stock.query.get(stock_id)
             if item:
@@ -120,15 +117,12 @@ def save_report():
                 elif action == 'retrieved':
                     item.quantity += qty
             
-        # 2. Verificar si es actualización de cita o parte nuevo
         if linked_task_id and linked_task_id != 'none':
-            # --- ACTUALIZAR TAREA EXISTENTE ---
             task = Task.query.get(linked_task_id)
             if task and task.tech_id == current_user.id:
-                task.date = nueva_fecha # Actualizamos fecha por si cambió
+                task.date = nueva_fecha
                 task.start_time = request.form['entry_time']
                 task.end_time = request.form['exit_time']
-                # Concatenamos la nota original de la cita con el reporte nuevo
                 nota_previa = task.description.replace("Cita Agendada: ", "")
                 task.description = f"{request.form['description']} (Nota Cita: {nota_previa})"
                 task.service_type = request.form['service_type']
@@ -136,12 +130,11 @@ def save_report():
                 task.stock_item_id = stock_id if (stock_id and qty > 0) else None
                 task.stock_quantity_used = qty if (stock_id and qty > 0) else 0
                 task.stock_action = action
-                task.status = 'Completado' # <--- CAMBIO DE ESTADO A COMPLETADO
+                task.status = 'Completado'
                 flash('Cita del calendario completada y parte generado.', 'success')
             else:
                 flash('Error al vincular con la cita.', 'danger')
         else:
-            # --- CREAR NUEVO PARTE (SIN CITA PREVIA) ---
             new_task = Task(
                 tech_id=current_user.id,
                 client_name=request.form['client_name'],
@@ -166,7 +159,6 @@ def save_report():
         
     return redirect(url_for('dashboard'))
 
-# --- AGENDAR CITA (Técnico o Admin) ---
 @app.route('/schedule_appointment', methods=['POST'])
 @login_required
 def schedule_appointment():
@@ -185,7 +177,7 @@ def schedule_appointment():
             date=nueva_fecha,
             start_time=hora,
             description="Cita Agendada: " + request.form.get('notes', ''),
-            status='Pendiente' # <--- Nace como pendiente
+            status='Pendiente'
         )
         db.session.add(new_appt)
         db.session.commit()
@@ -194,13 +186,40 @@ def schedule_appointment():
         flash(f'Error al agendar: {str(e)}', 'danger')
     return redirect(url_for('dashboard'))
 
-# --- ACCIONES CALENDARIO (API) ---
+@app.route('/edit_appointment/<int:task_id>', methods=['POST'])
+@login_required
+def edit_appointment(task_id):
+    try:
+        task = Task.query.get_or_404(task_id)
+        
+        if current_user.role != 'admin' and task.tech_id != current_user.id:
+            return jsonify({'success': False, 'msg': 'No autorizado'}), 403
+        
+        task.client_name = request.form.get('client_name')
+        task.service_type = request.form.get('service_type')
+        task.date = datetime.strptime(request.form['date'], '%Y-%m-%d').date()
+        task.start_time = request.form.get('time', '')
+        
+        notes = request.form.get('notes', '')
+        if notes:
+            if "Cita Agendada:" in task.description:
+                task.description = "Cita Agendada: " + notes
+            else:
+                task.description = notes
+        
+        db.session.commit()
+        flash('Cita modificada correctamente.', 'success')
+        
+    except Exception as e:
+        flash(f'Error al modificar: {str(e)}', 'danger')
+    
+    return redirect(url_for('dashboard'))
+
 @app.route('/api/task_action/<int:task_id>/<action>', methods=['POST'])
 @login_required
 def task_action(task_id, action):
     task = Task.query.get_or_404(task_id)
     
-    # Permisos: Solo admin o el dueño de la tarea
     if current_user.role != 'admin' and task.tech_id != current_user.id:
         return jsonify({'success': False, 'msg': 'No autorizado'}), 403
 
@@ -209,7 +228,6 @@ def task_action(task_id, action):
         msg = 'Tarea eliminada del calendario.'
     elif action == 'complete':
         task.status = 'Completado'
-        # Rellenar horas por defecto si están vacías al completar desde calendario
         if not task.start_time: task.start_time = "09:00"
         if not task.end_time: task.end_time = "10:00"
         msg = 'Tarea marcada como completada.'
@@ -219,7 +237,31 @@ def task_action(task_id, action):
     db.session.commit()
     return jsonify({'success': True, 'msg': msg})
 
-# --- GESTIÓN STOCK ADMIN ---
+@app.route('/api/get_task/<int:task_id>')
+@login_required
+def get_task(task_id):
+    task = Task.query.get_or_404(task_id)
+    
+    if current_user.role != 'admin' and task.tech_id != current_user.id:
+        return jsonify({'success': False, 'msg': 'No autorizado'}), 403
+    
+    notes = task.description
+    if "Cita Agendada: " in notes:
+        notes = notes.replace("Cita Agendada: ", "")
+    
+    return jsonify({
+        'success': True,
+        'data': {
+            'id': task.id,
+            'client_name': task.client_name,
+            'service_type': task.service_type,
+            'date': task.date.strftime('%Y-%m-%d'),
+            'time': task.start_time or '',
+            'notes': notes,
+            'status': task.status
+        }
+    })
+
 @app.route('/manage_stock', methods=['POST'])
 @login_required
 def manage_stock():
@@ -250,7 +292,6 @@ def manage_stock():
     db.session.commit()
     return redirect(url_for('dashboard'))
 
-# --- GESTIÓN CLIENTES ADMIN ---
 @app.route('/manage_clients', methods=['POST'])
 @login_required
 def manage_clients():
@@ -279,7 +320,77 @@ def manage_clients():
     db.session.commit()
     return redirect(url_for('dashboard'))
 
-# --- API BUSQUEDA CLIENTES (AUTOCOMPLETE) ---
+@app.route('/export_clients')
+@login_required
+def export_clients():
+    if current_user.role != 'admin':
+        flash('No autorizado', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    clients = Client.query.all()
+    clients_data = [{'id': c.id, 'name': c.name} for c in clients]
+    
+    json_data = json.dumps(clients_data, ensure_ascii=False, indent=2)
+    
+    mem_file = io.BytesIO()
+    mem_file.write(json_data.encode('utf-8'))
+    mem_file.seek(0)
+    
+    return send_file(
+        mem_file,
+        mimetype='application/json',
+        as_attachment=True,
+        download_name=f'clientes_oslaprint_{date.today().strftime("%Y%m%d")}.json'
+    )
+
+@app.route('/import_clients', methods=['POST'])
+@login_required
+def import_clients():
+    if current_user.role != 'admin':
+        flash('No autorizado', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    if 'file' not in request.files:
+        flash('No se seleccionó ningún archivo', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    file = request.files['file']
+    
+    if file.filename == '':
+        flash('No se seleccionó ningún archivo', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    if not file.filename.endswith('.json'):
+        flash('El archivo debe ser formato JSON', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    try:
+        content = file.read().decode('utf-8')
+        clients_data = json.loads(content)
+        
+        added = 0
+        skipped = 0
+        
+        for client_info in clients_data:
+            name = client_info.get('name', '').strip()
+            if name:
+                existing = Client.query.filter_by(name=name).first()
+                if not existing:
+                    db.session.add(Client(name=name))
+                    added += 1
+                else:
+                    skipped += 1
+        
+        db.session.commit()
+        flash(f'Importación completada: {added} clientes añadidos, {skipped} ya existían', 'success')
+        
+    except json.JSONDecodeError:
+        flash('Error: El archivo JSON no es válido', 'danger')
+    except Exception as e:
+        flash(f'Error al importar: {str(e)}', 'danger')
+    
+    return redirect(url_for('dashboard'))
+
 @app.route('/api/clients_search')
 @login_required
 def search_clients():
@@ -287,11 +398,9 @@ def search_clients():
     if len(query) < 2:
         return jsonify([])
     
-    # Busca clientes que contengan el texto, ordenados alfabéticamente
     results = Client.query.filter(Client.name.ilike(f'%{query}%')).order_by(Client.name).limit(10).all()
     return jsonify([{'name': c.name} for c in results])
 
-# --- VISUALIZAR PARTE (IMPRIMIR) ---
 @app.route('/print_report/<int:task_id>')
 @login_required
 def print_report(task_id):
@@ -372,7 +481,6 @@ def print_report(task_id):
     """
     return html
 
-# --- APIs Y EVENTOS ---
 @app.route('/api/tasks')
 @login_required
 def my_tasks():
@@ -388,12 +496,11 @@ def get_admin_tasks(user_id):
 def format_events(tasks):
     events = []
     for t in tasks:
-        # Lógica de colores: Verde si completado, Azul si pendiente
         color = '#28a745' if t.status == 'Completado' else '#0d6efd'
         title = f"{t.client_name} ({t.service_type})"
         
         events.append({
-            'id': t.id, # Enviamos ID para poder actuar sobre ella
+            'id': t.id,
             'title': title,
             'start': f"{t.date}T{t.start_time}" if t.start_time else str(t.date),
             'color': color,
@@ -411,24 +518,23 @@ def logout():
     logout_user()
     return redirect(url_for('login'))
 
-# Función de inicialización de la base de datos
 def init_db():
-    """Inicializa la base de datos con datos por defecto"""
     with app.app_context():
         db.create_all()
         
-        # Inicializar usuarios
         if not User.query.filter_by(username='admin').first():
             db.session.add(User(username='admin', role='admin', password_hash=generate_password_hash('admin123')))
         if not User.query.filter_by(username='tech').first():
             db.session.add(User(username='tech', role='tech', password_hash=generate_password_hash('tech123')))
+        if not User.query.filter_by(username='carlos').first():
+            db.session.add(User(username='carlos', role='tech', password_hash=generate_password_hash('carlos123')))
+        if not User.query.filter_by(username='maria').first():
+            db.session.add(User(username='maria', role='tech', password_hash=generate_password_hash('maria123')))
         
-        # Inicializar Stock
         if not Stock.query.first():
             db.session.add(Stock(name='Toner Genérico', category='Consumible', quantity=10))
             db.session.add(Stock(name='Fusor HP 4000', category='Pieza', quantity=2))
         
-        # Inicializar Clientes de Prueba
         if not Client.query.first():
             sample_clients = [
                 'Oficinas Centrales Bankia', 'Talleres Manolo S.L.', 'Colegio San José', 
@@ -440,7 +546,6 @@ def init_db():
                 
         db.session.commit()
 
-# Inicializar base de datos al cargar el módulo (importante para Gunicorn/Render)
 init_db()
 
 if __name__ == '__main__':
