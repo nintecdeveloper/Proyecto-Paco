@@ -71,8 +71,9 @@ def load_user(id):
 @app.context_processor
 def inject_globals():
     try:
+        # Ordenamos alfabéticamente para que salgan ordenados en los desplegables
         return {
-            'all_service_types': ServiceType.query.all()
+            'all_service_types': ServiceType.query.order_by(ServiceType.name).all()
         }
     except Exception as e:
         print("ERROR context_processor:", e)
@@ -104,13 +105,13 @@ def dashboard():
         informes = Task.query.filter_by(status='Completado').order_by(Task.date.desc()).all()
         inventory = Stock.query.order_by(Stock.name).all()
         clients = Client.query.order_by(Client.name).all()
-        services = ServiceType.query.order_by(ServiceType.name).all()
+        # Nota: services se pasa también por context_processor, pero lo dejamos aquí explícito para la tabla de config
+        services = ServiceType.query.order_by(ServiceType.name).all() 
         return render_template('admin_panel.html', empleados=empleados, informes=informes, inventory=inventory, clients=clients, services=services)
     
     stock_items = Stock.query.all()
     pending_tasks = Task.query.filter_by(tech_id=current_user.id, status='Pendiente').order_by(Task.date).all()
     
-    # Nota: tech_panel.html también tendrá acceso a 'all_service_types' gracias al context_processor
     return render_template('tech_panel.html', 
                            today_date=date.today().strftime('%Y-%m-%d'), 
                            stock_items=stock_items,
@@ -145,7 +146,6 @@ def manage_users():
             if user.id == current_user.id:
                 flash('No puedes eliminar tu propio usuario.', 'danger')
             else:
-                # Opcional: Eliminar tareas asociadas o reasignarlas
                 Task.query.filter_by(tech_id=user.id).delete()
                 db.session.delete(user)
                 db.session.commit()
@@ -193,8 +193,6 @@ def manage_services():
     elif action == 'delete':
         svc = ServiceType.query.get(request.form['service_id'])
         if svc:
-            # Opcional: Podrías querer migrar las tareas viejas a otro tipo, 
-            # pero por ahora simplemente las dejamos con el nombre antiguo (texto)
             db.session.delete(svc)
             flash('Tipo de servicio eliminado.', 'warning')
             
@@ -236,7 +234,6 @@ def save_report():
                 task.stock_item_id = stock_id if (stock_id and qty > 0) else None
                 task.stock_quantity_used = qty if (stock_id and qty > 0) else 0
                 task.stock_action = action
-                task.status = 'Completado'
                 task.status = 'Completado'
                 flash('Cita del calendario completada y parte generado.', 'success')
             else:
@@ -649,7 +646,7 @@ with app.app_context():
         db.session.add(User(username='admin', role='admin', password_hash=generate_password_hash('admin123')))
         db.session.add(User(username='tech', role='tech', password_hash=generate_password_hash('tech123')))
     
-    # 2. Tipos de Servicio y Colores (Lo que hacía fallar el admin)
+    # 2. Tipos de Servicio y Colores
     if not ServiceType.query.first():
         servicios = [
             {'name': 'Revisión', 'color': '#0d6efd'},

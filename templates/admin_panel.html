@@ -392,7 +392,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            {% for s in services %}
+                            {% for s in all_service_types %}
                             <tr>
                                 <td>
                                     <span class="badge rounded-pill"
@@ -403,17 +403,18 @@
                                 <td>
                                     <code class="text-white-50">{{ s.color|default('#6c757d') }}</code>
                                 </td>
-                                <button class="btn btn-sm btn-outline-light me-1"
-                                    onclick="openEditServiceModal('{{s.id}}', '{{s.name}}', '{{s.color}}')">
-                                    <i class="bi bi-pencil-fill"></i>
-                                </button>
-                                <form action="/manage_services" method="POST" class="d-inline">
-                                    <input type="hidden" name="action" value="delete">
-                                    <input type="hidden" name="service_id" value="{{ s.id }}">
-                                    <button class="btn btn-sm btn-outline-danger"
-                                        onclick="return confirm('¿Borrar este tipo de servicio?')"><i
-                                            class="bi bi-trash"></i></button>
-                                </form>
+                                <td class="text-end">
+                                    <button class="btn btn-sm btn-outline-light me-1"
+                                        onclick="openEditServiceModal('{{s.id}}', '{{s.name}}', '{{s.color}}')">
+                                        <i class="bi bi-pencil-fill"></i>
+                                    </button>
+                                    <form action="/manage_services" method="POST" class="d-inline">
+                                        <input type="hidden" name="action" value="delete">
+                                        <input type="hidden" name="service_id" value="{{ s.id }}">
+                                        <button class="btn btn-sm btn-outline-danger"
+                                            onclick="return confirm('¿Borrar este tipo de servicio?')"><i
+                                                class="bi bi-trash"></i></button>
+                                    </form>
                                 </td>
                             </tr>
                             {% endfor %}

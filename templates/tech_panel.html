@@ -132,7 +132,9 @@
                 <div class="col-12 col-md-4">
                     <label class="form-label">TIPO SERVICIO</label>
                     <select name="service_type" class="form-select">
-                        <option>Avería</option><option>Mantenimiento</option><option>Instalación</option><option>Otro</option>
+                        {% for s in all_service_types %}
+                        <option value="{{ s.name }}">{{ s.name }}</option>
+                        {% endfor %}
                     </select>
                 </div>
             </div>
@@ -247,7 +249,14 @@
                     <div class="col-7"><label class="form-label">FECHA</label><input type="date" name="date" id="modalDateInput" class="form-control" required></div>
                     <div class="col-5"><label class="form-label">HORA</label><input type="time" name="time" class="form-control"></div>
                 </div>
-                <div class="mb-3"><label class="form-label">TIPO</label><select name="service_type" class="form-select"><option>Revisión</option><option>Instalación</option><option>Urgencia</option></select></div>
+                <div class="mb-3">
+                    <label class="form-label">TIPO</label>
+                    <select name="service_type" class="form-select">
+                        {% for s in all_service_types %}
+                        <option value="{{ s.name }}">{{ s.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
                 <div class="mb-3"><label class="form-label">NOTAS</label><textarea name="notes" class="form-control" rows="3"></textarea></div>
             </div>
             <div class="modal-footer border-top border-secondary"><button type="submit" class="btn btn-primary w-100 py-2">Confirmar Cita</button></div>
@@ -296,7 +305,9 @@
                 <div class="mb-3">
                     <label class="form-label">Tipo Servicio</label>
                     <select name="service_type" id="editTechService" class="form-select">
-                        <option>Avería</option><option>Mantenimiento</option><option>Instalación</option><option>Revisión</option><option>Urgencia</option><option>Otro</option>
+                        {% for s in all_service_types %}
+                        <option value="{{ s.name }}">{{ s.name }}</option>
+                        {% endfor %}
                     </select>
                 </div>
                 <div class="mb-3"><label class="form-label">Notas</label><textarea name="notes" id="editTechNotes" class="form-control" rows="3"></textarea></div>
