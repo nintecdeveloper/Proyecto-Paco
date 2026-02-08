@@ -124,6 +124,7 @@
             color: #bbb;
             border-color: #555;
             opacity: 0.7;
+            transition: all 0.2s;
         }
 
         .btn-outline-custom:hover {
@@ -133,7 +134,7 @@
 
         .filter-group {
             background: #1f1f1f;
-            padding: 10px;
+            padding: 15px;
             border-radius: 10px;
             border: 1px solid #333;
         }
@@ -229,16 +230,24 @@
             </div>
 
             <div class="tab-pane fade" id="global-agenda">
-                <div class="filter-group mb-3 d-flex gap-2 flex-wrap align-items-center justify-content-center">
-                    <span class="text-white fw-bold me-2 small">MOSTRAR:</span>
-                    {% for s in all_service_types %}
-                    <input type="checkbox" class="btn-check filter-cb" id="f-{{s.id}}" value="{{ s.name }}" checked
-                        onchange="updateGlobalFilters()">
-                    <label class="btn btn-sm btn-outline-custom rounded-pill px-3" for="f-{{s.id}}"
-                        style="--bg-color: {{ s.color|default('#6c757d') }}; background-color: var(--bg-color); border-color: var(--bg-color); color: white;">
-                        {{ s.name }}
-                    </label>
-                    {% endfor %}
+                <div class="filter-group mb-3">
+                    <div class="d-flex gap-2 flex-wrap align-items-center justify-content-center">
+                        <span class="text-white fw-bold me-2 small">FILTRAR TAREAS:</span>
+                        
+                        <button class="btn btn-sm btn-light fw-bold px-3 rounded-pill" onclick="checkAllFilters()">
+                            <i class="bi bi-check-all me-1"></i>TODAS
+                        </button>
+                        <div class="vr bg-secondary mx-2"></div>
+
+                        {% for s in all_service_types %}
+                        <input type="checkbox" class="btn-check filter-cb" id="f-{{s.id}}" value="{{ s.name }}" checked
+                            onchange="updateGlobalFilters()">
+                        <label class="btn btn-sm btn-outline-custom rounded-pill px-3" for="f-{{s.id}}"
+                            style="--bg-color: {{ s.color|default('#6c757d') }}; background-color: var(--bg-color); border-color: var(--bg-color); color: white;">
+                            {{ s.name }}
+                        </label>
+                        {% endfor %}
+                    </div>
                 </div>
                 <div id="calendarGlobal"></div>
             </div>
@@ -875,6 +884,10 @@
                         info.el.style.display = 'none';
                     } else {
                         info.el.style.display = '';
+                        // Usar el color del evento que viene desde backend
+                        if (info.backgroundColor) {
+                            info.el.style.backgroundColor = info.backgroundColor;
+                        }
                         if (info.event.extendedProps.status === 'Completado') {
                             info.el.style.opacity = '0.6';
                             info.el.style.border = '2px solid white';
@@ -902,19 +915,19 @@
             return activeTypes;
         }
 
+        function checkAllFilters() {
+            document.querySelectorAll('.filter-cb').forEach(cb => {
+                cb.checked = true;
+            });
+            updateGlobalFilters();
+        }
+
         function updateGlobalFilters() {
             if (!calendarGlobalInstance) return;
             const activeTypes = getActiveFilters();
-            const events = calendarGlobalInstance.getEvents();
-
-            events.forEach(evt => {
-                const type = evt.extendedProps.service_type;
-                if (activeTypes.includes(type)) {
-                    evt.setProp('display', 'auto');
-                } else {
-                    evt.setProp('display', 'none');
-                }
-            });
+            
+            // Re-renderizamos para que eventDidMount vuelva a ejecutarse y filtre
+            calendarGlobalInstance.render();
         }
 
         // --- GESTIÓN DE ACCIONES ---
