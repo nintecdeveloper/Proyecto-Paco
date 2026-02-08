@@ -116,6 +116,58 @@ def dashboard():
                            stock_items=stock_items,
                            pending_tasks=pending_tasks)
 
+@app.route('/manage_users', methods=['POST'])
+@login_required
+def manage_users():
+    if current_user.role != 'admin':
+        return redirect(url_for('dashboard'))
+    
+    action = request.form.get('action')
+    
+    if action == 'add':
+        username = request.form['username']
+        password = request.form['password']
+        role = request.form['role']
+        
+        if User.query.filter_by(username=username).first():
+            flash('El nombre de usuario ya existe.', 'danger')
+        else:
+            hashed_password = generate_password_hash(password)
+            new_user = User(username=username, password_hash=hashed_password, role=role)
+            db.session.add(new_user)
+            db.session.commit()
+            flash(f'Usuario {username} creado exitosamente.', 'success')
+            
+    elif action == 'delete':
+        user_id = request.form.get('user_id')
+        user = User.query.get(user_id)
+        if user:
+            if user.id == current_user.id:
+                flash('No puedes eliminar tu propio usuario.', 'danger')
+            else:
+                # Opcional: Eliminar tareas asociadas o reasignarlas
+                Task.query.filter_by(tech_id=user.id).delete()
+                db.session.delete(user)
+                db.session.commit()
+                flash('Usuario y sus tareas eliminados.', 'warning')
+    
+    return redirect(url_for('dashboard'))
+
+@app.route('/change_password', methods=['POST'])
+@login_required
+def change_password():
+    current_pass = request.form.get('current_password')
+    new_pass = request.form.get('new_password')
+    
+    if check_password_hash(current_user.password_hash, current_pass):
+        current_user.password_hash = generate_password_hash(new_pass)
+        db.session.commit()
+        flash('Contraseña actualizada correctamente.', 'success')
+    else:
+        flash('La contraseña actual es incorrecta.', 'danger')
+        
+    return redirect(url_for('dashboard'))
+
 @app.route('/manage_services', methods=['POST'])
 @login_required
 def manage_services():

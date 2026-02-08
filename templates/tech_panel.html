@@ -70,6 +70,9 @@
         <span class="fw-bold fs-4 text-white">OSLA<span style="color:var(--osla-orange)">PRINT</span></span>
         <div class="d-flex align-items-center gap-2">
             <span class="text-white fw-bold me-2">Hola {{ current_user.username }}</span>
+            <button class="btn btn-outline-light btn-sm" data-bs-toggle="modal" data-bs-target="#modalChangePassword" title="Cambiar Contraseña">
+                <i class="bi bi-key-fill"></i>
+            </button>
             <a href="/logout" class="btn btn-outline-danger btn-sm"><i class="bi bi-box-arrow-right"></i></a>
         </div>
     </div>
@@ -299,6 +302,28 @@
                 <div class="mb-3"><label class="form-label">Notas</label><textarea name="notes" id="editTechNotes" class="form-control" rows="3"></textarea></div>
             </div>
             <div class="modal-footer border-0"><button type="submit" class="btn btn-warning w-100">Guardar Cambios</button></div>
+        </form>
+    </div>
+</div>
+
+<div class="modal fade" id="modalChangePassword" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <form action="/change_password" method="POST" class="modal-content bg-dark border-light">
+            <div class="modal-header border-0">
+                <h5 class="text-white">Cambiar Mi Contraseña</h5><button type="button" class="btn-close btn-close-white"
+                    data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Contraseña Actual</label>
+                    <input type="password" name="current_password" class="form-control" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Nueva Contraseña</label>
+                    <input type="password" name="new_password" class="form-control" required>
+                </div>
+            </div>
+            <div class="modal-footer border-0"><button type="submit" class="btn btn-light w-100 fw-bold">Actualizar</button></div>
         </form>
     </div>
 </div>

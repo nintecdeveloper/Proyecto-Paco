@@ -65,6 +65,16 @@
             border-radius: 15px;
             padding: 20px;
             text-align: center;
+            position: relative;
+        }
+
+        .btn-delete-user {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: #dc3545;
+            background: none;
+            border: none;
         }
 
         #calendarAdmin,
@@ -157,6 +167,9 @@
                 class="badge bg-secondary ms-1" style="font-size: 0.6em;">ADMIN</small></span>
         <div class="d-flex align-items-center gap-2">
             <span class="text-white fw-bold me-2">Hola {{ current_user.username }}</span>
+            <button class="btn btn-outline-light btn-sm" data-bs-toggle="modal" data-bs-target="#modalChangePassword" title="Cambiar Contraseña">
+                <i class="bi bi-key-fill"></i>
+            </button>
             <a href="/logout" class="btn btn-outline-danger btn-sm"><i class="bi bi-power"></i></a>
         </div>
     </nav>
@@ -184,10 +197,22 @@
 
         <div class="tab-content">
             <div class="tab-pane fade show active" id="team">
+                <div class="d-flex justify-content-between mb-3 align-items-center">
+                    <h4 class="fw-bold text-white fs-5 m-0">Gestión de Equipo</h4>
+                    <button class="btn btn-warning btn-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalAddUser">
+                        <i class="bi bi-person-plus-fill me-1"></i> Nuevo Usuario
+                    </button>
+                </div>
                 <div class="row g-3">
                     {% for emp in empleados %}
                     <div class="col-12 col-md-4">
                         <div class="card-emp shadow-sm">
+                            <form action="/manage_users" method="POST" class="d-inline" onsubmit="return confirm('¿Eliminar usuario y todos sus datos asignados?');">
+                                <input type="hidden" name="action" value="delete">
+                                <input type="hidden" name="user_id" value="{{ emp.id }}">
+                                <button type="submit" class="btn-delete-user" title="Eliminar Usuario"><i class="bi bi-trash-fill"></i></button>
+                            </form>
+                            
                             <div class="d-flex align-items-center justify-content-center gap-3 mb-3">
                                 <i class="bi bi-person-badge-fill fs-1 text-warning"></i>
                                 <h4 class="fw-bold text-white m-0">{{ emp.username|upper }}</h4>
@@ -510,6 +535,58 @@
                 </div>
                 <div class="modal-footer border-0"><button type="submit" class="btn btn-warning w-100">Guardar
                         Cambios</button></div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalAddUser" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <form action="/manage_users" method="POST" class="modal-content bg-dark border-warning">
+                <div class="modal-header border-0">
+                    <h5 class="text-white">Nuevo Usuario / Técnico</h5><button type="button" class="btn-close btn-close-white"
+                        data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="action" value="add">
+                    <div class="mb-3">
+                        <label class="form-label">Usuario</label>
+                        <input name="username" class="form-control" placeholder="Ej: tecnico1" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Contraseña Inicial</label>
+                        <input name="password" class="form-control" placeholder="Ej: pass123" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Rol</label>
+                        <select name="role" class="form-select">
+                            <option value="tech">Técnico</option>
+                            <option value="admin">Administrador</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer border-0"><button type="submit" class="btn btn-warning w-100">Crear Usuario</button></div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalChangePassword" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <form action="/change_password" method="POST" class="modal-content bg-dark border-light">
+                <div class="modal-header border-0">
+                    <h5 class="text-white">Cambiar Mi Contraseña</h5><button type="button" class="btn-close btn-close-white"
+                        data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Contraseña Actual</label>
+                        <input type="password" name="current_password" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Nueva Contraseña</label>
+                        <input type="password" name="new_password" class="form-control" required>
+                    </div>
+                </div>
+                <div class="modal-footer border-0"><button type="submit" class="btn btn-light w-100 fw-bold">Actualizar</button></div>
             </form>
         </div>
     </div>
