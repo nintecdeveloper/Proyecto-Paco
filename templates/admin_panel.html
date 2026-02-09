@@ -838,7 +838,18 @@
                     <p><strong>Servicio:</strong> <span id="evtService"></span></p>
                     <p><strong>Estado:</strong> <span id="evtStatus"></span></p>
                     <p><strong>Descripción:</strong><br><span id="evtDesc"></span></p>
-                    <div class="d-grid gap-2">
+                    
+                    <!-- Sección de Archivos Adjuntos -->
+                    <div id="attachmentsSection" class="mt-3" style="display: none;">
+                        <hr class="border-secondary">
+                        <p class="fw-bold mb-2"><i class="bi bi-paperclip me-1"></i> Archivos Adjuntos:</p>
+                        <div id="attachmentsList" class="list-group"></div>
+                    </div>
+                    
+                    <div class="d-grid gap-2 mt-3">
+                        <button class="btn btn-info" onclick="viewTaskDetails()">
+                            <i class="bi bi-eye-fill me-1"></i> Ver Detalles Completos
+                        </button>
                         <button class="btn btn-warning" onclick="openEditAdminModal()">
                             <i class="bi bi-pencil-fill me-1"></i> Editar Cita
                         </button>
@@ -849,6 +860,89 @@
                             <i class="bi bi-trash-fill me-1"></i> Eliminar Tarea
                         </button>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Modal: Detalles Completos de la Tarea -->
+    <div class="modal fade" id="modalTaskDetails" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">
+                        <i class="bi bi-file-text-fill me-2 text-warning"></i>
+                        Detalles del Parte de Trabajo
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <p class="mb-2"><strong class="text-warning">Cliente:</strong><br>
+                            <span id="detailClient"></span></p>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="mb-2"><strong class="text-warning">Técnico:</strong><br>
+                            <span id="detailTech"></span></p>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <p class="mb-2"><strong class="text-warning">Fecha:</strong><br>
+                            <span id="detailDate"></span></p>
+                        </div>
+                        <div class="col-md-4">
+                            <p class="mb-2"><strong class="text-warning">Hora Entrada:</strong><br>
+                            <span id="detailStartTime"></span></p>
+                        </div>
+                        <div class="col-md-4">
+                            <p class="mb-2"><strong class="text-warning">Hora Salida:</strong><br>
+                            <span id="detailEndTime"></span></p>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <p class="mb-2"><strong class="text-warning">Servicio:</strong><br>
+                            <span id="detailService"></span></p>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="mb-2"><strong class="text-warning">Estado:</strong><br>
+                            <span id="detailStatus"></span></p>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <p class="mb-2"><strong class="text-warning">Descripción del Trabajo:</strong></p>
+                        <div class="p-3 bg-black rounded border border-secondary" id="detailDescription"></div>
+                    </div>
+                    
+                    <div id="detailStockSection" class="mb-3" style="display: none;">
+                        <p class="mb-2"><strong class="text-warning">Material Utilizado/Retirado:</strong></p>
+                        <div class="p-3 bg-black rounded border border-secondary" id="detailStock"></div>
+                    </div>
+                    
+                    <div id="detailPartsSection" class="mb-3" style="display: none;">
+                        <p class="mb-2"><strong class="text-warning">Notas/Material Adicional:</strong></p>
+                        <div class="p-3 bg-black rounded border border-secondary" id="detailParts"></div>
+                    </div>
+                    
+                    <!-- Archivos Adjuntos -->
+                    <div id="detailAttachmentsSection" class="mb-3" style="display: none;">
+                        <p class="mb-2"><strong class="text-warning">
+                            <i class="bi bi-paperclip me-1"></i> Archivos Adjuntos:
+                        </strong></p>
+                        <div id="detailAttachmentsList" class="list-group"></div>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                    <a id="printReportLink" href="#" target="_blank" class="btn btn-warning">
+                        <i class="bi bi-printer-fill me-1"></i> Imprimir Parte
+                    </a>
                 </div>
             </div>
         </div>
@@ -970,7 +1064,8 @@
                 eventContent: function (arg) {
                     let techName = arg.event.extendedProps.tech_name || '';
                     let title = arg.event.title;
-                    return { html: `<div class="fc-content overflow-hidden text-truncate"><span class="fw-bold badge bg-dark text-white me-1 border border-secondary">${techName}</span> ${title}</div>` };
+                    let attachmentIcon = arg.event.extendedProps.has_attachments ? '<i class="bi bi-paperclip text-warning ms-1"></i>' : '';
+                    return { html: `<div class="fc-content overflow-hidden text-truncate"><span class="fw-bold badge bg-dark text-white me-1 border border-secondary">${techName}</span> ${title}${attachmentIcon}</div>` };
                 },
 
                 eventClick: handleEventClick
@@ -1148,6 +1243,106 @@
             
             // Abrir el modal de nueva cita
             new bootstrap.Modal(document.getElementById('modalScheduleAppointment')).show();
+        }
+
+        // Función para ver los detalles completos de una tarea
+        function viewTaskDetails() {
+            const taskId = document.getElementById('evtId').value;
+            
+            fetch(`/api/task_details/${taskId}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        const task = data.data;
+                        
+                        // Rellenar información básica
+                        document.getElementById('detailClient').textContent = task.client_name;
+                        document.getElementById('detailTech').textContent = task.tech_name;
+                        document.getElementById('detailDate').textContent = new Date(task.date).toLocaleDateString('es-ES');
+                        document.getElementById('detailStartTime').textContent = task.start_time || 'N/A';
+                        document.getElementById('detailEndTime').textContent = task.end_time || 'N/A';
+                        document.getElementById('detailService').textContent = task.service_type;
+                        document.getElementById('detailStatus').textContent = task.status;
+                        document.getElementById('detailDescription').textContent = task.description || 'Sin descripción';
+                        
+                        // Material/Stock
+                        if (task.stock_info) {
+                            document.getElementById('detailStockSection').style.display = 'block';
+                            const action = task.stock_info.action === 'used' ? 'USADO' : 'RETIRADO';
+                            document.getElementById('detailStock').textContent = 
+                                `${action}: ${task.stock_info.quantity}x ${task.stock_info.item_name}`;
+                        } else {
+                            document.getElementById('detailStockSection').style.display = 'none';
+                        }
+                        
+                        // Notas adicionales
+                        if (task.parts_text) {
+                            document.getElementById('detailPartsSection').style.display = 'block';
+                            document.getElementById('detailParts').textContent = task.parts_text;
+                        } else {
+                            document.getElementById('detailPartsSection').style.display = 'none';
+                        }
+                        
+                        // Archivos adjuntos
+                        if (task.attachments && task.attachments.length > 0) {
+                            document.getElementById('detailAttachmentsSection').style.display = 'block';
+                            const attachmentsList = document.getElementById('detailAttachmentsList');
+                            attachmentsList.innerHTML = '';
+                            
+                            task.attachments.forEach(filename => {
+                                const item = document.createElement('a');
+                                item.href = `/uploads/${filename}`;
+                                item.target = '_blank';
+                                item.className = 'list-group-item list-group-item-action bg-black text-white border-secondary d-flex justify-content-between align-items-center';
+                                item.innerHTML = `
+                                    <span>
+                                        <i class="bi bi-file-earmark-arrow-down me-2"></i>
+                                        ${filename}
+                                    </span>
+                                    <i class="bi bi-download text-warning"></i>
+                                `;
+                                attachmentsList.appendChild(item);
+                            });
+                        } else {
+                            document.getElementById('detailAttachmentsSection').style.display = 'none';
+                        }
+                        
+                        // Configurar enlace de impresión
+                        document.getElementById('printReportLink').href = `/print_report/${taskId}`;
+                        
+                        // Cerrar el modal actual y abrir el de detalles
+                        modalActionAdmin.hide();
+                        new bootstrap.Modal(document.getElementById('modalTaskDetails')).show();
+                    } else {
+                        alert('Error al cargar los detalles: ' + data.msg);
+                    }
+                })
+                .catch(err => {
+                    console.error('Error:', err);
+                    alert('Error al cargar los detalles de la tarea');
+                });
+        }
+
+        // Modificar handleEventClick para mostrar indicador de archivos adjuntos
+        function handleEventClick(info) {
+            document.getElementById('evtId').value = info.event.id;
+            document.getElementById('evtClient').innerText = info.event.extendedProps.client;
+            document.getElementById('evtTech').innerText = info.event.extendedProps.tech_name;
+            document.getElementById('evtService').innerText = info.event.extendedProps.service_type;
+            document.getElementById('evtStatus').innerText = info.event.extendedProps.status;
+            document.getElementById('evtDesc').innerText = info.event.extendedProps.desc || 'Sin descripción';
+            
+            // Mostrar indicador si hay archivos adjuntos
+            if (info.event.extendedProps.has_attachments) {
+                const attachmentsSection = document.getElementById('attachmentsSection');
+                attachmentsSection.style.display = 'block';
+                const attachmentsList = document.getElementById('attachmentsList');
+                attachmentsList.innerHTML = '<div class="alert alert-info small m-0"><i class="bi bi-paperclip me-1"></i> Esta tarea tiene archivos adjuntos. Haz clic en "Ver Detalles Completos" para acceder a ellos.</div>';
+            } else {
+                document.getElementById('attachmentsSection').style.display = 'none';
+            }
+            
+            modalActionAdmin.show();
         }
     </script>
 </body>
