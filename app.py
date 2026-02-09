@@ -840,6 +840,14 @@ def format_events(tasks):
     events = []
     for t in tasks:
         start = f"{t.date}T{t.start_time}" if t.start_time else str(t.date)
+        
+        # Procesar archivos adjuntos
+        attachments_list = []
+        if t.attachments:
+            try:
+                attachments_list = json.loads(t.attachments)
+            except:
+                pass
 
         events.append({
             'id': t.id,
@@ -852,12 +860,53 @@ def format_events(tasks):
                 'client': t.client_name,
                 'desc': t.description,
                 'tech_name': t.tech.username.upper() if t.tech else 'SIN TÉCNICO',
-                'service_type': t.service_type
+                'service_type': t.service_type,
+                'has_attachments': len(attachments_list) > 0
             }
         })
     return jsonify(events)
 
 
+
+
+@app.route('/api/task_details/<int:task_id>')
+@login_required
+def get_task_details(task_id):
+    task = Task.query.get_or_404(task_id)
+    
+    # Verificar permisos
+    if current_user.role != 'admin' and current_user.id != task.tech_id:
+        return jsonify({'success': False, 'msg': 'No autorizado'}), 403
+    
+    # Procesar archivos adjuntos
+    attachments_list = []
+    if task.attachments:
+        try:
+            attachments_list = json.loads(task.attachments)
+        except:
+            pass
+    
+    return jsonify({
+        'success': True,
+        'data': {
+            'id': task.id,
+            'client_name': task.client_name,
+            'date': task.date.strftime('%Y-%m-%d'),
+            'start_time': task.start_time,
+            'end_time': task.end_time,
+            'service_type': task.service_type,
+            'description': task.description,
+            'parts_text': task.parts_text,
+            'status': task.status,
+            'tech_name': task.tech.username if task.tech else 'SIN TÉCNICO',
+            'attachments': attachments_list,
+            'stock_info': {
+                'item_name': task.stock_item.name if task.stock_item else None,
+                'quantity': task.stock_quantity_used,
+                'action': task.stock_action
+            } if task.stock_item else None
+        }
+    })
 @app.route('/logout')
 def logout():
     logout_user()
