@@ -895,6 +895,8 @@
                 height: 'auto',
                 events: `/api/admin/tasks/${userId}`,
                 eventClick: handleEventClick,
+                dateClick: handleAdminDateClick,
+                selectable: true,
                 eventContent: function (arg) {
                     let statusIcon = arg.event.extendedProps.status === 'Completado' ? '✅' : '⏳';
                     return { html: `<div class="fc-content overflow-hidden text-truncate">${statusIcon} ${arg.event.title}</div>` };
@@ -942,6 +944,8 @@
                 },
                 height: 'auto',
                 events: '/api/admin/all_tasks',
+                dateClick: handleAdminDateClickGlobal,
+                selectable: true,
 
                 // FILTRADO DINÁMICO
                 eventDidMount: function (info) {
@@ -1121,6 +1125,29 @@
                         setupAutocomplete('editAdminClientInput', 'editAdminClientList');
                     }
                 });
+        }
+
+        // Función para manejar clic en día del calendario individual del empleado
+        function handleAdminDateClick(info) {
+            if (!currentEmployeeId) return;
+            
+            // Prellenar el modal con la fecha seleccionada y el empleado actual
+            document.getElementById('scheduleClientInput').value = '';
+            document.querySelector('#modalScheduleAppointment select[name="tech_id"]').value = currentEmployeeId;
+            document.querySelector('#modalScheduleAppointment input[name="date"]').value = info.dateStr;
+            
+            // Abrir el modal de nueva cita
+            new bootstrap.Modal(document.getElementById('modalScheduleAppointment')).show();
+        }
+
+        // Función para manejar clic en día del calendario global
+        function handleAdminDateClickGlobal(info) {
+            // Prellenar el modal con la fecha seleccionada
+            document.getElementById('scheduleClientInput').value = '';
+            document.querySelector('#modalScheduleAppointment input[name="date"]').value = info.dateStr;
+            
+            // Abrir el modal de nueva cita
+            new bootstrap.Modal(document.getElementById('modalScheduleAppointment')).show();
         }
     </script>
 </body>
