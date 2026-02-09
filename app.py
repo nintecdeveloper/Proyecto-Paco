@@ -1,10 +1,11 @@
 import os
 import json
 from datetime import datetime, date
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_file
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_file, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
 import io
 
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -13,6 +14,13 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'oslaprint_pro_2026_secure_key'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'oslaprint.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['UPLOAD_FOLDER'] = os.path.join(basedir, 'uploads')
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf', 'doc', 'docx', 'txt'}
+
+# Crear carpeta de uploads si no existe
+if not os.path.exists(app.config['UPLOAD_FOLDER']):
+    os.makedirs(app.config['UPLOAD_FOLDER'])
 
 db = SQLAlchemy(app)
 login_manager = LoginManager(app)
@@ -58,6 +66,9 @@ class Task(db.Model):
     stock_action = db.Column(db.String(20))
 
     status = db.Column(db.String(20), default='Completado')
+    
+    # Nuevos campos para archivos adjuntos
+    attachments = db.Column(db.Text)  # JSON con lista de archivos adjuntos
 
     tech = db.relationship('User', backref='tasks')
     stock_item = db.relationship('Stock', backref='tasks')
@@ -66,12 +77,14 @@ class Task(db.Model):
 def load_user(id):
     return User.query.get(int(id))
 
+# --- FUNCIONES AUXILIARES ---
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
 # --- CONTEXT PROCESSOR ---
-# Esto hace que 'all_service_types' esté disponible en TODOS los templates HTML automáticamente
 @app.context_processor
 def inject_globals():
     try:
-        # Ordenamos alfabéticamente para que salgan ordenados en los desplegables
         return {
             'all_service_types': ServiceType.query.order_by(ServiceType.name).all()
         }
@@ -80,7 +93,6 @@ def inject_globals():
         return {
             'all_service_types': []
         }
-
 
 # --- RUTAS PRINCIPALES ---
 @app.route('/')
@@ -105,7 +117,6 @@ def dashboard():
         informes = Task.query.filter_by(status='Completado').order_by(Task.date.desc()).all()
         inventory = Stock.query.order_by(Stock.name).all()
         clients = Client.query.order_by(Client.name).all()
-        # Nota: services se pasa también por context_processor, pero lo dejamos aquí explícito para la tabla de config
         services = ServiceType.query.order_by(ServiceType.name).all() 
         return render_template('admin_panel.html', empleados=empleados, informes=informes, inventory=inventory, clients=clients, services=services)
     
@@ -208,32 +219,81 @@ def save_report():
         qty = int(request.form.get('stock_qty', 0))
         action = request.form.get('stock_action', 'used')
         
-        nueva = Task(
-            tech_id=current_user.id,
-            client_name=request.form['client_name'],
-            description=request.form['description'],
-            date=nueva_fecha,
-            start_time=request.form['entry_time'],
-            end_time=request.form['exit_time'],
-            service_type=request.form['service_type'],
-            parts_text=request.form.get('parts_text', ''),
-            stock_item_id=int(stock_id) if stock_id else None,
-            stock_quantity_used=qty,
-            stock_action=action,
-            status='Completado'
-        )
+        # Procesar archivos adjuntos
+        uploaded_files = []
+        if 'attachments' in request.files:
+            files = request.files.getlist('attachments')
+            for file in files:
+                if file and file.filename and allowed_file(file.filename):
+                    filename = secure_filename(file.filename)
+                    # Añadir timestamp para evitar duplicados
+                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
+                    filename = timestamp + filename
+                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                    file.save(filepath)
+                    uploaded_files.append(filename)
         
-        if stock_id and qty > 0:
-            item = Stock.query.get(int(stock_id))
-            if item:
-                if action == 'used':
-                    item.quantity -= qty
-                elif action == 'removed':
-                    item.quantity -= qty
-                    
-        db.session.add(nueva)
-        db.session.commit()
-        flash('Informe guardado correctamente.', 'success')
+        # Verificar si estamos completando una tarea pendiente
+        linked_task_id = request.form.get('linked_task_id')
+        if linked_task_id and linked_task_id != 'none':
+            # Actualizar tarea existente
+            task = Task.query.get(int(linked_task_id))
+            if task:
+                task.description = request.form['description']
+                task.start_time = request.form['entry_time']
+                task.end_time = request.form['exit_time']
+                task.parts_text = request.form.get('parts_text', '')
+                task.stock_item_id = int(stock_id) if stock_id else None
+                task.stock_quantity_used = qty
+                task.stock_action = action
+                task.status = 'Completado'
+                
+                # Añadir archivos adjuntos
+                if uploaded_files:
+                    existing_attachments = json.loads(task.attachments) if task.attachments else []
+                    existing_attachments.extend(uploaded_files)
+                    task.attachments = json.dumps(existing_attachments)
+                
+                if stock_id and qty > 0:
+                    item = Stock.query.get(int(stock_id))
+                    if item:
+                        if action == 'used':
+                            item.quantity -= qty
+                        elif action == 'removed':
+                            item.quantity -= qty
+                
+                db.session.commit()
+                flash('Tarea completada y guardada correctamente.', 'success')
+        else:
+            # Crear nueva tarea
+            nueva = Task(
+                tech_id=current_user.id,
+                client_name=request.form['client_name'],
+                description=request.form['description'],
+                date=nueva_fecha,
+                start_time=request.form['entry_time'],
+                end_time=request.form['exit_time'],
+                service_type=request.form['service_type'],
+                parts_text=request.form.get('parts_text', ''),
+                stock_item_id=int(stock_id) if stock_id else None,
+                stock_quantity_used=qty,
+                stock_action=action,
+                status='Completado',
+                attachments=json.dumps(uploaded_files) if uploaded_files else None
+            )
+            
+            if stock_id and qty > 0:
+                item = Stock.query.get(int(stock_id))
+                if item:
+                    if action == 'used':
+                        item.quantity -= qty
+                    elif action == 'removed':
+                        item.quantity -= qty
+                        
+            db.session.add(nueva)
+            db.session.commit()
+            flash('Informe guardado correctamente.', 'success')
+            
     except Exception as e:
         flash(f'Error al guardar: {str(e)}', 'danger')
         
@@ -313,6 +373,25 @@ def get_task(task_id):
         }
     })
 
+@app.route('/api/get_task_full/<int:task_id>')
+@login_required
+def get_task_full(task_id):
+    """Devuelve información completa de una tarea para sincronizar formularios"""
+    task = Task.query.get(task_id)
+    if not task:
+        return jsonify({'success': False, 'msg': 'Tarea no encontrada'})
+    
+    return jsonify({
+        'success': True,
+        'data': {
+            'client_name': task.client_name,
+            'date': task.date.strftime('%Y-%m-%d'),
+            'start_time': task.start_time or '',
+            'service_type': task.service_type,
+            'description': task.description or ''
+        }
+    })
+
 @app.route('/api/task_action/<int:task_id>/<action>', methods=['POST'])
 @login_required
 def task_action(task_id, action):
@@ -326,6 +405,17 @@ def task_action(task_id, action):
         return jsonify({'success': True, 'msg': 'Tarea marcada como completada'})
         
     elif action == 'delete':
+        # Eliminar archivos adjuntos si existen
+        if task.attachments:
+            try:
+                attachments = json.loads(task.attachments)
+                for filename in attachments:
+                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                    if os.path.exists(filepath):
+                        os.remove(filepath)
+            except:
+                pass
+        
         db.session.delete(task)
         db.session.commit()
         return jsonify({'success': True, 'msg': 'Tarea eliminada'})
@@ -482,12 +572,30 @@ def search_clients():
     results = Client.query.filter(Client.name.ilike(f'%{query}%')).order_by(Client.name).limit(10).all()
     return jsonify([{'name': c.name} for c in results])
 
+@app.route('/uploads/<filename>')
+@login_required
+def uploaded_file(filename):
+    """Servir archivos adjuntos"""
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
 @app.route('/print_report/<int:task_id>')
 @login_required
 def print_report(task_id):
     task = Task.query.get_or_404(task_id)
     if current_user.role != 'admin' and current_user.id != task.tech_id:
         return "Acceso denegado", 403
+    
+    # Procesar archivos adjuntos
+    attachments_html = ""
+    if task.attachments:
+        try:
+            attachments = json.loads(task.attachments)
+            if attachments:
+                attachments_html = "<br><strong>Archivos adjuntos:</strong><br>"
+                for filename in attachments:
+                    attachments_html += f"- {filename}<br>"
+        except:
+            pass
         
     html = f"""
     <!DOCTYPE html>
@@ -550,6 +658,7 @@ def print_report(task_id):
                 <div class="box">
                     { f"Stock ({'USADO' if task.stock_action == 'used' else 'RETIRADO'}): {task.stock_quantity_used}x {task.stock_item.name}<br>" if task.stock_item else "" }
                     { f"Notas/Retirado: {task.parts_text}" if task.parts_text else "Sin notas adicionales" }
+                    {attachments_html}
                 </div>
             </div>
         </div>
