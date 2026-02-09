@@ -445,6 +445,8 @@
             height: 'auto',
             events: '/api/tasks',
             eventClick: handleEventClick,
+            dateClick: handleDateClick,
+            selectable: true,
             eventDidMount: function(info) {
                 if (info.backgroundColor) {
                     info.el.style.backgroundColor = info.backgroundColor;
@@ -482,6 +484,15 @@
         }
         
         modalAction.show();
+    }
+
+    // Función para manejar clic en día del calendario
+    function handleDateClick(info) {
+        // Prellenar el modal con la fecha seleccionada
+        document.getElementById('modalDateInput').value = info.dateStr;
+        
+        // Abrir el modal de nueva cita
+        new bootstrap.Modal(document.getElementById('modalNewAppointmentTech')).show();
     }
 
     function renderTaskList() {
