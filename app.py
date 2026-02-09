@@ -182,7 +182,8 @@ def change_password():
 @app.route('/manage_services', methods=['POST'])
 @login_required
 def manage_services():
-    if current_user.role != 'admin': return redirect(url_for('dashboard'))
+    if current_user.role != 'admin': 
+        return redirect(url_for('dashboard'))
     
     action = request.form.get('action')
     
@@ -210,125 +211,288 @@ def manage_services():
     db.session.commit()
     return redirect(url_for('dashboard'))
 
+@app.route('/manage_stock', methods=['POST'])
+@login_required
+def manage_stock():
+    if current_user.role != 'admin': 
+        return redirect(url_for('dashboard'))
+    
+    action = request.form.get('action')
+    
+    if action == 'add':
+        existing = Stock.query.filter_by(name=request.form['name']).first()
+        if not existing:
+            db.session.add(Stock(
+                name=request.form['name'],
+                category=request.form['category'],
+                quantity=int(request.form.get('quantity', 0))
+            ))
+            flash('Artículo de stock añadido.', 'success')
+        else:
+            flash('Ese artículo ya existe.', 'warning')
+            
+    elif action == 'adjust':
+        item = Stock.query.get(request.form['item_id'])
+        if item:
+            qty_change = int(request.form.get('adjust_qty', request.form.get('quantity', 0)))
+            item.quantity += qty_change
+            flash(f'Stock ajustado: {item.name}', 'success')
+            
+    elif action == 'edit':
+        item = Stock.query.get(request.form['item_id'])
+        if item:
+            item.name = request.form['name']
+            item.category = request.form['category']
+            item.quantity = int(request.form['quantity'])
+            flash('Artículo actualizado.', 'success')
+            
+    elif action == 'delete':
+        item = Stock.query.get(request.form['item_id'])
+        if item:
+            db.session.delete(item)
+            flash('Artículo eliminado.', 'warning')
+            
+    db.session.commit()
+    return redirect(url_for('dashboard'))
+
 @app.route('/save_report', methods=['POST'])
 @login_required
 def save_report():
     try:
-        nueva_fecha = datetime.strptime(request.form['date'], '%Y-%m-%d').date()
-        stock_id = request.form.get('stock_item')
-        qty = int(request.form.get('stock_qty', 0))
-        action = request.form.get('stock_action', 'used')
+        client_name = request.form.get('client_name')
+        service_type = request.form.get('service_type')
+        description = request.form.get('description')
+        parts_text = request.form.get('parts_text', '')
         
-        # Procesar archivos adjuntos
+        report_date = request.form.get('date')
+        start_time = request.form.get('entry_time')
+        end_time = request.form.get('exit_time')
+        
+        # Convertir fecha
+        if report_date:
+            task_date = datetime.strptime(report_date, '%Y-%m-%d').date()
+        else:
+            task_date = date.today()
+        
+        # Procesar stock
+        stock_item_id = None
+        stock_quantity_used = 0
+        stock_action = None
+        
+        stock_id_str = request.form.get('stock_item')
+        if stock_id_str and stock_id_str != 'none':
+            stock_item_id = int(stock_id_str)
+            stock_quantity_used = int(request.form.get('stock_qty', request.form.get('stock_quantity', 0)))
+            stock_action = request.form.get('stock_action')
+            
+            item = Stock.query.get(stock_item_id)
+            if item and stock_action == 'used':
+                item.quantity -= stock_quantity_used
+                if item.quantity < 0:
+                    item.quantity = 0
+        
+        # Manejo de archivos adjuntos
         uploaded_files = []
         if 'attachments' in request.files:
             files = request.files.getlist('attachments')
             for file in files:
                 if file and file.filename and allowed_file(file.filename):
                     filename = secure_filename(file.filename)
-                    # Añadir timestamp para evitar duplicados
-                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
-                    filename = timestamp + filename
+                    # Añadir timestamp para evitar colisiones
+                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                    filename = f"{timestamp}_{filename}"
                     filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
                     file.save(filepath)
                     uploaded_files.append(filename)
         
-        # Verificar si estamos completando una tarea pendiente
+        # Verificar si es una cita vinculada
         linked_task_id = request.form.get('linked_task_id')
+        
         if linked_task_id and linked_task_id != 'none':
             # Actualizar tarea existente
             task = Task.query.get(int(linked_task_id))
             if task:
-                task.description = request.form['description']
-                task.start_time = request.form['entry_time']
-                task.end_time = request.form['exit_time']
-                task.parts_text = request.form.get('parts_text', '')
-                task.stock_item_id = int(stock_id) if stock_id else None
-                task.stock_quantity_used = qty
-                task.stock_action = action
                 task.status = 'Completado'
+                task.end_time = end_time
+                task.parts_text = parts_text
+                task.stock_item_id = stock_item_id
+                task.stock_quantity_used = stock_quantity_used
+                task.stock_action = stock_action
                 
-                # Añadir archivos adjuntos
+                # Actualizar archivos adjuntos
                 if uploaded_files:
-                    existing_attachments = json.loads(task.attachments) if task.attachments else []
+                    existing_attachments = []
+                    if task.attachments:
+                        try:
+                            existing_attachments = json.loads(task.attachments)
+                        except:
+                            pass
                     existing_attachments.extend(uploaded_files)
                     task.attachments = json.dumps(existing_attachments)
                 
-                if stock_id and qty > 0:
-                    item = Stock.query.get(int(stock_id))
-                    if item:
-                        if action == 'used':
-                            item.quantity -= qty
-                        elif action == 'removed':
-                            item.quantity -= qty
-                
                 db.session.commit()
-                flash('Tarea completada y guardada correctamente.', 'success')
-        else:
-            # Crear nueva tarea
-            nueva = Task(
-                tech_id=current_user.id,
-                client_name=request.form['client_name'],
-                description=request.form['description'],
-                date=nueva_fecha,
-                start_time=request.form['entry_time'],
-                end_time=request.form['exit_time'],
-                service_type=request.form['service_type'],
-                parts_text=request.form.get('parts_text', ''),
-                stock_item_id=int(stock_id) if stock_id else None,
-                stock_quantity_used=qty,
-                stock_action=action,
-                status='Completado',
-                attachments=json.dumps(uploaded_files) if uploaded_files else None
-            )
-            
-            if stock_id and qty > 0:
-                item = Stock.query.get(int(stock_id))
-                if item:
-                    if action == 'used':
-                        item.quantity -= qty
-                    elif action == 'removed':
-                        item.quantity -= qty
-                        
-            db.session.add(nueva)
-            db.session.commit()
-            flash('Informe guardado correctamente.', 'success')
-            
-    except Exception as e:
-        flash(f'Error al guardar: {str(e)}', 'danger')
+                flash('Cita completada exitosamente.', 'success')
+                return redirect(url_for('dashboard'))
         
+        # Crear nueva tarea
+        new_task = Task(
+            tech_id=current_user.id,
+            client_name=client_name,
+            service_type=service_type,
+            description=description,
+            parts_text=parts_text,
+            date=task_date,
+            start_time=start_time,
+            end_time=end_time,
+            stock_item_id=stock_item_id,
+            stock_quantity_used=stock_quantity_used,
+            stock_action=stock_action,
+            status='Completado',
+            attachments=json.dumps(uploaded_files) if uploaded_files else None
+        )
+        
+        db.session.add(new_task)
+        
+        # Añadir cliente si no existe
+        if not Client.query.filter_by(name=client_name).first():
+            db.session.add(Client(name=client_name))
+        
+        db.session.commit()
+        flash('Parte guardado exitosamente.', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al guardar: {str(e)}', 'danger')
+    
+    return redirect(url_for('dashboard'))
+
+@app.route('/create_appointment', methods=['POST'])
+@login_required
+def create_appointment():
+    try:
+        client_name = request.form.get('client_name')
+        appt_date = request.form.get('date')
+        appt_time = request.form.get('time')
+        service_type = request.form.get('service_type')
+        notes = request.form.get('notes', '')
+        
+        if appt_date:
+            task_date = datetime.strptime(appt_date, '%Y-%m-%d').date()
+        else:
+            task_date = date.today()
+        
+        new_appointment = Task(
+            tech_id=current_user.id,
+            client_name=client_name,
+            service_type=service_type,
+            description=notes,
+            date=task_date,
+            start_time=appt_time,
+            status='Pendiente'
+        )
+        
+        db.session.add(new_appointment)
+        
+        # Añadir cliente si no existe
+        if not Client.query.filter_by(name=client_name).first():
+            db.session.add(Client(name=client_name))
+        
+        db.session.commit()
+        flash('Cita creada exitosamente.', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al crear cita: {str(e)}', 'danger')
+    
     return redirect(url_for('dashboard'))
 
 @app.route('/schedule_appointment', methods=['POST'])
 @login_required
 def schedule_appointment():
+    """Ruta para que el admin cree citas (usado en modalScheduleAppointment)"""
+    if current_user.role != 'admin':
+        return redirect(url_for('dashboard'))
+    
     try:
-        # Si es técnico, asignar a sí mismo
-        if current_user.role == 'tech':
-            tech_id = current_user.id
-        else:
-            # Si es admin, usar el tech_id del formulario
-            tech_id = int(request.form['tech_id'])
-            
-        appt_date = datetime.strptime(request.form['date'], '%Y-%m-%d').date()
-        appt_time = request.form['time']
+        tech_id = request.form.get('tech_id')
+        client_name = request.form.get('client_name')
+        appt_date = request.form.get('date')
+        appt_time = request.form.get('time')
+        service_type = request.form.get('service_type')
+        notes = request.form.get('notes', '')
         
-        nueva = Task(
-            tech_id=tech_id,
-            client_name=request.form['client_name'],
-            description=request.form.get('notes', ''),
-            date=appt_date,
+        if appt_date:
+            task_date = datetime.strptime(appt_date, '%Y-%m-%d').date()
+        else:
+            task_date = date.today()
+        
+        new_appointment = Task(
+            tech_id=int(tech_id),
+            client_name=client_name,
+            service_type=service_type,
+            description=notes,
+            date=task_date,
             start_time=appt_time,
-            service_type=request.form['service_type'],
             status='Pendiente'
         )
         
-        db.session.add(nueva)
-        db.session.commit()
-        flash('Cita agendada correctamente.', 'success')
-    except Exception as e:
-        flash(f'Error al agendar: {str(e)}', 'danger')
+        db.session.add(new_appointment)
         
+        # Añadir cliente si no existe
+        if not Client.query.filter_by(name=client_name).first():
+            db.session.add(Client(name=client_name))
+        
+        db.session.commit()
+        flash('Cita creada exitosamente.', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al crear cita: {str(e)}', 'danger')
+    
+    return redirect(url_for('dashboard'))
+
+@app.route('/create_appointment_admin', methods=['POST'])
+@login_required
+def create_appointment_admin():
+    if current_user.role != 'admin':
+        return redirect(url_for('dashboard'))
+    
+    try:
+        tech_id = request.form.get('tech_id')
+        client_name = request.form.get('client_name')
+        appt_date = request.form.get('date')
+        appt_time = request.form.get('time')
+        service_type = request.form.get('service_type')
+        notes = request.form.get('notes', '')
+        
+        if appt_date:
+            task_date = datetime.strptime(appt_date, '%Y-%m-%d').date()
+        else:
+            task_date = date.today()
+        
+        new_appointment = Task(
+            tech_id=int(tech_id),
+            client_name=client_name,
+            service_type=service_type,
+            description=notes,
+            date=task_date,
+            start_time=appt_time,
+            status='Pendiente'
+        )
+        
+        db.session.add(new_appointment)
+        
+        # Añadir cliente si no existe
+        if not Client.query.filter_by(name=client_name).first():
+            db.session.add(Client(name=client_name))
+        
+        db.session.commit()
+        flash('Cita creada exitosamente.', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al crear cita: {str(e)}', 'danger')
+    
     return redirect(url_for('dashboard'))
 
 @app.route('/edit_appointment/<int:task_id>', methods=['POST'])
@@ -336,23 +500,29 @@ def schedule_appointment():
 def edit_appointment(task_id):
     task = Task.query.get_or_404(task_id)
     
-    # Solo admin o el técnico asignado puede editar
+    # Verificar permisos
     if current_user.role != 'admin' and current_user.id != task.tech_id:
-        flash('No tienes permisos para editar esta tarea.', 'danger')
+        flash('No tienes permisos para editar esta cita.', 'danger')
         return redirect(url_for('dashboard'))
     
     try:
-        task.client_name = request.form['client_name']
-        task.date = datetime.strptime(request.form['date'], '%Y-%m-%d').date()
-        task.start_time = request.form['time']
-        task.service_type = request.form['service_type']
+        task.client_name = request.form.get('client_name')
+        task.date = datetime.strptime(request.form.get('date'), '%Y-%m-%d').date()
+        task.start_time = request.form.get('time')
+        task.service_type = request.form.get('service_type')
         task.description = request.form.get('notes', '')
         
-        db.session.commit()
-        flash('Cita actualizada correctamente.', 'success')
-    except Exception as e:
-        flash(f'Error al actualizar: {str(e)}', 'danger')
+        # Añadir cliente si no existe
+        if not Client.query.filter_by(name=task.client_name).first():
+            db.session.add(Client(name=task.client_name))
         
+        db.session.commit()
+        flash('Cita actualizada exitosamente.', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al actualizar cita: {str(e)}', 'danger')
+    
     return redirect(url_for('dashboard'))
 
 @app.route('/api/get_task/<int:task_id>')
@@ -360,15 +530,21 @@ def edit_appointment(task_id):
 def get_task(task_id):
     task = Task.query.get(task_id)
     if not task:
-        return jsonify({'success': False, 'msg': 'Tarea no encontrada'})
+        return jsonify({'success': False})
+    
+    # Verificar permisos
+    if current_user.role != 'admin' and current_user.id != task.tech_id:
+        return jsonify({'success': False})
     
     return jsonify({
         'success': True,
         'data': {
             'client_name': task.client_name,
             'date': task.date.strftime('%Y-%m-%d'),
+            'start_time': task.start_time or '',
             'time': task.start_time or '',
             'service_type': task.service_type,
+            'description': task.description or '',
             'notes': task.description or ''
         }
     })
@@ -376,10 +552,14 @@ def get_task(task_id):
 @app.route('/api/get_task_full/<int:task_id>')
 @login_required
 def get_task_full(task_id):
-    """Devuelve información completa de una tarea para sincronizar formularios"""
+    """Devuelve información completa de una tarea para rellenar el formulario de parte"""
     task = Task.query.get(task_id)
     if not task:
-        return jsonify({'success': False, 'msg': 'Tarea no encontrada'})
+        return jsonify({'success': False})
+    
+    # Verificar permisos
+    if current_user.role != 'admin' and current_user.id != task.tech_id:
+        return jsonify({'success': False})
     
     return jsonify({
         'success': True,
@@ -399,98 +579,72 @@ def task_action(task_id, action):
     if not task:
         return jsonify({'success': False, 'msg': 'Tarea no encontrada'})
     
-    if action == 'complete':
-        task.status = 'Completado'
-        db.session.commit()
-        return jsonify({'success': True, 'msg': 'Tarea marcada como completada'})
-        
-    elif action == 'delete':
-        # Eliminar archivos adjuntos si existen
-        if task.attachments:
-            try:
-                attachments = json.loads(task.attachments)
-                for filename in attachments:
-                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                    if os.path.exists(filepath):
-                        os.remove(filepath)
-            except:
-                pass
-        
-        db.session.delete(task)
-        db.session.commit()
-        return jsonify({'success': True, 'msg': 'Tarea eliminada'})
-        
-    return jsonify({'success': False, 'msg': 'Acción no válida'})
-
-@app.route('/manage_stock', methods=['POST'])
-@login_required
-def manage_stock():
-    if current_user.role != 'admin': return redirect(url_for('dashboard'))
+    # Verificar permisos
+    if current_user.role != 'admin' and current_user.id != task.tech_id:
+        return jsonify({'success': False, 'msg': 'Sin permisos'})
     
-    action = request.form.get('action')
-    
-    if action == 'add':
-        existing = Stock.query.filter_by(name=request.form['name']).first()
-        if not existing:
-            db.session.add(Stock(
-                name=request.form['name'],
-                category=request.form['category'],
-                quantity=int(request.form['quantity'])
-            ))
-            flash('Artículo añadido al inventario.', 'success')
+    try:
+        if action == 'delete':
+            db.session.delete(task)
+            db.session.commit()
+            return jsonify({'success': True, 'msg': 'Tarea eliminada'})
+        
+        elif action == 'complete':
+            task.status = 'Completado'
+            db.session.commit()
+            return jsonify({'success': True, 'msg': 'Tarea completada'})
+        
+        elif action == 'reopen':
+            task.status = 'Pendiente'
+            db.session.commit()
+            return jsonify({'success': True, 'msg': 'Tarea reabierta'})
+        
         else:
-            flash('Ese artículo ya existe en inventario.', 'warning')
+            return jsonify({'success': False, 'msg': 'Acción no válida'})
             
-    elif action == 'adjust':
-        item = Stock.query.get(request.form['item_id'])
-        if item:
-            item.quantity += int(request.form['adjust_qty'])
-            flash('Cantidad ajustada.', 'success')
-            
-    elif action == 'edit':
-        item = Stock.query.get(request.form['item_id'])
-        if item:
-            item.name = request.form['name']
-            item.category = request.form['category']
-            item.quantity = int(request.form['quantity'])
-            flash('Artículo actualizado.', 'success')
-            
-    elif action == 'delete':
-        item = Stock.query.get(request.form['item_id'])
-        if item:
-            db.session.delete(item)
-            flash('Artículo eliminado del inventario.', 'warning')
-            
-    db.session.commit()
-    return redirect(url_for('dashboard'))
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'msg': str(e)})
 
 @app.route('/manage_clients', methods=['POST'])
 @login_required
 def manage_clients():
-    if current_user.role != 'admin': return redirect(url_for('dashboard'))
+    if current_user.role != 'admin': 
+        return redirect(url_for('dashboard'))
     
     action = request.form.get('action')
     
     if action == 'add':
-        existing = Client.query.filter_by(name=request.form['name']).first()
-        if not existing:
-            db.session.add(Client(name=request.form['name']))
-            flash('Cliente añadido.', 'success')
-        else:
-            flash('Ese cliente ya existe.', 'warning')
-            
+        name = request.form.get('name', '').strip()
+        if name:
+            existing = Client.query.filter_by(name=name).first()
+            if not existing:
+                db.session.add(Client(name=name))
+                flash('Cliente añadido.', 'success')
+            else:
+                flash('Ese cliente ya existe.', 'warning')
+        
     elif action == 'edit':
-        client = Client.query.get(request.form['client_id'])
-        if client:
-            client.name = request.form['name']
-            flash('Cliente actualizado.', 'success')
-            
+        client_id = request.form.get('client_id')
+        new_name = request.form.get('name', '').strip()
+        client = Client.query.get(client_id)
+        
+        if client and new_name:
+            # Verificar si el nuevo nombre ya existe
+            existing = Client.query.filter_by(name=new_name).first()
+            if not existing or existing.id == client.id:
+                client.name = new_name
+                flash('Cliente actualizado.', 'success')
+            else:
+                flash('Ya existe un cliente con ese nombre.', 'warning')
+        
     elif action == 'delete':
-        client = Client.query.get(request.form['client_id'])
+        client_id = request.form.get('client_id')
+        client = Client.query.get(client_id)
         if client:
             db.session.delete(client)
             flash('Cliente eliminado.', 'warning')
-            
+    
     db.session.commit()
     return redirect(url_for('dashboard'))
 
@@ -503,17 +657,11 @@ def export_clients():
     clients = Client.query.order_by(Client.name).all()
     data = [{'name': c.name} for c in clients]
     
-    json_str = json.dumps(data, indent=2, ensure_ascii=False)
-    buffer = io.BytesIO()
-    buffer.write(json_str.encode('utf-8'))
-    buffer.seek(0)
+    output = io.BytesIO()
+    output.write(json.dumps(data, indent=2, ensure_ascii=False).encode('utf-8'))
+    output.seek(0)
     
-    return send_file(
-        buffer,
-        as_attachment=True,
-        download_name='clientes_oslaprint.json',
-        mimetype='application/json'
-    )
+    return send_file(output, mimetype='application/json', as_attachment=True, download_name='clientes.json')
 
 @app.route('/import_clients', methods=['POST'])
 @login_required
@@ -526,27 +674,21 @@ def import_clients():
         return redirect(url_for('dashboard'))
     
     file = request.files['file']
-    
     if file.filename == '':
         flash('No se seleccionó ningún archivo', 'danger')
         return redirect(url_for('dashboard'))
     
-    if not file.filename.endswith('.json'):
-        flash('El archivo debe ser formato JSON', 'danger')
-        return redirect(url_for('dashboard'))
-    
     try:
         content = file.read().decode('utf-8')
-        clients_data = json.loads(content)
+        data = json.loads(content)
         
         added = 0
         skipped = 0
         
-        for client_info in clients_data:
-            name = client_info.get('name', '').strip()
+        for item in data:
+            name = item.get('name', '').strip()
             if name:
-                existing = Client.query.filter_by(name=name).first()
-                if not existing:
+                if not Client.query.filter_by(name=name).first():
                     db.session.add(Client(name=name))
                     added += 1
                 else:
@@ -755,4 +897,4 @@ with app.app_context():
 
 # --- ARRANQUE ---
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5000, debug=True)
