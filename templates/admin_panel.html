@@ -8,6 +8,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js'></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         :root {
             --osla-orange: #f37021;
@@ -189,6 +190,8 @@
             <li class="nav-item"><button class="nav-link w-100" data-bs-toggle="tab"
                     data-bs-target="#data">INFORMES</button></li>
             <li class="nav-item"><button class="nav-link w-100" data-bs-toggle="tab"
+                    data-bs-target="#analytics">ANALÍTICAS</button></li>
+            <li class="nav-item"><button class="nav-link w-100" data-bs-toggle="tab"
                     data-bs-target="#stock">STOCK</button></li>
             <li class="nav-item"><button class="nav-link w-100" data-bs-toggle="tab"
                     data-bs-target="#clients">CLIENTES</button></li>
@@ -269,73 +272,7 @@
                 <div id="calendarGlobal"></div>
             </div>
 
-            
-            <!-- ANÁLISIS INDIVIDUAL DE TRABAJADORES -->
-            <div class="tab-pane fade" id="analytics">
-                <h4 class="fw-bold text-white fs-5 mb-3">Análisis Individual de Trabajadores</h4>
-                
-                <div class="row g-3 mb-4">
-                    {% for u in empleados %}
-                    <div class="col-12 col-md-6 col-lg-4">
-                        <div class="card bg-dark border-secondary">
-                            <div class="card-body">
-                                <h5 class="card-title text-warning">
-                                    <i class="bi bi-person-circle me-2"></i>{{ u.username.upper() }}
-                                </h5>
-                                <button class="btn btn-sm btn-outline-info w-100" 
-                                        onclick="loadTechStats({{ u.id }}, '{{ u.username }}')">
-                                    <i class="bi bi-bar-chart-fill me-1"></i> Ver Estadísticas
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-
-                <div id="techStatsContainer" class="d-none">
-                    <div class="card bg-dark border-warning">
-                        <div class="card-header bg-warning text-dark">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <h5 class="m-0">
-                                    <i class="bi bi-graph-up me-2"></i>
-                                    <span id="statsName">Trabajador</span>
-                                </h5>
-                                <button class="btn btn-sm btn-dark" onclick="closeTechStats()">
-                                    <i class="bi bi-x-circle"></i> Cerrar
-                                </button>
-                            </div>
-                        </div>
-                        <div class="card-body">
-                            <div class="row mb-3">
-                                <div class="col-md-4">
-                                    <div class="text-center p-3 bg-black rounded">
-                                        <div class="text-muted small">Trabajos Completados</div>
-                                        <div class="fs-3 fw-bold text-success" id="statsTotal">0</div>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="text-center p-3 bg-black rounded">
-                                        <div class="text-muted small">Horas Totales</div>
-                                        <div class="fs-3 fw-bold text-info" id="statsHours">0</div>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="text-center p-3 bg-black rounded">
-                                        <div class="text-muted small">Tipos de Servicio</div>
-                                        <div class="fs-3 fw-bold text-warning" id="statsServices">0</div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <h6 class="text-white fw-bold mb-3">
-                                <i class="bi bi-list-task me-2"></i>Desglose por Tipo de Servicio
-                            </h6>
-                            <div id="serviceBreakdown"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-<div class="tab-pane fade" id="data">
+            <div class="tab-pane fade" id="data">
                 <h4 class="fw-bold text-white fs-5 mb-3">Informes Técnicos Completados</h4>
                 <div class="table-responsive">
                     <table class="table table-dark table-sm">
@@ -367,6 +304,132 @@
                             {% endfor %}
                         </tbody>
                     </table>
+                </div>
+            </div>
+
+            <!-- SECCIÓN ANALÍTICAS -->
+            <div class="tab-pane fade" id="analytics">
+                <h4 class="fw-bold text-info fs-5 mb-4"><i class="bi bi-graph-up me-2"></i>Panel de Analíticas</h4>
+                
+                <!-- Selector de Técnico -->
+                <div class="card bg-dark border-secondary p-3 mb-4">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-info">TÉCNICO</label>
+                            <select id="analyticsTechSelector" class="form-select" onchange="loadAdminAnalytics()">
+                                <option value="">-- Seleccionar Técnico --</option>
+                                {% for emp in employees %}
+                                <option value="{{ emp.id }}">{{ emp.username }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold text-info">PERÍODO</label>
+                            <select id="analyticsPeriodSelector" class="form-select" onchange="loadAdminAnalytics()">
+                                <option value="7">Últimos 7 días</option>
+                                <option value="30" selected>Últimos 30 días</option>
+                                <option value="90">Últimos 3 meses</option>
+                                <option value="180">Últimos 6 meses</option>
+                                <option value="365">Último año</option>
+                                <option value="all">Todo el historial</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <button class="btn btn-warning w-100" onclick="loadAdminAnalytics()">
+                                <i class="bi bi-arrow-clockwise me-1"></i>Actualizar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Mensaje inicial -->
+                <div id="analyticsPlaceholder" class="text-center text-muted py-5">
+                    <i class="bi bi-bar-chart fs-1 d-block mb-3"></i>
+                    <h5>Selecciona un técnico para ver sus analíticas</h5>
+                    <p class="small">Elige un técnico del menú desplegable para visualizar sus estadísticas de rendimiento</p>
+                </div>
+
+                <!-- Contenedor de Analíticas (oculto inicialmente) -->
+                <div id="analyticsContent" style="display: none;">
+                    <!-- Tarjetas de Resumen -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-3 col-6">
+                            <div class="card bg-dark border-secondary p-3 text-center">
+                                <i class="bi bi-clipboard-check fs-1 text-success mb-2"></i>
+                                <h2 class="text-white fw-bold mb-0" id="adminTotalServices">0</h2>
+                                <small class="text-muted">Servicios Totales</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-6">
+                            <div class="card bg-dark border-secondary p-3 text-center">
+                                <i class="bi bi-tools fs-1 text-warning mb-2"></i>
+                                <h2 class="text-white fw-bold mb-0" id="adminTotalMaintenances">0</h2>
+                                <small class="text-muted">Mantenimientos</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-6">
+                            <div class="card bg-dark border-secondary p-3 text-center">
+                                <i class="bi bi-cash-stack fs-1 text-info mb-2"></i>
+                                <h2 class="text-white fw-bold mb-0" id="adminTotalRevenue">0€</h2>
+                                <small class="text-muted">Ingresos Estimados</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-6">
+                            <div class="card bg-dark border-secondary p-3 text-center">
+                                <i class="bi bi-clock-history fs-1 text-danger mb-2"></i>
+                                <h2 class="text-white fw-bold mb-0" id="adminAvgTime">0h</h2>
+                                <small class="text-muted">Tiempo Promedio</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Gráficos -->
+                    <div class="row g-3 mb-4">
+                        <!-- Distribución de Servicios -->
+                        <div class="col-lg-6">
+                            <div class="card bg-dark border-secondary p-4">
+                                <h5 class="text-white fw-bold mb-3"><i class="bi bi-pie-chart me-2"></i>Distribución de Servicios</h5>
+                                <canvas id="adminServiceDistributionChart" style="max-height: 300px;"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Evolución Temporal -->
+                        <div class="col-lg-6">
+                            <div class="card bg-dark border-secondary p-4">
+                                <h5 class="text-white fw-bold mb-3"><i class="bi bi-graph-up me-2"></i>Evolución Temporal</h5>
+                                <div class="mb-3">
+                                    <select id="adminMetricSelector" class="form-select form-select-sm" onchange="updateAdminTimelineChart()">
+                                        <option value="services">Servicios Realizados</option>
+                                        <option value="revenue">Ingresos Totales</option>
+                                        <option value="maintenances">Mantenimientos</option>
+                                    </select>
+                                </div>
+                                <canvas id="adminTimelineChart" style="max-height: 250px;"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Top Clientes y Servicios -->
+                    <div class="row g-3">
+                        <div class="col-lg-6">
+                            <div class="card bg-dark border-secondary p-4">
+                                <h5 class="text-white fw-bold mb-3"><i class="bi bi-people-fill me-2"></i>Top 5 Clientes</h5>
+                                <div id="adminTopClients" class="list-group">
+                                    <div class="text-center text-muted py-5">
+                                        <i class="bi bi-hourglass-split fs-1 d-block mb-2"></i>
+                                        Cargando datos...
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-lg-6">
+                            <div class="card bg-dark border-secondary p-4">
+                                <h5 class="text-white fw-bold mb-3"><i class="bi bi-bar-chart me-2"></i>Servicios Más Frecuentes</h5>
+                                <canvas id="adminTopServicesChart" style="max-height: 300px;"></canvas>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -1410,173 +1473,251 @@
             
             modalActionAdmin.show();
         }
-    </script>
 
-    <!-- Modal de Alarmas -->
-    <div class="modal fade" id="modalAlarms" tabindex="-1">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title text-warning">
-                        <i class="bi bi-bell-fill me-2"></i>Sistema de Alarmas y Avisos
-                    </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <button class="btn btn-sm btn-warning mb-3" data-bs-toggle="modal" data-bs-target="#modalCreateAlarm">
-                        <i class="bi bi-plus-circle me-1"></i> Crear Alarma
-                    </button>
+        // ============================================================
+        // FUNCIONES DE ANALÍTICAS ADMIN
+        // ============================================================
+        
+        let adminPieChart, adminLineChart, adminBarChart;
+        let adminAnalyticsData = null;
 
-                    <div id="alarmsList">
-                        {% for alarm in alarms %}
-                        <div class="alarm-item {% if alarm.is_read %}read{% endif %} priority-{{ alarm.priority }}"
-                             onclick="markAlarmRead({{ alarm.id }})">
-                            <div class="d-flex justify-content-between align-items-start">
-                                <div>
-                                    <h6 class="text-white mb-1">
-                                        {% if alarm.alarm_type == 'technical' %}
-                                        <i class="bi bi-tools me-1"></i>
-                                        {% elif alarm.alarm_type == 'maintenance' %}
-                                        <i class="bi bi-wrench me-1"></i>
-                                        {% elif alarm.alarm_type == 'low_stock' %}
-                                        <i class="bi bi-box-seam me-1"></i>
-                                        {% endif %}
-                                        {{ alarm.title }}
-                                    </h6>
-                                    <p class="text-muted small mb-1">{{ alarm.description }}</p>
-                                    {% if alarm.client_name %}
-                                    <small class="text-info">
-                                        <i class="bi bi-person me-1"></i>{{ alarm.client_name }}
-                                    </small>
-                                    {% endif %}
-                                </div>
-                                <small class="text-muted">{{ alarm.created_at.strftime('%d/%m %H:%M') }}</small>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+        function loadAdminAnalytics() {
+            const techId = document.getElementById('analyticsTechSelector').value;
+            const period = document.getElementById('analyticsPeriodSelector').value;
+            
+            if (!techId) {
+                document.getElementById('analyticsPlaceholder').style.display = 'block';
+                document.getElementById('analyticsContent').style.display = 'none';
+                return;
+            }
 
-    <!-- Modal Crear Alarma -->
-    <div class="modal fade" id="modalCreateAlarm" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <form method="POST" action="/create_alarm">
-                    <div class="modal-header">
-                        <h5 class="modal-title text-warning">Nueva Alarma</h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <label class="form-label">Tipo de Alarma</label>
-                            <select name="alarm_type" class="form-select" required>
-                                <option value="technical">Incidencia Técnica</option>
-                                <option value="maintenance">Mantenimiento</option>
-                                <option value="low_stock">Stock Bajo</option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Título</label>
-                            <input type="text" name="title" class="form-control" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Descripción</label>
-                            <textarea name="description" class="form-control" rows="3" required></textarea>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Cliente (Opcional)</label>
-                            <input type="text" name="client_name" class="form-control">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Prioridad</label>
-                            <select name="priority" class="form-select">
-                                <option value="low">Baja</option>
-                                <option value="normal" selected>Normal</option>
-                                <option value="high">Alta</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                        <button type="submit" class="btn btn-warning">Crear Alarma</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
+            // Ocultar placeholder y mostrar contenido
+            document.getElementById('analyticsPlaceholder').style.display = 'none';
+            document.getElementById('analyticsContent').style.display = 'block';
+            
+            // Mostrar indicadores de carga
+            document.getElementById('adminTotalServices').textContent = '...';
+            document.getElementById('adminTotalMaintenances').textContent = '...';
+            document.getElementById('adminTotalRevenue').textContent = '...';
+            document.getElementById('adminAvgTime').textContent = '...';
+            
+            fetch(`/api/admin_analytics?tech_id=${techId}&period=${period}`)
+                .then(res => res.json())
+                .then(data => {
+                    adminAnalyticsData = data;
+                    updateAdminAnalyticsSummary(data);
+                    updateAdminServiceDistributionChart(data);
+                    updateAdminTimelineChart();
+                    updateAdminTopClients(data);
+                    updateAdminTopServicesChart(data);
+                })
+                .catch(err => {
+                    console.error('Error cargando analíticas:', err);
+                    alert('Error al cargar las analíticas');
+                });
+        }
 
-<script>
-    function toggleSupportOptions() {
-        const checkbox = document.getElementById('hasSupport');
-        const options = document.getElementById('supportOptions');
-        options.classList.toggle('d-none', !checkbox.checked);
-    }
+        function updateAdminAnalyticsSummary(data) {
+            document.getElementById('adminTotalServices').textContent = data.total_services || 0;
+            document.getElementById('adminTotalMaintenances').textContent = data.total_maintenances || 0;
+            document.getElementById('adminTotalRevenue').textContent = (data.total_revenue || 0).toLocaleString('es-ES') + '€';
+            document.getElementById('adminAvgTime').textContent = (data.avg_time || 0) + 'h';
+        }
 
-    function loadTechStats(techId, techName) {
-        document.getElementById('statsName').textContent = techName.toUpperCase();
-        document.getElementById('techStatsContainer').classList.remove('d-none');
+        function updateAdminServiceDistributionChart(data) {
+            const ctx = document.getElementById('adminServiceDistributionChart');
+            
+            if (adminPieChart) {
+                adminPieChart.destroy();
+            }
 
-        fetch(`/api/tech_stats/${techId}`)
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    document.getElementById('statsTotal').textContent = data.data.total_completed;
-                    document.getElementById('statsHours').textContent = data.data.total_hours + 'h';
-                    document.getElementById('statsServices').textContent = Object.keys(data.data.service_breakdown).length;
+            const distribution = data.service_distribution || {};
+            const labels = Object.keys(distribution);
+            const values = Object.values(distribution);
+            
+            const colors = [
+                '#f37021', '#4bc0c0', '#ff6384', '#36a2eb', '#ffcd56',
+                '#9966ff', '#ff9f40', '#4dc9f6', '#f67019', '#8549ba'
+            ];
 
-                    // Render service breakdown
-                    const breakdown = document.getElementById('serviceBreakdown');
-                    breakdown.innerHTML = '';
-
-                    for (const [service, info] of Object.entries(data.data.service_breakdown)) {
-                        const serviceCard = `
-                            <div class="card bg-black border-secondary mb-3">
-                                <div class="card-header">
-                                    <h6 class="mb-0 text-white">
-                                        <i class="bi bi-tag-fill me-2"></i>${service} 
-                                        <span class="badge bg-primary float-end">${info.count} trabajos</span>
-                                    </h6>
-                                </div>
-                                <div class="card-body">
-                                    <div class="list-group">
-                                        ${info.tasks.map(task => `
-                                            <div class="list-group-item bg-dark text-white border-secondary">
-                                                <div class="d-flex justify-content-between">
-                                                    <div>
-                                                        <strong>${task.client}</strong><br>
-                                                        <small class="text-muted">${task.time}</small>
-                                                    </div>
-                                                    <small class="text-muted">${task.date}</small>
-                                                </div>
-                                            </div>
-                                        `).join('')}
-                                    </div>
-                                </div>
-                            </div>
-                        `;
-                        breakdown.innerHTML += serviceCard;
+            adminPieChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: values,
+                        backgroundColor: colors.slice(0, labels.length),
+                        borderColor: '#161616',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                color: '#ffffff',
+                                padding: 15,
+                                font: { size: 11 }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.parsed || 0;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = ((value / total) * 100).toFixed(1);
+                                    return `${label}: ${value} (${percentage}%)`;
+                                }
+                            }
+                        }
                     }
                 }
             });
-    }
+        }
 
-    function closeTechStats() {
-        document.getElementById('techStatsContainer').classList.add('d-none');
-    }
+        function updateAdminTimelineChart() {
+            const ctx = document.getElementById('adminTimelineChart');
+            const metric = document.getElementById('adminMetricSelector').value;
+            
+            if (adminLineChart) {
+                adminLineChart.destroy();
+            }
 
-    function markAlarmRead(alarmId) {
-        fetch(`/mark_alarm_read/${alarmId}`, { method: 'POST' })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    location.reload();
+            if (!adminAnalyticsData || !adminAnalyticsData.timeline) {
+                return;
+            }
+
+            const timeline = adminAnalyticsData.timeline;
+            const labels = timeline.map(t => t.date);
+            let data, label, color;
+
+            if (metric === 'services') {
+                data = timeline.map(t => t.services);
+                label = 'Servicios Realizados';
+                color = '#4bc0c0';
+            } else if (metric === 'revenue') {
+                data = timeline.map(t => t.revenue);
+                label = 'Ingresos (€)';
+                color = '#36a2eb';
+            } else if (metric === 'maintenances') {
+                data = timeline.map(t => t.maintenances);
+                label = 'Mantenimientos';
+                color = '#ffcd56';
+            }
+
+            adminLineChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: label,
+                        data: data,
+                        borderColor: color,
+                        backgroundColor: color + '33',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#ffffff' }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { color: '#aaaaaa' },
+                            grid: { color: '#333333' }
+                        },
+                        x: {
+                            ticks: { color: '#aaaaaa' },
+                            grid: { color: '#333333' }
+                        }
+                    }
                 }
             });
-    }
-</script>
+        }
+
+        function updateAdminTopClients(data) {
+            const container = document.getElementById('adminTopClients');
+            const topClients = data.top_clients || [];
+            
+            if (topClients.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                        No hay datos disponibles
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = topClients.map((client, index) => `
+                <div class="list-group-item bg-dark border-secondary text-white d-flex justify-content-between align-items-center mb-2">
+                    <div>
+                        <span class="badge bg-info me-2">${index + 1}</span>
+                        <strong>${client.name}</strong>
+                    </div>
+                    <span class="badge bg-warning text-dark">${client.count} servicios</span>
+                </div>
+            `).join('');
+        }
+
+        function updateAdminTopServicesChart(data) {
+            const ctx = document.getElementById('adminTopServicesChart');
+            
+            if (adminBarChart) {
+                adminBarChart.destroy();
+            }
+
+            const topServices = data.top_services || {};
+            const labels = Object.keys(topServices);
+            const values = Object.values(topServices);
+
+            adminBarChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Cantidad',
+                        data: values,
+                        backgroundColor: '#f37021',
+                        borderColor: '#f37021',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    indexAxis: 'y',
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            ticks: { color: '#aaaaaa' },
+                            grid: { color: '#333333' }
+                        },
+                        y: {
+                            ticks: { color: '#aaaaaa' },
+                            grid: { display: false }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
 </body>
 
 </html>
