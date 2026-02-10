@@ -1,0 +1,1582 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>OSLAPRINT | Paco</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js'></script>
+    <style>
+        :root {
+            --osla-orange: #f37021;
+            --osla-dark: #0a0a0a;
+            --osla-card: #161616;
+        }
+
+        body {
+            background-color: var(--osla-dark);
+            color: #fff;
+            font-family: 'Segoe UI', sans-serif;
+            margin: 0;
+            padding-bottom: 60px;
+        }
+
+        .navbar {
+            background: #000;
+            border-bottom: 2px solid var(--osla-orange);
+            padding: 0.8rem 1rem;
+        }
+
+        .text-muted {
+            color: #d1d1d1 !important;
+        }
+
+        .form-label,
+        label {
+            color: #f8f9fa !important;
+            font-weight: 500;
+        }
+
+        .nav-link {
+            color: #d1d1d1;
+            font-weight: 600;
+            border: none !important;
+            font-size: 0.9rem;
+        }
+
+        .nav-link.active {
+            color: var(--osla-orange) !important;
+            background: transparent !important;
+            border-bottom: 3px solid var(--osla-orange) !important;
+        }
+
+        .table-dark {
+            --bs-table-bg: #161616;
+            color: #f1f1f1;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .card-emp {
+            background: var(--osla-card);
+            border: 1px solid #333;
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            position: relative;
+        }
+
+        .btn-delete-user {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: #dc3545;
+            background: none;
+            border: none;
+        }
+
+        #calendarAdmin,
+        #calendarGlobal {
+            background: #fff;
+            color: #000;
+            padding: 10px;
+            border-radius: 10px;
+            min-height: 500px;
+        }
+
+        /* Autocomplete Styles */
+        .suggestions-list {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            width: 100%;
+            max-height: 200px;
+            overflow-y: auto;
+            background: #1f1f1f;
+            border: 1px solid #444;
+            border-radius: 0 0 8px 8px;
+            z-index: 1050;
+            display: none;
+        }
+
+        .suggestion-item {
+            padding: 10px 15px;
+            cursor: pointer;
+            border-bottom: 1px solid #333;
+            color: #fff;
+        }
+
+        .suggestion-item:hover {
+            background: var(--osla-orange);
+            color: white;
+        }
+
+        /* Filtros Calendario Dinámicos */
+        .btn-check:checked+.btn-outline-custom {
+            color: white;
+            border-width: 2px;
+            opacity: 1;
+        }
+
+        .btn-outline-custom {
+            color: #bbb;
+            border-color: #555;
+            opacity: 0.7;
+            transition: all 0.2s;
+        }
+
+        .btn-outline-custom:hover {
+            opacity: 1;
+            filter: brightness(1.2);
+        }
+
+        .filter-group {
+            background: #1f1f1f;
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid #333;
+        }
+
+        /* Mobile overrides */
+        @media(max-width: 768px) {
+            .nav-tabs {
+                display: flex;
+                justify-content: space-around;
+                flex-wrap: wrap;
+            }
+
+            .nav-item {
+                flex: 1 1 30%;
+                text-align: center;
+                font-size: 0.8em;
+            }
+
+            .fc-header-toolbar {
+                flex-direction: column;
+                font-size: 0.8em;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <nav class="navbar d-flex justify-content-between sticky-top">
+        <span class="fw-bold fs-5 text-white">OSLA<span style="color:var(--osla-orange)">PRINT</span> <small
+                class="badge bg-secondary ms-1" style="font-size: 0.6em;">PACO</small></span>
+        <div class="d-flex align-items-center gap-2">
+            <span class="text-white fw-bold me-2">Hola {{ current_user.username }}</span>
+            <button class="btn btn-outline-light btn-sm" data-bs-toggle="modal" data-bs-target="#modalChangePassword" title="Cambiar Contraseña">
+                <i class="bi bi-key-fill"></i>
+            </button>
+            <a href="/logout" class="btn btn-outline-danger btn-sm"><i class="bi bi-power"></i></a>
+        </div>
+    </nav>
+
+    <div class="container mt-3 pb-5">
+        {% with messages = get_flashed_messages() %}
+        {% if messages %}{% for m in messages %}<div class="alert alert-info py-2 small">{{ m }}</div>{% endfor %}{%
+        endif %}
+        {% endwith %}
+
+        <ul class="nav nav-tabs mb-4 border-0 bg-dark sticky-top pt-2" style="top:55px; z-index:900;" role="tablist">
+            <li class="nav-item"><button class="nav-link active w-100" data-bs-toggle="tab"
+                    data-bs-target="#team">EQUIPO</button></li>
+            <li class="nav-item"><button class="nav-link w-100" data-bs-toggle="tab" data-bs-target="#global-agenda"
+                    id="tabGlobalBtn">AGENDA GLOBAL</button></li>
+            <li class="nav-item"><button class="nav-link w-100" data-bs-toggle="tab"
+                    data-bs-target="#data">INFORMES</button></li>
+            <li class="nav-item"><button class="nav-link w-100" data-bs-toggle="tab"
+                    data-bs-target="#stock">STOCK</button></li>
+            <li class="nav-item"><button class="nav-link w-100" data-bs-toggle="tab"
+                    data-bs-target="#clients">CLIENTES</button></li>
+            <li class="nav-item"><button class="nav-link w-100" data-bs-toggle="tab"
+                    data-bs-target="#config">CONFIGURACIÓN</button></li>
+        </ul>
+
+        <div class="tab-content">
+            <div class="tab-pane fade show active" id="team">
+                <div class="d-flex justify-content-between mb-3 align-items-center">
+                    <h4 class="fw-bold text-white fs-5 m-0">Gestión de Equipo</h4>
+                    <button class="btn btn-warning btn-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalAddUser">
+                        <i class="bi bi-person-plus-fill me-1"></i> Nuevo Usuario
+                    </button>
+                </div>
+
+                <div class="row g-3">
+                    {% for u in empleados %}
+                    <div class="col-12 col-sm-6 col-md-4">
+                        <div class="card-emp">
+                            <button class="btn-delete-user" 
+                                data-bs-toggle="modal"
+                                data-user-id="{{ u.id }}"
+                                onclick="document.getElementById('deleteUserId').value=this.dataset.userId;"
+                                data-bs-target="#modalDeleteUser"><i class="bi bi-x-circle-fill fs-4"></i></button>
+                            <i class="bi bi-person-circle fs-1 mb-2 text-warning"></i>
+                            <h5 class="mb-1 text-white fw-bold">{{ u.username }}</h5>
+                            <small class="text-muted">ID: #{{ u.id }}</small>
+                            <hr class="my-3" style="border-color:#333;">
+                            <button class="btn btn-sm btn-primary w-100" 
+                                data-user-id="{{ u.id }}"
+                                onclick="loadEmployeeCalendar(this.dataset.userId)">
+                                <i class="bi bi-calendar-check-fill me-1"></i> Ver Calendario
+                            </button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <div id="calendarAdminContainer" class="mt-4" style="display:none;">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="text-white fw-bold m-0" id="empCalendarTitle">Calendario de Empleado</h5>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="closeEmployeeCalendar()">
+                            <i class="bi bi-x-circle me-1"></i> Cerrar
+                        </button>
+                    </div>
+                    <div id="calendarAdmin"></div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="global-agenda">
+                <div class="d-flex justify-content-between mb-3 align-items-center flex-wrap">
+                    <h4 class="fw-bold text-white fs-5 m-0">Agenda Global de Tareas</h4>
+                    <button class="btn btn-warning btn-sm fw-bold" data-bs-toggle="modal"
+                        data-bs-target="#modalScheduleAppointment">
+                        <i class="bi bi-calendar-plus-fill me-1"></i> Nueva Cita
+                    </button>
+                </div>
+
+                <!-- FILTROS DINÁMICOS POR TIPO -->
+                <div class="filter-group mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <small class="text-muted fw-bold">FILTRAR POR TIPO</small>
+                        <button class="btn btn-outline-light btn-sm" onclick="checkAllFilters()">
+                            <i class="bi bi-check-all me-1"></i> Todos
+                        </button>
+                    </div>
+                    <div class="btn-group-sm d-flex flex-wrap gap-2" role="group">
+                        {% for svc in all_service_types %}
+                        <input type="checkbox" class="btn-check filter-cb" id="filter-{{ svc.id }}" value="{{ svc.name }}" checked onchange="updateGlobalFilters()">
+                        <label class="btn btn-outline-custom flex-grow-1" for="filter-{{ svc.id }}" data-color="{{ svc.color }}">
+                            {{ svc.name }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div id="calendarGlobal"></div>
+            </div>
+
+            
+            <!-- ANÁLISIS INDIVIDUAL DE TRABAJADORES -->
+            <div class="tab-pane fade" id="analytics">
+                <h4 class="fw-bold text-white fs-5 mb-3">Análisis Individual de Trabajadores</h4>
+                
+                <div class="row g-3 mb-4">
+                    {% for u in empleados %}
+                    <div class="col-12 col-md-6 col-lg-4">
+                        <div class="card bg-dark border-secondary">
+                            <div class="card-body">
+                                <h5 class="card-title text-warning">
+                                    <i class="bi bi-person-circle me-2"></i>{{ u.username.upper() }}
+                                </h5>
+                                <button class="btn btn-sm btn-outline-info w-100" 
+                                        onclick="loadTechStats({{ u.id }}, '{{ u.username }}')">
+                                    <i class="bi bi-bar-chart-fill me-1"></i> Ver Estadísticas
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <div id="techStatsContainer" class="d-none">
+                    <div class="card bg-dark border-warning">
+                        <div class="card-header bg-warning text-dark">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h5 class="m-0">
+                                    <i class="bi bi-graph-up me-2"></i>
+                                    <span id="statsName">Trabajador</span>
+                                </h5>
+                                <button class="btn btn-sm btn-dark" onclick="closeTechStats()">
+                                    <i class="bi bi-x-circle"></i> Cerrar
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <div class="text-center p-3 bg-black rounded">
+                                        <div class="text-muted small">Trabajos Completados</div>
+                                        <div class="fs-3 fw-bold text-success" id="statsTotal">0</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="text-center p-3 bg-black rounded">
+                                        <div class="text-muted small">Horas Totales</div>
+                                        <div class="fs-3 fw-bold text-info" id="statsHours">0</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="text-center p-3 bg-black rounded">
+                                        <div class="text-muted small">Tipos de Servicio</div>
+                                        <div class="fs-3 fw-bold text-warning" id="statsServices">0</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <h6 class="text-white fw-bold mb-3">
+                                <i class="bi bi-list-task me-2"></i>Desglose por Tipo de Servicio
+                            </h6>
+                            <div id="serviceBreakdown"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+<div class="tab-pane fade" id="data">
+                <h4 class="fw-bold text-white fs-5 mb-3">Informes Técnicos Completados</h4>
+                <div class="table-responsive">
+                    <table class="table table-dark table-sm">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Cliente</th>
+                                <th>Servicio</th>
+                                <th>Fecha</th>
+                                <th>Técnico</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in informes %}
+                            <tr>
+                                <td>{{ r.id }}</td>
+                                <td>{{ r.client_name }}</td>
+                                <td>{{ r.service_type }}</td>
+                                <td>{{ r.date.strftime('%d/%m/%Y') }}</td>
+                                <td>{{ r.tech.username if r.tech else 'Sin técnico' }}</td>
+                                <td>
+                                    <a href="/print_report/{{ r.id }}" target="_blank"
+                                        class="btn btn-sm btn-outline-warning">
+                                        <i class="bi bi-printer-fill"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="stock">
+                <div class="d-flex justify-content-between mb-3 align-items-center">
+                    <h4 class="fw-bold text-white fs-5 m-0">Gestión de Inventario</h4>
+                    <button class="btn btn-warning btn-sm fw-bold" data-bs-toggle="modal"
+                        data-bs-target="#modalAddStock">
+                        <i class="bi bi-plus-circle-fill me-1"></i> Nuevo Artículo
+                    </button>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-dark table-sm">
+                        <thead>
+                            <tr>
+                                <th>Artículo</th>
+                                <th>Categoría</th>
+                                <th>Cantidad</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for i in inventory %}
+                            <tr>
+                                <td>{{ i.name }}</td>
+                                <td>{{ i.category }}</td>
+                                <td>
+                                    <span class="badge {% if i.quantity < 5 %}bg-danger{% else %}bg-success{% endif %}">
+                                        {{ i.quantity }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-info"
+                                        data-item-id="{{ i.id }}"
+                                        data-item-name="{{ i.name }}"
+                                        onclick="ajustarStock(this.dataset.itemId, this.dataset.itemName)">
+                                        <i class="bi bi-arrow-repeat"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-warning"
+                                        data-item-id="{{ i.id }}"
+                                        data-item-name="{{ i.name }}"
+                                        data-item-category="{{ i.category }}"
+                                        data-item-quantity="{{ i.quantity }}"
+                                        onclick="openEditStockModal(this.dataset.itemId, this.dataset.itemName, this.dataset.itemCategory, this.dataset.itemQuantity)">
+                                        <i class="bi bi-pencil-fill"></i>
+                                    </button>
+                                    <form method="POST" action="/manage_stock" class="d-inline">
+                                        <input type="hidden" name="action" value="delete">
+                                        <input type="hidden" name="item_id" value="{{ i.id }}">
+                                        <button class="btn btn-sm btn-outline-danger"
+                                            onclick="return confirm('¿Eliminar este artículo?')">
+                                            <i class="bi bi-trash-fill"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="clients">
+                <div class="d-flex justify-content-between mb-3 align-items-center flex-wrap gap-2">
+                    <h4 class="fw-bold text-white fs-5 m-0">Gestión de Clientes</h4>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-warning btn-sm fw-bold" data-bs-toggle="modal"
+                            data-bs-target="#modalAddClient">
+                            <i class="bi bi-person-plus-fill me-1"></i> Nuevo Cliente
+                        </button>
+                        <a href="/export_clients" class="btn btn-outline-success btn-sm">
+                            <i class="bi bi-download me-1"></i> Exportar
+                        </a>
+                        <button class="btn btn-outline-info btn-sm" data-bs-toggle="modal"
+                            data-bs-target="#modalImportClients">
+                            <i class="bi bi-upload me-1"></i> Importar
+                        </button>
+                    </div>
+                </div>
+
+                <input type="text" id="clientSearchInput" class="form-control mb-3"
+                    placeholder="🔍 Buscar cliente..." onkeyup="filterClientsTable()">
+
+                <div class="table-responsive">
+                    <table class="table table-dark table-sm" id="clientsTable">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Nombre</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for c in clients %}
+                            <tr>
+                                <td>{{ c.id }}</td>
+                                <td class="client-name-cell">{{ c.name }}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-warning"
+                                        data-client-id="{{ c.id }}"
+                                        data-client-name="{{ c.name }}"
+                                        onclick="openEditClientModal(this.dataset.clientId, this.dataset.clientName)">
+                                        <i class="bi bi-pencil-fill"></i>
+                                    </button>
+                                    <form method="POST" action="/manage_clients" class="d-inline">
+                                        <input type="hidden" name="action" value="delete">
+                                        <input type="hidden" name="client_id" value="{{ c.id }}">
+                                        <button class="btn btn-sm btn-outline-danger"
+                                            onclick="return confirm('¿Eliminar este cliente?')">
+                                            <i class="bi bi-trash-fill"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="config">
+                <h4 class="fw-bold text-white fs-5 mb-3">Configuración del Sistema</h4>
+
+                <div class="card bg-dark text-white p-3 mb-3 border border-secondary">
+                    <h6 class="fw-bold mb-3"><i class="bi bi-wrench-adjustable-circle-fill me-2 text-warning"></i>
+                        Tipos de Servicio</h6>
+                    <button class="btn btn-sm btn-warning mb-3" data-bs-toggle="modal"
+                        data-bs-target="#modalAddService">
+                        <i class="bi bi-plus-circle-fill me-1"></i> Añadir Tipo de Servicio
+                    </button>
+                    <div class="table-responsive">
+                        <table class="table table-dark table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Nombre</th>
+                                    <th>Color</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for s in services %}
+                                <tr>
+                                    <td>{{ s.name }}</td>
+                                    <td><span class="badge service-color-badge" data-bg-color="{{ s.color }}">{{ s.color }}</span></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-warning"
+                                            data-service-id="{{ s.id }}"
+                                            data-service-name="{{ s.name }}"
+                                            data-service-color="{{ s.color }}"
+                                            onclick="openEditServiceModal(this.dataset.serviceId, this.dataset.serviceName, this.dataset.serviceColor)">
+                                            <i class="bi bi-pencil-fill"></i>
+                                        </button>
+                                        <form method="POST" action="/manage_services" class="d-inline">
+                                            <input type="hidden" name="action" value="delete">
+                                            <input type="hidden" name="service_id" value="{{ s.id }}">
+                                            <button class="btn btn-sm btn-outline-danger"
+                                                onclick="return confirm('¿Eliminar este tipo de servicio?')">
+                                                <i class="bi bi-trash-fill"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODALES -->
+    <!-- Modal: Añadir Usuario -->
+    <div class="modal fade" id="modalAddUser" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">Nuevo Usuario</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="/manage_users">
+                    <div class="modal-body">
+                        <input type="hidden" name="action" value="add">
+                        <label class="form-label">Usuario</label>
+                        <input type="text" name="username" class="form-control mb-2" required>
+                        <label class="form-label">Contraseña</label>
+                        <input type="password" name="password" class="form-control mb-2" required>
+                        <label class="form-label">Rol</label>
+                        <select name="role" class="form-select" required>
+                            <option value="tech">Técnico</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="submit" class="btn btn-warning">Crear</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Eliminar Usuario -->
+    <div class="modal fade" id="modalDeleteUser" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title text-danger">Confirmar Eliminación</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="/manage_users">
+                    <div class="modal-body">
+                        <input type="hidden" name="action" value="delete">
+                        <input type="hidden" name="user_id" id="deleteUserId">
+                        <p>¿Seguro que deseas eliminar este usuario? Todas sus tareas también serán eliminadas.</p>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-danger">Eliminar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Cambiar Contraseña -->
+    <div class="modal fade" id="modalChangePassword" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">Cambiar Contraseña</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="/change_password">
+                    <div class="modal-body">
+                        <label class="form-label">Contraseña Actual</label>
+                        <input type="password" name="current_password" class="form-control mb-2" required>
+                        <label class="form-label">Nueva Contraseña</label>
+                        <input type="password" name="new_password" class="form-control" required>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="submit" class="btn btn-warning">Actualizar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Añadir Stock -->
+    <div class="modal fade" id="modalAddStock" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">Nuevo Artículo de Stock</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="/manage_stock">
+                    <div class="modal-body">
+                        <input type="hidden" name="action" value="add">
+                        <label class="form-label">Nombre del Artículo</label>
+                        <input type="text" name="name" class="form-control mb-2" required>
+                        <label class="form-label">Categoría</label>
+                        <input type="text" name="category" class="form-control mb-2" required>
+                        <label class="form-label">Cantidad Inicial</label>
+                        <input type="number" name="quantity" class="form-control" value="0" required>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="submit" class="btn btn-warning">Añadir</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Ajustar Stock -->
+    <div class="modal fade" id="modalAdjustStock" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">Ajustar Cantidad</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="/manage_stock">
+                    <div class="modal-body">
+                        <input type="hidden" name="action" value="adjust">
+                        <input type="hidden" name="item_id" id="adjId">
+                        <p>Artículo: <strong id="adjName"></strong></p>
+                        <label class="form-label">Cantidad a Añadir/Restar (use - para restar)</label>
+                        <input type="number" name="adjust_qty" class="form-control" required>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="submit" class="btn btn-warning">Ajustar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Editar Stock Completo -->
+    <div class="modal fade" id="modalEditStock" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">Editar Artículo</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="/manage_stock">
+                    <div class="modal-body">
+                        <input type="hidden" name="action" value="edit">
+                        <input type="hidden" name="item_id" id="editFullId">
+                        <label class="form-label">Nombre</label>
+                        <input type="text" name="name" id="editFullName" class="form-control mb-2" required>
+                        <label class="form-label">Categoría</label>
+                        <input type="text" name="category" id="editFullCat" class="form-control mb-2" required>
+                        <label class="form-label">Cantidad</label>
+                        <input type="number" name="quantity" id="editFullQty" class="form-control" required>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="submit" class="btn btn-warning">Guardar Cambios</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Añadir Cliente -->
+    <div class="modal fade" id="modalAddClient" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">Nuevo Cliente</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="/manage_clients">
+                    <div class="modal-body">
+                        <input type="hidden" name="action" value="add">
+                        <label class="form-label">Nombre del Cliente</label>
+                        <input type="text" name="name" class="form-control" required>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="submit" class="btn btn-warning">Añadir</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Editar Cliente -->
+    <div class="modal fade" id="modalEditClient" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">Editar Cliente</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="/manage_clients">
+                    <div class="modal-body">
+                        <input type="hidden" name="action" value="edit">
+                        <input type="hidden" name="client_id" id="editClientId">
+                        <label class="form-label">Nombre del Cliente</label>
+                        <input type="text" name="name" id="editClientName" class="form-control" required>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="submit" class="btn btn-warning">Guardar Cambios</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Importar Clientes -->
+    <div class="modal fade" id="modalImportClients" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">Importar Clientes (JSON)</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="/import_clients" enctype="multipart/form-data">
+                    <div class="modal-body">
+                        <label class="form-label">Archivo JSON</label>
+                        <input type="file" name="file" class="form-control" accept=".json" required>
+                        <small class="text-muted">Formato esperado: [{"name": "Cliente1"}, {"name":
+                            "Cliente2"}]</small>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="submit" class="btn btn-info">Importar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Añadir Tipo de Servicio -->
+    <div class="modal fade" id="modalAddService" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">Nuevo Tipo de Servicio</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="/manage_services">
+                    <div class="modal-body">
+                        <input type="hidden" name="action" value="add">
+                        <label class="form-label">Nombre</label>
+                        <input type="text" name="name" class="form-control mb-2" required>
+                        <label class="form-label">Color (Hex)</label>
+                        <input type="color" name="color" class="form-control" value="#6c757d" required>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="submit" class="btn btn-warning">Añadir</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Editar Tipo de Servicio -->
+    <div class="modal fade" id="modalEditService" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">Editar Tipo de Servicio</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="/manage_services">
+                    <div class="modal-body">
+                        <input type="hidden" name="action" value="edit">
+                        <input type="hidden" name="service_id" id="editServiceId">
+                        <label class="form-label">Nombre</label>
+                        <input type="text" name="name" id="editServiceName" class="form-control mb-2" required>
+                        <label class="form-label">Color (Hex)</label>
+                        <input type="color" name="color" id="editServiceColor" class="form-control" required>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="submit" class="btn btn-warning">Guardar Cambios</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Agendar Cita -->
+    <div class="modal fade" id="modalScheduleAppointment" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">Agendar Nueva Cita</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="/schedule_appointment">
+                    <div class="modal-body">
+                        <label class="form-label">Técnico</label>
+                        <select name="tech_id" class="form-select mb-2" required>
+                            {% for u in empleados %}
+                            <option value="{{ u.id }}">{{ u.username }}</option>
+                            {% endfor %}
+                        </select>
+                        <label class="form-label">Cliente</label>
+                        <div class="position-relative mb-2">
+                            <input type="text" name="client_name" id="scheduleClientInput" class="form-control"
+                                required autocomplete="off">
+                            <div id="scheduleClientList" class="suggestions-list"></div>
+                        </div>
+                        <label class="form-label">Fecha</label>
+                        <input type="date" name="date" class="form-control mb-2" required>
+                        <label class="form-label">Hora</label>
+                        <input type="time" name="time" class="form-control mb-2" required>
+                        <label class="form-label">Tipo de Servicio</label>
+                        <select name="service_type" class="form-select mb-2" required>
+                            {% for svc in all_service_types %}
+                            <option value="{{ svc.name }}">{{ svc.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <label class="form-label">Notas</label>
+                        <textarea name="notes" class="form-control" rows="3"></textarea>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="submit" class="btn btn-warning">Agendar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Editar Cita desde Admin -->
+    <div class="modal fade" id="modalEditAppointmentAdmin" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">Editar Cita</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" id="formEditApptAdmin">
+                    <div class="modal-body">
+                        <label class="form-label">Cliente</label>
+                        <div class="position-relative mb-2">
+                            <input type="text" name="client_name" id="editAdminClientInput" class="form-control"
+                                required autocomplete="off">
+                            <div id="editAdminClientList" class="suggestions-list"></div>
+                        </div>
+                        <label class="form-label">Fecha</label>
+                        <input type="date" name="date" id="editAdminDate" class="form-control mb-2" required>
+                        <label class="form-label">Hora</label>
+                        <input type="time" name="time" id="editAdminTime" class="form-control mb-2" required>
+                        <label class="form-label">Tipo de Servicio</label>
+                        <select name="service_type" id="editAdminService" class="form-select mb-2" required>
+                            {% for svc in all_service_types %}
+                            <option value="{{ svc.name }}">{{ svc.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <label class="form-label">Notas</label>
+                        <textarea name="notes" id="editAdminNotes" class="form-control" rows="3"></textarea>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="submit" class="btn btn-warning">Guardar Cambios</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Acciones Tarea Admin -->
+    <div class="modal fade" id="modalActionAdmin" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">Acciones sobre la Tarea</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="evtId">
+                    <p><strong>Cliente:</strong> <span id="evtClient"></span></p>
+                    <p><strong>Técnico:</strong> <span id="evtTech"></span></p>
+                    <p><strong>Servicio:</strong> <span id="evtService"></span></p>
+                    <p><strong>Estado:</strong> <span id="evtStatus"></span></p>
+                    <p><strong>Descripción:</strong><br><span id="evtDesc"></span></p>
+                    
+                    <!-- Sección de Archivos Adjuntos -->
+                    <div id="attachmentsSection" class="mt-3" style="display: none;">
+                        <hr class="border-secondary">
+                        <p class="fw-bold mb-2"><i class="bi bi-paperclip me-1"></i> Archivos Adjuntos:</p>
+                        <div id="attachmentsList" class="list-group"></div>
+                    </div>
+                    
+                    <div class="d-grid gap-2 mt-3">
+                        <button class="btn btn-info" onclick="viewTaskDetails()">
+                            <i class="bi bi-eye-fill me-1"></i> Ver Detalles Completos
+                        </button>
+                        <button class="btn btn-warning" onclick="openEditAdminModal()">
+                            <i class="bi bi-pencil-fill me-1"></i> Editar Cita
+                        </button>
+                        <button class="btn btn-success" onclick="performAdminTaskAction('complete')">
+                            <i class="bi bi-check-circle-fill me-1"></i> Marcar Completado
+                        </button>
+                        <button class="btn btn-danger" onclick="performAdminTaskAction('delete')">
+                            <i class="bi bi-trash-fill me-1"></i> Eliminar Tarea
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Modal: Detalles Completos de la Tarea -->
+    <div class="modal fade" id="modalTaskDetails" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">
+                        <i class="bi bi-file-text-fill me-2 text-warning"></i>
+                        Detalles del Parte de Trabajo
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <p class="mb-2"><strong class="text-warning">Cliente:</strong><br>
+                            <span id="detailClient"></span></p>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="mb-2"><strong class="text-warning">Técnico:</strong><br>
+                            <span id="detailTech"></span></p>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <p class="mb-2"><strong class="text-warning">Fecha:</strong><br>
+                            <span id="detailDate"></span></p>
+                        </div>
+                        <div class="col-md-4">
+                            <p class="mb-2"><strong class="text-warning">Hora Entrada:</strong><br>
+                            <span id="detailStartTime"></span></p>
+                        </div>
+                        <div class="col-md-4">
+                            <p class="mb-2"><strong class="text-warning">Hora Salida:</strong><br>
+                            <span id="detailEndTime"></span></p>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <p class="mb-2"><strong class="text-warning">Servicio:</strong><br>
+                            <span id="detailService"></span></p>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="mb-2"><strong class="text-warning">Estado:</strong><br>
+                            <span id="detailStatus"></span></p>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <p class="mb-2"><strong class="text-warning">Descripción del Trabajo:</strong></p>
+                        <div class="p-3 bg-black rounded border border-secondary" id="detailDescription"></div>
+                    </div>
+                    
+                    <div id="detailStockSection" class="mb-3" style="display: none;">
+                        <p class="mb-2"><strong class="text-warning">Material Utilizado/Retirado:</strong></p>
+                        <div class="p-3 bg-black rounded border border-secondary" id="detailStock"></div>
+                    </div>
+                    
+                    <div id="detailPartsSection" class="mb-3" style="display: none;">
+                        <p class="mb-2"><strong class="text-warning">Notas/Material Adicional:</strong></p>
+                        <div class="p-3 bg-black rounded border border-secondary" id="detailParts"></div>
+                    </div>
+                    
+                    <!-- Archivos Adjuntos -->
+                    <div id="detailAttachmentsSection" class="mb-3" style="display: none;">
+                        <p class="mb-2"><strong class="text-warning">
+                            <i class="bi bi-paperclip me-1"></i> Archivos Adjuntos:
+                        </strong></p>
+                        <div id="detailAttachmentsList" class="list-group"></div>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                    <a id="printReportLink" href="#" target="_blank" class="btn btn-warning">
+                        <i class="bi bi-printer-fill me-1"></i> Imprimir Parte
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        var calendar = null;
+        var calendarGlobalInstance = null;
+        var modalActionAdmin = new bootstrap.Modal(document.getElementById('modalActionAdmin'));
+        var currentEmployeeId = null;
+
+        // Aplicar colores dinámicos a los labels de filtros
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('label[data-color]').forEach(function(label) {
+                const color = label.dataset.color;
+                label.style.borderColor = color;
+                label.style.color = color;
+            });
+        });
+
+        setupAutocomplete('scheduleClientInput', 'scheduleClientList');
+
+        function loadEmployeeCalendar(userId) {
+            currentEmployeeId = userId;
+            document.getElementById('calendarAdminContainer').style.display = 'block';
+            document.getElementById('empCalendarTitle').innerText = `Calendario de Empleado #${userId}`;
+
+            if (calendar) {
+                calendar.destroy();
+            }
+
+            var calendarEl = document.getElementById('calendarAdmin');
+            var isMobile = window.innerWidth < 768;
+
+            calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: isMobile ? 'listWeek' : 'dayGridMonth',
+                locale: 'es',
+                headerToolbar: {
+                    left: 'prev,next',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek,listWeek'
+                },
+                height: 'auto',
+                events: `/api/admin/tasks/${userId}`,
+                eventClick: handleEventClick,
+                dateClick: handleAdminDateClick,
+                selectable: true,
+                eventContent: function (arg) {
+                    let statusIcon = arg.event.extendedProps.status === 'Completado' ? '✅' : '⏳';
+                    return { html: `<div class="fc-content overflow-hidden text-truncate">${statusIcon} ${arg.event.title}</div>` };
+                }
+            });
+            calendar.render();
+        }
+
+        function closeEmployeeCalendar() {
+            document.getElementById('calendarAdminContainer').style.display = 'none';
+            if (calendar) {
+                calendar.destroy();
+                calendar = null;
+            }
+        }
+
+        function handleEventClick(info) {
+            document.getElementById('evtId').value = info.event.id;
+            document.getElementById('evtClient').innerText = info.event.extendedProps.client;
+            document.getElementById('evtTech').innerText = info.event.extendedProps.tech_name;
+            document.getElementById('evtService').innerText = info.event.extendedProps.service_type;
+            document.getElementById('evtStatus').innerText = info.event.extendedProps.status;
+            document.getElementById('evtDesc').innerText = info.event.extendedProps.desc || '(Sin descripción)';
+            modalActionAdmin.show();
+        }
+
+        // CALENDARIO GLOBAL
+        document.getElementById('tabGlobalBtn').addEventListener('click', function () {
+            if (calendarGlobalInstance) {
+                calendarGlobalInstance.render();
+                updateGlobalFilters();
+                return;
+            }
+
+            var calendarEl = document.getElementById('calendarGlobal');
+            var isMobile = window.innerWidth < 768;
+
+            calendarGlobalInstance = new FullCalendar.Calendar(calendarEl, {
+                initialView: isMobile ? 'listWeek' : 'dayGridMonth',
+                locale: 'es',
+                headerToolbar: {
+                    left: 'prev,next',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek,listWeek'
+                },
+                height: 'auto',
+                events: '/api/admin/all_tasks',
+                dateClick: handleAdminDateClickGlobal,
+                selectable: true,
+
+                // FILTRADO DINÁMICO
+                eventDidMount: function (info) {
+                    const type = info.event.extendedProps.service_type;
+                    const activeTypes = getActiveFilters();
+
+                    if (!activeTypes.includes(type)) {
+                        info.el.style.display = 'none';
+                    } else {
+                        info.el.style.display = '';
+                        // Usar el color del evento que viene desde backend
+                        if (info.backgroundColor) {
+                            info.el.style.backgroundColor = info.backgroundColor;
+                        }
+                        if (info.event.extendedProps.status === 'Completado') {
+                            info.el.style.opacity = '0.6';
+                            info.el.style.border = '2px solid white';
+                        }
+                    }
+                },
+
+                eventContent: function (arg) {
+                    let techName = arg.event.extendedProps.tech_name || '';
+                    let title = arg.event.title;
+                    let attachmentIcon = arg.event.extendedProps.has_attachments ? '<i class="bi bi-paperclip text-warning ms-1"></i>' : '';
+                    return { html: `<div class="fc-content overflow-hidden text-truncate"><span class="fw-bold badge bg-dark text-white me-1 border border-secondary">${techName}</span> ${title}${attachmentIcon}</div>` };
+                },
+
+                eventClick: handleEventClick
+            });
+            calendarGlobalInstance.render();
+        });
+
+        // --- LÓGICA DE FILTRADO DINÁMICO ---
+        function getActiveFilters() {
+            const activeTypes = [];
+            document.querySelectorAll('.filter-cb:checked').forEach(cb => {
+                activeTypes.push(cb.value);
+            });
+            return activeTypes;
+        }
+
+        function checkAllFilters() {
+            document.querySelectorAll('.filter-cb').forEach(cb => {
+                cb.checked = true;
+            });
+            updateGlobalFilters();
+        }
+
+        function updateGlobalFilters() {
+            if (!calendarGlobalInstance) return;
+            
+            // Refrescamos los eventos para que se vuelva a ejecutar eventDidMount
+            calendarGlobalInstance.refetchEvents();
+        }
+
+        // --- GESTIÓN DE ACCIONES ---
+        function performAdminTaskAction(action) {
+            const id = document.getElementById('evtId').value;
+            if (!confirm('¿Confirmar acción administrativa?')) return;
+
+            fetch(`/api/task_action/${id}/${action}`, { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        if (calendar) calendar.refetchEvents();
+                        if (calendarGlobalInstance) calendarGlobalInstance.refetchEvents();
+                        modalActionAdmin.hide();
+                    } else {
+                        alert('Error: ' + data.msg);
+                    }
+                });
+        }
+
+        // --- HELPERS Y MODALES ---
+        function ajustarStock(id, name) {
+            document.getElementById('adjId').value = id;
+            document.getElementById('adjName').innerText = name;
+            new bootstrap.Modal(document.getElementById('modalAdjustStock')).show();
+        }
+
+        function openEditStockModal(id, name, category, qty) {
+            document.getElementById('editFullId').value = id;
+            document.getElementById('editFullName').value = name;
+            document.getElementById('editFullCat').value = category;
+            document.getElementById('editFullQty').value = qty;
+            new bootstrap.Modal(document.getElementById('modalEditStock')).show();
+        }
+
+        function openEditClientModal(id, name) {
+            document.getElementById('editClientId').value = id;
+            document.getElementById('editClientName').value = name;
+            new bootstrap.Modal(document.getElementById('modalEditClient')).show();
+        }
+
+        function openEditServiceModal(id, name, color) {
+            document.getElementById('editServiceId').value = id;
+            document.getElementById('editServiceName').value = name;
+            document.getElementById('editServiceColor').value = color;
+            new bootstrap.Modal(document.getElementById('modalEditService')).show();
+        }
+
+        function setupAutocomplete(inputId, listId) {
+            const input = document.getElementById(inputId);
+            const list = document.getElementById(listId);
+            if (!input) return;
+
+            input.addEventListener('input', function () {
+                const val = this.value;
+                if (!val || val.length < 2) {
+                    list.innerHTML = '';
+                    list.style.display = 'none';
+                    return;
+                }
+                fetch(`/api/clients_search?q=${encodeURIComponent(val)}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        list.innerHTML = '';
+                        if (data.length > 0) {
+                            list.style.display = 'block';
+                            data.forEach(item => {
+                                const div = document.createElement('div');
+                                div.className = 'suggestion-item';
+                                div.innerText = item.name;
+                                div.onclick = function () {
+                                    input.value = item.name;
+                                    list.innerHTML = '';
+                                    list.style.display = 'none';
+                                };
+                                list.appendChild(div);
+                            });
+                        } else {
+                            list.style.display = 'none';
+                        }
+                    });
+            });
+
+            document.addEventListener('click', function (e) {
+                if (e.target !== input && e.target !== list) {
+                    list.style.display = 'none';
+                }
+            });
+        }
+
+        function filterClientsTable() {
+            var input, filter, table, tr, td, i, txtValue;
+            input = document.getElementById("clientSearchInput");
+            filter = input.value.toUpperCase();
+            table = document.getElementById("clientsTable");
+            tr = table.getElementsByTagName("tr");
+            for (i = 0; i < tr.length; i++) {
+                td = tr[i].getElementsByClassName("client-name-cell")[0];
+                if (td) {
+                    txtValue = td.textContent || td.innerText;
+                    if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                        tr[i].style.display = "";
+                    } else {
+                        tr[i].style.display = "none";
+                    }
+                }
+            }
+        }
+
+        function openEditAdminModal() {
+            const taskId = document.getElementById('evtId').value;
+            fetch(`/api/get_task/${taskId}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('editAdminClientInput').value = data.data.client_name;
+                        document.getElementById('editAdminDate').value = data.data.date;
+                        document.getElementById('editAdminTime').value = data.data.time;
+                        document.getElementById('editAdminService').value = data.data.service_type;
+                        document.getElementById('editAdminNotes').value = data.data.notes;
+                        document.getElementById('formEditApptAdmin').action = `/edit_appointment/${taskId}`;
+                        modalActionAdmin.hide();
+                        new bootstrap.Modal(document.getElementById('modalEditAppointmentAdmin')).show();
+                        setupAutocomplete('editAdminClientInput', 'editAdminClientList');
+                    }
+                });
+        }
+
+        // Función para manejar clic en día del calendario individual del empleado
+        function handleAdminDateClick(info) {
+            if (!currentEmployeeId) return;
+            
+            // Prellenar el modal con la fecha seleccionada y el empleado actual
+            document.getElementById('scheduleClientInput').value = '';
+            document.querySelector('#modalScheduleAppointment select[name="tech_id"]').value = currentEmployeeId;
+            document.querySelector('#modalScheduleAppointment input[name="date"]').value = info.dateStr;
+            
+            // Abrir el modal de nueva cita
+            new bootstrap.Modal(document.getElementById('modalScheduleAppointment')).show();
+        }
+
+        // Función para manejar clic en día del calendario global
+        function handleAdminDateClickGlobal(info) {
+            // Prellenar el modal con la fecha seleccionada
+            document.getElementById('scheduleClientInput').value = '';
+            document.querySelector('#modalScheduleAppointment input[name="date"]').value = info.dateStr;
+            
+            // Abrir el modal de nueva cita
+            new bootstrap.Modal(document.getElementById('modalScheduleAppointment')).show();
+        }
+
+        // Función para ver los detalles completos de una tarea
+        function viewTaskDetails() {
+            const taskId = document.getElementById('evtId').value;
+            
+            fetch(`/api/task_details/${taskId}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        const task = data.data;
+                        
+                        // Rellenar información básica
+                        document.getElementById('detailClient').textContent = task.client_name;
+                        document.getElementById('detailTech').textContent = task.tech_name;
+                        document.getElementById('detailDate').textContent = new Date(task.date).toLocaleDateString('es-ES');
+                        document.getElementById('detailStartTime').textContent = task.start_time || 'N/A';
+                        document.getElementById('detailEndTime').textContent = task.end_time || 'N/A';
+                        document.getElementById('detailService').textContent = task.service_type;
+                        document.getElementById('detailStatus').textContent = task.status;
+                        document.getElementById('detailDescription').textContent = task.description || 'Sin descripción';
+                        
+                        // Material/Stock
+                        if (task.stock_info) {
+                            document.getElementById('detailStockSection').style.display = 'block';
+                            const action = task.stock_info.action === 'used' ? 'USADO' : 'RETIRADO';
+                            document.getElementById('detailStock').textContent = 
+                                `${action}: ${task.stock_info.quantity}x ${task.stock_info.item_name}`;
+                        } else {
+                            document.getElementById('detailStockSection').style.display = 'none';
+                        }
+                        
+                        // Notas adicionales
+                        if (task.parts_text) {
+                            document.getElementById('detailPartsSection').style.display = 'block';
+                            document.getElementById('detailParts').textContent = task.parts_text;
+                        } else {
+                            document.getElementById('detailPartsSection').style.display = 'none';
+                        }
+                        
+                        // Archivos adjuntos
+                        if (task.attachments && task.attachments.length > 0) {
+                            document.getElementById('detailAttachmentsSection').style.display = 'block';
+                            const attachmentsList = document.getElementById('detailAttachmentsList');
+                            attachmentsList.innerHTML = '';
+                            
+                            task.attachments.forEach(filename => {
+                                const item = document.createElement('a');
+                                item.href = `/uploads/${filename}`;
+                                item.target = '_blank';
+                                item.className = 'list-group-item list-group-item-action bg-black text-white border-secondary d-flex justify-content-between align-items-center';
+                                item.innerHTML = `
+                                    <span>
+                                        <i class="bi bi-file-earmark-arrow-down me-2"></i>
+                                        ${filename}
+                                    </span>
+                                    <i class="bi bi-download text-warning"></i>
+                                `;
+                                attachmentsList.appendChild(item);
+                            });
+                        } else {
+                            document.getElementById('detailAttachmentsSection').style.display = 'none';
+                        }
+                        
+                        // Configurar enlace de impresión
+                        document.getElementById('printReportLink').href = `/print_report/${taskId}`;
+                        
+                        // Cerrar el modal actual y abrir el de detalles
+                        modalActionAdmin.hide();
+                        new bootstrap.Modal(document.getElementById('modalTaskDetails')).show();
+                    } else {
+                        alert('Error al cargar los detalles: ' + data.msg);
+                    }
+                })
+                .catch(err => {
+                    console.error('Error:', err);
+                    alert('Error al cargar los detalles de la tarea');
+                });
+        }
+
+        // Modificar handleEventClick para mostrar indicador de archivos adjuntos
+        function handleEventClick(info) {
+            document.getElementById('evtId').value = info.event.id;
+            document.getElementById('evtClient').innerText = info.event.extendedProps.client;
+            document.getElementById('evtTech').innerText = info.event.extendedProps.tech_name;
+            document.getElementById('evtService').innerText = info.event.extendedProps.service_type;
+            document.getElementById('evtStatus').innerText = info.event.extendedProps.status;
+            document.getElementById('evtDesc').innerText = info.event.extendedProps.desc || 'Sin descripción';
+            
+            // Mostrar indicador si hay archivos adjuntos
+            if (info.event.extendedProps.has_attachments) {
+                const attachmentsSection = document.getElementById('attachmentsSection');
+                attachmentsSection.style.display = 'block';
+                const attachmentsList = document.getElementById('attachmentsList');
+                attachmentsList.innerHTML = '<div class="alert alert-info small m-0"><i class="bi bi-paperclip me-1"></i> Esta tarea tiene archivos adjuntos. Haz clic en "Ver Detalles Completos" para acceder a ellos.</div>';
+            } else {
+                document.getElementById('attachmentsSection').style.display = 'none';
+            }
+            
+            modalActionAdmin.show();
+        }
+    </script>
+
+    <!-- Modal de Alarmas -->
+    <div class="modal fade" id="modalAlarms" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title text-warning">
+                        <i class="bi bi-bell-fill me-2"></i>Sistema de Alarmas y Avisos
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <button class="btn btn-sm btn-warning mb-3" data-bs-toggle="modal" data-bs-target="#modalCreateAlarm">
+                        <i class="bi bi-plus-circle me-1"></i> Crear Alarma
+                    </button>
+
+                    <div id="alarmsList">
+                        {% for alarm in alarms %}
+                        <div class="alarm-item {% if alarm.is_read %}read{% endif %} priority-{{ alarm.priority }}"
+                             onclick="markAlarmRead({{ alarm.id }})">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <h6 class="text-white mb-1">
+                                        {% if alarm.alarm_type == 'technical' %}
+                                        <i class="bi bi-tools me-1"></i>
+                                        {% elif alarm.alarm_type == 'maintenance' %}
+                                        <i class="bi bi-wrench me-1"></i>
+                                        {% elif alarm.alarm_type == 'low_stock' %}
+                                        <i class="bi bi-box-seam me-1"></i>
+                                        {% endif %}
+                                        {{ alarm.title }}
+                                    </h6>
+                                    <p class="text-muted small mb-1">{{ alarm.description }}</p>
+                                    {% if alarm.client_name %}
+                                    <small class="text-info">
+                                        <i class="bi bi-person me-1"></i>{{ alarm.client_name }}
+                                    </small>
+                                    {% endif %}
+                                </div>
+                                <small class="text-muted">{{ alarm.created_at.strftime('%d/%m %H:%M') }}</small>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Crear Alarma -->
+    <div class="modal fade" id="modalCreateAlarm" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="POST" action="/create_alarm">
+                    <div class="modal-header">
+                        <h5 class="modal-title text-warning">Nueva Alarma</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Tipo de Alarma</label>
+                            <select name="alarm_type" class="form-select" required>
+                                <option value="technical">Incidencia Técnica</option>
+                                <option value="maintenance">Mantenimiento</option>
+                                <option value="low_stock">Stock Bajo</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Título</label>
+                            <input type="text" name="title" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Descripción</label>
+                            <textarea name="description" class="form-control" rows="3" required></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Cliente (Opcional)</label>
+                            <input type="text" name="client_name" class="form-control">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Prioridad</label>
+                            <select name="priority" class="form-select">
+                                <option value="low">Baja</option>
+                                <option value="normal" selected>Normal</option>
+                                <option value="high">Alta</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-warning">Crear Alarma</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+<script>
+    function toggleSupportOptions() {
+        const checkbox = document.getElementById('hasSupport');
+        const options = document.getElementById('supportOptions');
+        options.classList.toggle('d-none', !checkbox.checked);
+    }
+
+    function loadTechStats(techId, techName) {
+        document.getElementById('statsName').textContent = techName.toUpperCase();
+        document.getElementById('techStatsContainer').classList.remove('d-none');
+
+        fetch(`/api/tech_stats/${techId}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('statsTotal').textContent = data.data.total_completed;
+                    document.getElementById('statsHours').textContent = data.data.total_hours + 'h';
+                    document.getElementById('statsServices').textContent = Object.keys(data.data.service_breakdown).length;
+
+                    // Render service breakdown
+                    const breakdown = document.getElementById('serviceBreakdown');
+                    breakdown.innerHTML = '';
+
+                    for (const [service, info] of Object.entries(data.data.service_breakdown)) {
+                        const serviceCard = `
+                            <div class="card bg-black border-secondary mb-3">
+                                <div class="card-header">
+                                    <h6 class="mb-0 text-white">
+                                        <i class="bi bi-tag-fill me-2"></i>${service} 
+                                        <span class="badge bg-primary float-end">${info.count} trabajos</span>
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="list-group">
+                                        ${info.tasks.map(task => `
+                                            <div class="list-group-item bg-dark text-white border-secondary">
+                                                <div class="d-flex justify-content-between">
+                                                    <div>
+                                                        <strong>${task.client}</strong><br>
+                                                        <small class="text-muted">${task.time}</small>
+                                                    </div>
+                                                    <small class="text-muted">${task.date}</small>
+                                                </div>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        breakdown.innerHTML += serviceCard;
+                    }
+                }
+            });
+    }
+
+    function closeTechStats() {
+        document.getElementById('techStatsContainer').classList.add('d-none');
+    }
+
+    function markAlarmRead(alarmId) {
+        fetch(`/mark_alarm_read/${alarmId}`, { method: 'POST' })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                }
+            });
+    }
+</script>
+</body>
+
+</html>

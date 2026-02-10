@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>OSLAPRINT | Panel Técnico</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js'></script>
+    <style>
+        :root { --osla-orange: #f37021; --osla-dark: #0a0a0a; --osla-card: #161616; }
+        body { background-color: var(--osla-dark); color: #fff; font-family: 'Segoe UI', sans-serif; padding-bottom: 80px;}
+        .navbar { background: #000; border-bottom: 2px solid var(--osla-orange); }
+        /* Prevent iOS zoom on inputs */
+        .form-control, .form-select { background: #000 !important; border: 1px solid #444 !important; color: #fff !important; font-size: 16px !important; }
+        .form-control:focus, .form-select:focus { border-color: var(--osla-orange); box-shadow: none; }
+        
+        .text-muted { color: #d1d1d1 !important; }
+        .text-secondary { color: #bcbcbc !important; }
+        .form-label, label { color: #f8f9fa !important; font-weight: 500; }
+        .small, small { color: #e0e0e0 !important; }
+        .fc-event { cursor: pointer; }
+
+        .menu-card { background: var(--osla-card); border: 2px solid #222; border-radius: 20px; padding: 25px; cursor: pointer; transition: 0.3s; text-align: center; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .menu-card:hover { border-color: var(--osla-orange); transform: translateY(-5px); background: #1f1f1f; }
+        .btn-osla { background: var(--osla-orange); color: white; border: none; font-weight: bold; padding: 12px; width: 100%; border-radius: 8px; font-size: 1.1rem; }
+        #calendar { background: #fff; color: #333; padding: 10px; border-radius: 10px; }
+        
+        /* Task List Styles */
+        .task-list-container { max-height: 600px; overflow-y: auto; }
+        .task-item { background: #1f1f1f; border-left: 4px solid #444; padding: 10px; margin-bottom: 10px; border-radius: 4px; transition: all 0.2s; }
+        .task-item:hover { background: #2a2a2a; }
+        .task-item.status-Completado { border-left-color: #198754; opacity: 0.7; }
+        .task-item.status-Pendiente { border-left-color: var(--osla-orange); }
+
+        /* Autocomplete Styles */
+        .suggestions-list {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            width: 100%;
+            max-height: 200px;
+            overflow-y: auto;
+            background: #1f1f1f;
+            border: 1px solid #444;
+            border-radius: 0 0 8px 8px;
+            z-index: 1050;
+            display: none;
+        }
+        .suggestion-item {
+            padding: 10px 15px;
+            cursor: pointer;
+            border-bottom: 1px solid #333;
+            color: #fff;
+        }
+        .suggestion-item:hover { background: var(--osla-orange); color: white; }
+        
+        /* File upload area */
+        .file-upload-area {
+            border: 2px dashed #666;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            background: #161616;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .file-upload-area:hover {
+            border-color: var(--osla-orange);
+            background: #1f1f1f;
+        }
+        .file-upload-area.drag-over {
+            border-color: var(--osla-orange);
+            background: #2a2a2a;
+        }
+        .file-list {
+            margin-top: 10px;
+        }
+        .file-item {
+            background: #1f1f1f;
+            padding: 8px 12px;
+            border-radius: 4px;
+            margin-bottom: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .file-item .remove-file {
+            color: #dc3545;
+            cursor: pointer;
+            font-size: 1.2rem;
+        }
+        
+        /* Mobile adjustments */
+        @media (max-width: 768px) {
+            .container { padding-left: 15px; padding-right: 15px; }
+            .fc-toolbar { flex-direction: column; gap: 10px; }
+            .fc-toolbar-title { font-size: 1.2rem !important; }
+        }
+    </style>
+</head>
+<body>
+
+<nav class="navbar px-3 py-3 mb-4 sticky-top">
+    <div class="d-flex justify-content-between w-100 align-items-center">
+        <span class="fw-bold fs-4 text-white">OSLA<span style="color:var(--osla-orange)">PRINT</span></span>
+        <div class="d-flex align-items-center gap-2">
+            <span class="text-white fw-bold me-2">Hola {{ current_user.username }}</span>
+            <button class="btn btn-outline-light btn-sm" data-bs-toggle="modal" data-bs-target="#modalChangePassword" title="Cambiar Contraseña">
+                <i class="bi bi-key-fill"></i>
+            </button>
+            <a href="/logout" class="btn btn-outline-danger btn-sm"><i class="bi bi-box-arrow-right"></i></a>
+        </div>
+    </div>
+</nav>
+
+<div class="container-fluid px-3 px-md-5">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}{% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show bg-dark text-white border-secondary">
+            {{ message }}<button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
+          </div>
+      {% endfor %}{% endif %}
+    {% endwith %}
+
+    <div id="home-menu" class="row g-3 justify-content-center" style="max-width: 900px; margin: auto;">
+        <div class="col-12 col-md-6" onclick="showSection('section-parte')">
+            <div class="menu-card">
+                <i class="bi bi-clipboard-check-fill fs-1 text-warning mb-2 d-block"></i>
+                <h4 class="text-white">NUEVO PARTE</h4>
+                <p class="text-muted small">Cerrar trabajo realizado</p>
+            </div>
+        </div>
+        <div class="col-12 col-md-6" onclick="showSection('section-agenda')">
+            <div class="menu-card">
+                <i class="bi bi-calendar-week fs-1 text-white mb-2 d-block"></i>
+                <h4 class="text-white">MI AGENDA</h4>
+                <p class="text-muted small">Ver calendario y citas</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="section-parte" class="d-none" style="max-width: 900px; margin: auto;">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h3 class="text-warning fw-bold m-0 fs-4">Parte de Trabajo</h3>
+            <button class="btn btn-outline-secondary btn-sm px-3" onclick="showSection('home-menu')">Atrás</button>
+        </div>
+        <form action="/save_report" method="POST" enctype="multipart/form-data" class="card bg-dark border-secondary p-3 p-md-4">
+            
+            <div class="mb-3 p-3 rounded" style="background: #1f1f1f; border-left: 4px solid var(--osla-orange);">
+                <label class="form-label text-warning fw-bold mb-2 small">VINCULAR CITA (OPCIONAL)</label>
+                <select name="linked_task_id" id="linkedTaskSelect" class="form-select form-select-lg" onchange="fillFromTask(this)">
+                    <option value="none" selected>Nueva incidencia (Sin cita)</option>
+                    {% for task in pending_tasks %}
+                    <option value="{{ task.id }}" 
+                            data-client="{{ task.client_name }}"
+                            data-date="{{ task.date.strftime('%Y-%m-%d') }}"
+                            data-time="{{ task.start_time }}"
+                            data-service="{{ task.service_type }}"
+                            data-desc="{{ task.description }}">
+                        {{ task.date.strftime('%d/%m') }} - {{ task.client_name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-12 col-md-8 position-relative">
+                    <label class="form-label">CLIENTE</label>
+                    <input type="text" name="client_name" id="fieldClient" class="form-control" required placeholder="Buscar cliente..." autocomplete="off">
+                    <div id="listClient" class="suggestions-list"></div>
+                </div>
+                <div class="col-12 col-md-4">
+                    <label class="form-label">TIPO SERVICIO</label>
+                    <select name="service_type" id="fieldService" class="form-select">
+                        {% for s in all_service_types %}
+                        <option value="{{ s.name }}">{{ s.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            
+            <div class="row g-3 mb-3">
+                <div class="col-12 col-md-4">
+                    <label class="form-label">FECHA</label>
+                    <input type="date" name="date" id="fieldDate" class="form-control" value="{{ today_date }}" required>
+                </div>
+                <div class="col-6 col-md-4">
+                    <label class="form-label">ENTRADA</label>
+                    <input type="time" name="entry_time" id="fieldEntryTime" class="form-control" required>
+                </div>
+                <div class="col-6 col-md-4">
+                    <label class="form-label">SALIDA</label>
+                    <input type="time" name="exit_time" class="form-control" required>
+                </div>
+            </div>
+            
+            <div class="mb-3">
+                <label class="form-label">TRABAJO REALIZADO</label>
+                <textarea name="description" id="fieldDescription" class="form-control" rows="4" required placeholder="Describa la solución..."></textarea>
+            </div>
+            
+            <div class="p-3 mb-3 rounded" style="background: #161616; border: 1px dashed #666;">
+                <label class="text-white fw-bold small mb-2 d-block"><i class="bi bi-box-seam me-2"></i>PIEZAS / STOCK</label>
+                <div class="mb-2 d-flex gap-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="stock_action" value="used" id="radioUsed" checked>
+                        <label class="form-check-label small" for="radioUsed">Usado</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="stock_action" value="removed" id="radioRemoved">
+                        <label class="form-check-label small" for="radioRemoved">Retirado</label>
+                    </div>
+                </div>
+                <div class="row g-2">
+                    <div class="col-8">
+                        <select name="stock_item" class="form-select">
+                            <option value="">Sin artículo de stock</option>
+                            {% for item in stock_items %}
+                            <option value="{{ item.id }}">{{ item.name }} ({{ item.quantity }} disponibles)</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-4">
+                        <input type="number" name="stock_qty" class="form-control" min="0" value="0" placeholder="Cant.">
+                    </div>
+                </div>
+                <div class="mt-2">
+                    <input type="text" name="parts_text" class="form-control" placeholder="Notas adicionales / Piezas retiradas...">
+                </div>
+            </div>
+
+            <!-- NUEVA SECCIÓN: ARCHIVOS ADJUNTOS -->
+            <div class="mb-3 p-3 rounded" style="background: #161616; border: 1px dashed #666;">
+                <label class="text-white fw-bold small mb-2 d-block">
+                    <i class="bi bi-paperclip me-2"></i>ARCHIVOS ADJUNTOS (OPCIONAL)
+                </label>
+                <small class="text-muted d-block mb-2">Máximo 16MB por archivo. Formatos permitidos: PNG, JPG, PDF, DOC, TXT</small>
+                
+                <div class="file-upload-area" id="fileUploadArea" onclick="document.getElementById('fileInput').click();">
+                    <i class="bi bi-cloud-upload fs-1 text-muted mb-2"></i>
+                    <p class="text-muted mb-0">Click para seleccionar archivos o arrastra aquí</p>
+                    <input type="file" id="fileInput" name="attachments" multiple accept=".png,.jpg,.jpeg,.gif,.pdf,.doc,.docx,.txt" style="display: none;" onchange="handleFileSelect(event)">
+                </div>
+                
+                <div id="fileList" class="file-list"></div>
+            </div>
+            
+            <button type="submit" class="btn-osla">GUARDAR PARTE</button>
+        </form>
+    </div>
+
+    <div id="section-agenda" class="d-none" style="max-width: 1400px; margin: auto;">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h3 class="text-white fw-bold m-0 fs-4">Mi Calendario</h3>
+            <div class="d-flex gap-2">
+                <button class="btn btn-warning btn-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalNewAppointmentTech">
+                    <i class="bi bi-calendar-plus-fill me-1"></i> Nueva Cita
+                </button>
+                <button class="btn btn-outline-secondary btn-sm px-3" onclick="showSection('home-menu')">Atrás</button>
+            </div>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-12 col-lg-8">
+                <div id="calendarSection">
+                    <div id="calendar"></div>
+                </div>
+            </div>
+            <div class="col-12 col-lg-4">
+                <div class="card bg-dark border-secondary p-3">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="text-white fw-bold m-0">Mis Tareas</h5>
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button type="button" class="btn btn-outline-light" onclick="sortTasks('date')" title="Ordenar por fecha">
+                                <i class="bi bi-calendar3"></i>
+                            </button>
+                            <button type="button" class="btn btn-outline-light" onclick="sortTasks('alpha')" title="Ordenar alfabético">
+                                <i class="bi bi-sort-alpha-down"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="toggleCompleted" onchange="renderTaskList()">
+                        <label class="form-check-label small" for="toggleCompleted">Mostrar completadas</label>
+                    </div>
+                    <div id="taskListContainer" class="task-list-container"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODALES -->
+<div class="modal fade" id="modalEventAction" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark text-white border-warning">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title" id="evtTitle">Detalles Cita</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <span id="evtStatus" class="badge p-2"></span>
+                </div>
+                <h5 id="evtClient" class="text-warning fw-bold mb-3"></h5>
+                <p class="small text-muted bg-black p-3 rounded border border-secondary" id="evtDesc"></p>
+                <input type="hidden" id="evtId">
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-outline-danger flex-grow-1" onclick="performTaskAction('delete')">Eliminar</button>
+                <button type="button" class="btn btn-success flex-grow-1" id="btnComplete" onclick="performTaskAction('complete')">Marcar Hecha</button>
+                <button type="button" class="btn btn-outline-warning flex-grow-1" onclick="openEditTechModal()">Editar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalEditAppointmentTech" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <form action="/edit_appointment/0" method="POST" id="formEditApptTech" class="modal-content bg-dark border-warning text-white">
+            <div class="modal-header border-0"><h5>Editar Cita</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="mb-3 position-relative">
+                    <label class="form-label">Cliente</label>
+                    <input type="text" name="client_name" id="editTechClientInput" class="form-control" required autocomplete="off">
+                    <div id="editTechClientList" class="suggestions-list"></div>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-7"><label class="form-label">Fecha</label><input type="date" name="date" id="editTechDate" class="form-control" required></div>
+                    <div class="col-5"><label class="form-label">Hora</label><input type="time" name="time" id="editTechTime" class="form-control"></div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Tipo Servicio</label>
+                    <select name="service_type" id="editTechService" class="form-select">
+                        {% for s in all_service_types %}
+                        <option value="{{ s.name }}">{{ s.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3"><label class="form-label">Notas</label><textarea name="notes" id="editTechNotes" class="form-control" rows="3"></textarea></div>
+            </div>
+            <div class="modal-footer border-0"><button type="submit" class="btn btn-warning w-100">Guardar Cambios</button></div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Nueva Cita (Técnico) -->
+<div class="modal fade" id="modalNewAppointmentTech" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <form action="/create_appointment" method="POST" class="modal-content bg-dark border-warning text-white">
+            <div class="modal-header border-0">
+                <h5 class="modal-title">Nueva Cita</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3 position-relative">
+                    <label class="form-label">Cliente</label>
+                    <input type="text" name="client_name" id="modalFieldClient" class="form-control" required autocomplete="off">
+                    <div id="modalListClient" class="suggestions-list"></div>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-7">
+                        <label class="form-label">Fecha</label>
+                        <input type="date" name="date" id="modalDateInput" class="form-control" required>
+                    </div>
+                    <div class="col-5">
+                        <label class="form-label">Hora</label>
+                        <input type="time" name="time" class="form-control" required>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Tipo de Servicio</label>
+                    <select name="service_type" class="form-select" required>
+                        {% for s in all_service_types %}
+                        <option value="{{ s.name }}">{{ s.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Notas</label>
+                    <textarea name="notes" class="form-control" rows="3"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="submit" class="btn btn-warning w-100 fw-bold">Agendar Cita</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal fade" id="modalChangePassword" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <form action="/change_password" method="POST" class="modal-content bg-dark border-light">
+            <div class="modal-header border-0">
+                <h5 class="text-white">Cambiar Mi Contraseña</h5><button type="button" class="btn-close btn-close-white"
+                    data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Contraseña Actual</label>
+                    <input type="password" name="current_password" class="form-control" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Nueva Contraseña</label>
+                    <input type="password" name="new_password" class="form-control" required>
+                </div>
+            </div>
+            <div class="modal-footer border-0"><button type="submit" class="btn btn-light w-100 fw-bold">Actualizar</button></div>
+        </form>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    let calendar;
+    const modalAction = new bootstrap.Modal(document.getElementById('modalEventAction'));
+    
+    // Almacén local de tareas para la lista
+    let cachedTasks = [];
+    let currentSort = 'date'; // 'date' | 'alpha'
+    let selectedFiles = []; // Array para almacenar archivos seleccionados
+
+    function showSection(id) {
+        document.querySelectorAll('[id^="section-"], #home-menu').forEach(el => el.classList.add('d-none'));
+        document.getElementById(id).classList.remove('d-none');
+        
+        if (id === 'section-agenda' && !calendar) {
+            setTimeout(() => initCalendar(), 100);
+        }
+    }
+    
+    function initCalendar() {
+        const isMobile = window.innerWidth < 768;
+        const calendarEl = document.getElementById('calendar');
+        
+        calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: isMobile ? 'listWeek' : 'dayGridMonth',
+            locale: 'es',
+            headerToolbar: {
+                left: 'prev,next',
+                center: 'title',
+                right: 'dayGridMonth,timeGridWeek,listWeek'
+            },
+            height: 'auto',
+            events: '/api/tasks',
+            eventClick: handleEventClick,
+            dateClick: handleDateClick,
+            selectable: true,
+            eventDidMount: function(info) {
+                if (info.backgroundColor) {
+                    info.el.style.backgroundColor = info.backgroundColor;
+                }
+                if (info.event.extendedProps.status === 'Completado') {
+                    info.el.style.opacity = '0.6';
+                    info.el.style.border = '2px solid white';
+                }
+            },
+            eventsSet: function(events) {
+                cachedTasks = events;
+                renderTaskList();
+            }
+        });
+        calendar.render();
+    }
+
+    function handleEventClick(info) {
+        const evt = info.event;
+        document.getElementById('evtId').value = evt.id;
+        document.getElementById('evtTitle').innerText = evt.title;
+        document.getElementById('evtClient').innerText = evt.extendedProps.client;
+        document.getElementById('evtDesc').innerText = evt.extendedProps.desc || 'Sin descripción';
+        
+        const badge = document.getElementById('evtStatus');
+        const status = evt.extendedProps.status;
+        badge.innerText = status;
+        badge.className = 'badge p-2 ' + (status === 'Completado' ? 'bg-success' : 'bg-warning text-dark');
+        
+        const btnComplete = document.getElementById('btnComplete');
+        if(status === 'Completado') {
+            btnComplete.style.display = 'none';
+        } else {
+            btnComplete.style.display = '';
+        }
+        
+        modalAction.show();
+    }
+
+    // Función para manejar clic en día del calendario
+    function handleDateClick(info) {
+        // Prellenar el modal con la fecha seleccionada
+        document.getElementById('modalDateInput').value = info.dateStr;
+        
+        // Abrir el modal de nueva cita
+        new bootstrap.Modal(document.getElementById('modalNewAppointmentTech')).show();
+    }
+
+    function renderTaskList() {
+        const container = document.getElementById('taskListContainer');
+        const showCompleted = document.getElementById('toggleCompleted').checked;
+
+        // 1. Filtrar
+        let filtered = cachedTasks.filter(t => {
+            if(showCompleted) return true;
+            return t.extendedProps.status !== 'Completado';
+        });
+
+        // 2. Ordenar
+        filtered.sort((a, b) => {
+            if (currentSort === 'alpha') {
+                return a.title.localeCompare(b.title);
+            } else {
+                return new Date(a.start) - new Date(b.start);
+            }
+        });
+
+        // 3. Renderizar HTML
+        container.innerHTML = '';
+        if(filtered.length === 0) {
+            container.innerHTML = '<div class="text-muted text-center py-3">No hay tareas pendientes.</div>';
+            return;
+        }
+
+        filtered.forEach(t => {
+            const isDone = t.extendedProps.status === 'Completado';
+            const dateStr = t.start.split('T')[0];
+            const timeStr = t.start.includes('T') ? t.start.split('T')[1].substring(0,5) : '';
+            
+            // Usar el color del tipo también aquí
+            const typeColor = t.color; 
+
+            const div = document.createElement('div');
+            div.className = `task-item d-flex justify-content-between align-items-center`;
+            div.style.borderLeftColor = typeColor; // Borde izquierdo del color del tipo
+            if(isDone) div.style.opacity = '0.6';
+
+            div.innerHTML = `
+                <div style="cursor:pointer;" onclick="focusCalendarEvent('${t.id}')">
+                    <div class="fw-bold text-white">${t.extendedProps.client}</div>
+                    <div class="small text-secondary">
+                        <i class="bi bi-calendar-event me-1"></i>${dateStr} ${timeStr ? '| '+timeStr : ''}
+                        <br>
+                        <span class="badge ${isDone ? 'bg-success' : 'bg-secondary'}">${t.extendedProps.status}</span>
+                        <span class="badge" style="background:${typeColor}">${t.extendedProps.service_type}</span>
+                    </div>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-secondary" onclick="openEditFromList('${t.id}')"><i class="bi bi-pencil"></i></button>
+                    ${isDone ? `<button class="btn btn-sm btn-outline-danger" onclick="deleteFromList('${t.id}')"><i class="bi bi-trash"></i></button>` : ''}
+                </div>
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    function sortTasks(sortType) {
+        currentSort = sortType;
+        renderTaskList();
+    }
+
+    function deleteFromList(id) {
+        if(!confirm('¿Eliminar esta tarea terminada?')) return;
+        fetch(`/api/task_action/${id}/delete`, { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+            if(data.success) calendar.refetchEvents(); // Esto recargará lista y calendario
+        });
+    }
+    
+    // Función auxiliar para editar desde la lista
+    function openEditFromList(id) {
+         document.getElementById('evtId').value = id; 
+         openEditTechModal(); 
+    }
+
+    function focusCalendarEvent(id) {
+        let task = cachedTasks.find(t => t.id == id);
+        if(task) {
+            calendar.gotoDate(task.start);
+        }
+    }
+
+    function performTaskAction(action) {
+        const id = document.getElementById('evtId').value;
+        if(!confirm('¿Confirmar acción?')) return;
+
+        fetch(`/api/task_action/${id}/${action}`, { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+            if(data.success) {
+                calendar.refetchEvents(); 
+                modalAction.hide();
+            } else {
+                alert('Error: ' + data.msg);
+            }
+        });
+    }
+
+    // --- SINCRONIZACIÓN DE DATOS AL SELECCIONAR TAREA ---
+    function fillFromTask(select) {
+        const option = select.options[select.selectedIndex];
+        if(select.value === 'none') {
+            // Resetear formulario
+            document.getElementById('fieldClient').value = '';
+            document.getElementById('fieldDate').value = "{{ today_date }}";
+            document.getElementById('fieldEntryTime').value = '';
+            document.getElementById('fieldService').selectedIndex = 0;
+            document.getElementById('fieldDescription').value = '';
+            return;
+        }
+
+        // Obtener datos completos de la tarea desde la API
+        const taskId = select.value;
+        fetch(`/api/get_task_full/${taskId}`)
+            .then(res => res.json())
+            .then(data => {
+                if(data.success) {
+                    // Sincronizar todos los campos
+                    document.getElementById('fieldClient').value = data.data.client_name;
+                    document.getElementById('fieldDate').value = data.data.date;
+                    document.getElementById('fieldEntryTime').value = data.data.start_time;
+                    document.getElementById('fieldService').value = data.data.service_type;
+                    document.getElementById('fieldDescription').value = data.data.description;
+                }
+            });
+    }
+
+    // --- AUTOCOMPLETE LOGIC ---
+    function setupAutocomplete(inputId, listId) {
+        const input = document.getElementById(inputId);
+        const list = document.getElementById(listId);
+        
+        if (!input || !list) return;
+
+        input.addEventListener('input', function() {
+            const val = this.value;
+            if(!val || val.length < 2) {
+                list.innerHTML = '';
+                list.style.display = 'none';
+                return;
+            }
+            
+            fetch(`/api/clients_search?q=${encodeURIComponent(val)}`)
+                .then(res => res.json())
+                .then(data => {
+                    list.innerHTML = '';
+                    if (data.length > 0) {
+                        list.style.display = 'block';
+                        data.forEach(item => {
+                            const div = document.createElement('div');
+                            div.className = 'suggestion-item';
+                            div.innerText = item.name;
+                            div.onclick = function() {
+                                input.value = item.name;
+                                list.innerHTML = '';
+                                list.style.display = 'none';
+                            };
+                            list.appendChild(div);
+                        });
+                    } else {
+                        list.style.display = 'none';
+                    }
+                });
+        });
+
+        document.addEventListener('click', function(e) {
+            if(e.target !== input && e.target !== list) {
+                list.style.display = 'none';
+            }
+        });
+    }
+
+    // Activar autocompletado en los campos
+    setupAutocomplete('fieldClient', 'listClient'); 
+    setupAutocomplete('modalFieldClient', 'modalListClient'); 
+
+    // Función para editar cita (Tech)
+    function openEditTechModal() {
+        const taskId = document.getElementById('evtId').value;
+        fetch(`/api/get_task/${taskId}`)
+            .then(res => res.json())
+            .then(data => {
+                if(data.success) {
+                    document.getElementById('editTechClientInput').value = data.data.client_name;
+                    document.getElementById('editTechDate').value = data.data.date;
+                    document.getElementById('editTechTime').value = data.data.time;
+                    document.getElementById('editTechService').value = data.data.service_type;
+                    document.getElementById('editTechNotes').value = data.data.notes;
+                    document.getElementById('formEditApptTech').action = `/edit_appointment/${taskId}`;
+                    modalAction.hide();
+                    new bootstrap.Modal(document.getElementById('modalEditAppointmentTech')).show();
+                    setupAutocomplete('editTechClientInput', 'editTechClientList');
+                }
+            });
+    }
+
+    // --- MANEJO DE ARCHIVOS ---
+    const fileUploadArea = document.getElementById('fileUploadArea');
+    const fileInput = document.getElementById('fileInput');
+    const fileListContainer = document.getElementById('fileList');
+
+    // Prevenir comportamiento por defecto de drag and drop
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        fileUploadArea.addEventListener(eventName, preventDefaults, false);
+    });
+
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    // Resaltar área de drop cuando se arrastra un archivo
+    ['dragenter', 'dragover'].forEach(eventName => {
+        fileUploadArea.addEventListener(eventName, () => {
+            fileUploadArea.classList.add('drag-over');
+        }, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        fileUploadArea.addEventListener(eventName, () => {
+            fileUploadArea.classList.remove('drag-over');
+        }, false);
+    });
+
+    // Manejar drop de archivos
+    fileUploadArea.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        handleFiles(files);
+    }, false);
+
+    // Manejar selección de archivos
+    function handleFileSelect(event) {
+        const files = event.target.files;
+        handleFiles(files);
+    }
+
+    function handleFiles(files) {
+        [...files].forEach(file => {
+            // Validar tamaño (16MB máximo)
+            if(file.size > 16 * 1024 * 1024) {
+                alert(`El archivo ${file.name} es muy grande. Máximo 16MB.`);
+                return;
+            }
+            
+            // Validar extensión
+            const extension = file.name.split('.').pop().toLowerCase();
+            const allowed = ['png', 'jpg', 'jpeg', 'gif', 'pdf', 'doc', 'docx', 'txt'];
+            if(!allowed.includes(extension)) {
+                alert(`Tipo de archivo no permitido: ${file.name}`);
+                return;
+            }
+            
+            selectedFiles.push(file);
+        });
+        
+        renderFileList();
+    }
+
+    function renderFileList() {
+        fileListContainer.innerHTML = '';
+        selectedFiles.forEach((file, index) => {
+            const fileItem = document.createElement('div');
+            fileItem.className = 'file-item';
+            fileItem.innerHTML = `
+                <div>
+                    <i class="bi bi-file-earmark me-2"></i>
+                    <span>${file.name}</span>
+                    <small class="text-muted ms-2">(${(file.size / 1024).toFixed(1)} KB)</small>
+                </div>
+                <span class="remove-file" onclick="removeFile(${index})">
+                    <i class="bi bi-x-circle-fill"></i>
+                </span>
+            `;
+            fileListContainer.appendChild(fileItem);
+        });
+
+        // Actualizar el input de archivos
+        const dt = new DataTransfer();
+        selectedFiles.forEach(file => dt.items.add(file));
+        fileInput.files = dt.files;
+    }
+
+    function removeFile(index) {
+        selectedFiles.splice(index, 1);
+        renderFileList();
+    }
+</script>
+
+<script>
+    // Firma Digital
+    const canvas = document.getElementById('signatureCanvas');
+    const ctx = canvas.getContext('2d');
+    let isDrawing = false;
+    let lastX = 0;
+    let lastY = 0;
+
+    function getMousePos(canvas, evt) {
+        const rect = canvas.getBoundingClientRect();
+        return {
+            x: (evt.clientX - rect.left) / (rect.width / canvas.width),
+            y: (evt.clientY - rect.top) / (rect.height / canvas.height)
+        };
+    }
+
+    function getTouchPos(canvas, touch) {
+        const rect = canvas.getBoundingClientRect();
+        return {
+            x: (touch.clientX - rect.left) / (rect.width / canvas.width),
+            y: (touch.clientY - rect.top) / (rect.height / canvas.height)
+        };
+    }
+
+    canvas.addEventListener('mousedown', (e) => {
+        isDrawing = true;
+        const pos = getMousePos(canvas, e);
+        [lastX, lastY] = [pos.x, pos.y];
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+        if (!isDrawing) return;
+        const pos = getMousePos(canvas, e);
+        
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        
+        ctx.beginPath();
+        ctx.moveTo(lastX, lastY);
+        ctx.lineTo(pos.x, pos.y);
+        ctx.stroke();
+        
+        [lastX, lastY] = [pos.x, pos.y];
+    });
+
+    canvas.addEventListener('mouseup', () => {
+        isDrawing = false;
+        document.getElementById('signatureData').value = canvas.toDataURL();
+    });
+
+    // Touch support
+    canvas.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        const touch = e.touches[0];
+        const pos = getTouchPos(canvas, touch);
+        isDrawing = true;
+        [lastX, lastY] = [pos.x, pos.y];
+    });
+
+    canvas.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        if (!isDrawing) return;
+        const touch = e.touches[0];
+        const pos = getTouchPos(canvas, touch);
+        
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        
+        ctx.beginPath();
+        ctx.moveTo(lastX, lastY);
+        ctx.lineTo(pos.x, pos.y);
+        ctx.stroke();
+        
+        [lastX, lastY] = [pos.x, pos.y];
+    });
+
+    canvas.addEventListener('touchend', () => {
+        isDrawing = false;
+        document.getElementById('signatureData').value = canvas.toDataURL();
+    });
+
+    function clearSignature() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        document.getElementById('signatureData').value = '';
+    }
+
+    // Validación antes de enviar
+    document.querySelector('form[action="/save_report"]').addEventListener('submit', function(e) {
+        const signatureData = document.getElementById('signatureData').value;
+        if (!signatureData) {
+            e.preventDefault();
+            alert('Por favor, solicita la firma del cliente antes de cerrar el parte. Es obligatoria.');
+            return false;
+        }
+    });
+</script>
+</body>
+</html>
