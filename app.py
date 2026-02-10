@@ -970,13 +970,18 @@ with app.app_context():
     db.create_all()
     
     # Después llenamos los datos (el contenido)
-    # 1. Usuarios
+    # 1. Usuarios - CORREGIDO: crear tanto admin como paco
+    if not User.query.filter_by(username='admin').first():
+        db.session.add(User(username='admin', role='admin', password_hash=generate_password_hash('admin123')))
+    
     if not User.query.filter_by(username='paco').first():
         db.session.add(User(username='paco', role='admin', password_hash=generate_password_hash('admin123')))
+        
+    if not User.query.filter_by(username='tech').first():
         db.session.add(User(username='tech', role='tech', password_hash=generate_password_hash('tech123')))
     
     # 2. Tipos de Servicio y Colores
-    if not ServiceType.query.first():
+    if ServiceType.query.count() == 0:
         servicios = [
             {'name': 'Avería', 'color': '#fd7e14'},
             {'name': 'Revisión', 'color': '#0d6efd'},
@@ -987,10 +992,21 @@ with app.app_context():
             db.session.add(ServiceType(name=s['name'], color=s['color']))
 
     # 3. Datos de ejemplo
-    if not Stock.query.first():
-        db.session.add(Stock(name='Toner Genérico', category='Consumibles', quantity=10, min_stock=5))
+    if Stock.query.count() == 0:
+        # Añadir productos de ejemplo con categorías y subcategorías
+        stock_items = [
+            {'name': 'Toner Genérico', 'category': 'Consumibles', 'subcategory': '', 'quantity': 10, 'min_stock': 5},
+            {'name': 'Copiadora HP LaserJet', 'category': 'Copiadoras', 'subcategory': '', 'quantity': 3, 'min_stock': 1},
+            {'name': 'Cajón Cashlogy 1500', 'category': 'Cajones', 'subcategory': 'Cashlogy', 'quantity': 5, 'min_stock': 2},
+            {'name': 'Cajón Cashkeeper Pro', 'category': 'Cajones', 'subcategory': 'Cashkeeper', 'quantity': 4, 'min_stock': 2},
+            {'name': 'Cajón ATCA Standard', 'category': 'Cajones', 'subcategory': 'ATCA', 'quantity': 3, 'min_stock': 1},
+            {'name': 'TPV Táctil 15"', 'category': 'TPV', 'subcategory': '', 'quantity': 6, 'min_stock': 2},
+            {'name': 'Reciclador 1', 'category': 'Recicladores', 'subcategory': '', 'quantity': 2, 'min_stock': 1}
+        ]
+        for item in stock_items:
+            db.session.add(Stock(**item))
         
-    if not Client.query.first():
+    if Client.query.count() == 0:
         db.session.add(Client(
             name='Cliente Ejemplo',
             phone='900123456',
