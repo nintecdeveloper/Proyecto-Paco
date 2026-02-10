@@ -7,6 +7,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js'></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         :root { --osla-orange: #f37021; --osla-dark: #0a0a0a; --osla-card: #161616; }
         body { background-color: var(--osla-dark); color: #fff; font-family: 'Segoe UI', sans-serif; padding-bottom: 80px;}
@@ -136,6 +137,13 @@
                 <i class="bi bi-calendar-week fs-1 text-white mb-2 d-block"></i>
                 <h4 class="text-white">MI AGENDA</h4>
                 <p class="text-muted small">Ver calendario y citas</p>
+            </div>
+        </div>
+        <div class="col-12 col-md-6" onclick="showSection('section-analytics')">
+            <div class="menu-card">
+                <i class="bi bi-graph-up-arrow fs-1 text-info mb-2 d-block"></i>
+                <h4 class="text-white">MIS ANALÍTICAS</h4>
+                <p class="text-muted small">Estadísticas y rendimiento</p>
             </div>
         </div>
     </div>
@@ -285,6 +293,108 @@
                         <label class="form-check-label small" for="toggleCompleted">Mostrar completadas</label>
                     </div>
                     <div id="taskListContainer" class="task-list-container"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECCIÓN ANALÍTICAS -->
+    <div id="section-analytics" class="d-none" style="max-width: 1400px; margin: auto;">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h3 class="text-info fw-bold m-0 fs-4"><i class="bi bi-graph-up me-2"></i>Mis Analíticas</h3>
+            <button class="btn btn-outline-secondary btn-sm px-3" onclick="showSection('home-menu')">Atrás</button>
+        </div>
+
+        <!-- Selector de Período -->
+        <div class="card bg-dark border-secondary p-3 mb-4">
+            <label class="form-label fw-bold text-info">PERÍODO DE ANÁLISIS</label>
+            <select id="periodSelector" class="form-select" onchange="loadAnalytics()">
+                <option value="7">Últimos 7 días</option>
+                <option value="30" selected>Últimos 30 días</option>
+                <option value="90">Últimos 3 meses</option>
+                <option value="180">Últimos 6 meses</option>
+                <option value="365">Último año</option>
+                <option value="all">Todo el historial</option>
+            </select>
+        </div>
+
+        <!-- Tarjetas de Resumen -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-3 col-6">
+                <div class="card bg-dark border-secondary p-3 text-center">
+                    <i class="bi bi-clipboard-check fs-1 text-success mb-2"></i>
+                    <h2 class="text-white fw-bold mb-0" id="totalServices">0</h2>
+                    <small class="text-muted">Servicios Totales</small>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="card bg-dark border-secondary p-3 text-center">
+                    <i class="bi bi-tools fs-1 text-warning mb-2"></i>
+                    <h2 class="text-white fw-bold mb-0" id="totalMaintenances">0</h2>
+                    <small class="text-muted">Mantenimientos</small>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="card bg-dark border-secondary p-3 text-center">
+                    <i class="bi bi-cash-stack fs-1 text-info mb-2"></i>
+                    <h2 class="text-white fw-bold mb-0" id="totalRevenue">0€</h2>
+                    <small class="text-muted">Ingresos Estimados</small>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="card bg-dark border-secondary p-3 text-center">
+                    <i class="bi bi-clock-history fs-1 text-danger mb-2"></i>
+                    <h2 class="text-white fw-bold mb-0" id="avgTime">0h</h2>
+                    <small class="text-muted">Tiempo Promedio</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gráficos -->
+        <div class="row g-3 mb-4">
+            <!-- Distribución de Servicios -->
+            <div class="col-lg-6">
+                <div class="card bg-dark border-secondary p-4">
+                    <h5 class="text-white fw-bold mb-3"><i class="bi bi-pie-chart me-2"></i>Distribución de Servicios</h5>
+                    <canvas id="serviceDistributionChart" style="max-height: 300px;"></canvas>
+                </div>
+            </div>
+
+            <!-- Evolución Temporal -->
+            <div class="col-lg-6">
+                <div class="card bg-dark border-secondary p-4">
+                    <h5 class="text-white fw-bold mb-3"><i class="bi bi-graph-up me-2"></i>Evolución Temporal</h5>
+                    <div class="mb-3">
+                        <select id="metricSelector" class="form-select form-select-sm" onchange="updateTimelineChart()">
+                            <option value="services">Servicios Realizados</option>
+                            <option value="revenue">Ingresos Totales</option>
+                            <option value="maintenances">Mantenimientos</option>
+                        </select>
+                    </div>
+                    <canvas id="timelineChart" style="max-height: 250px;"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Clientes -->
+        <div class="row g-3">
+            <div class="col-lg-6">
+                <div class="card bg-dark border-secondary p-4">
+                    <h5 class="text-white fw-bold mb-3"><i class="bi bi-people-fill me-2"></i>Top 5 Clientes</h5>
+                    <div id="topClients" class="list-group">
+                        <div class="text-center text-muted py-5">
+                            <i class="bi bi-hourglass-split fs-1 d-block mb-2"></i>
+                            Cargando datos...
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tipos de Servicio Más Frecuentes -->
+            <div class="col-lg-6">
+                <div class="card bg-dark border-secondary p-4">
+                    <h5 class="text-white fw-bold mb-3"><i class="bi bi-bar-chart me-2"></i>Servicios Más Frecuentes</h5>
+                    <canvas id="topServicesChart" style="max-height: 300px;"></canvas>
                 </div>
             </div>
         </div>
@@ -785,105 +895,249 @@
         selectedFiles.splice(index, 1);
         renderFileList();
     }
-</script>
 
-<script>
-    // Firma Digital
-    const canvas = document.getElementById('signatureCanvas');
-    const ctx = canvas.getContext('2d');
-    let isDrawing = false;
-    let lastX = 0;
-    let lastY = 0;
+    // ============================================================
+    // FUNCIONES DE ANALÍTICAS
+    // ============================================================
+    
+    let pieChart, lineChart, barChart;
+    let analyticsData = null;
 
-    function getMousePos(canvas, evt) {
-        const rect = canvas.getBoundingClientRect();
-        return {
-            x: (evt.clientX - rect.left) / (rect.width / canvas.width),
-            y: (evt.clientY - rect.top) / (rect.height / canvas.height)
-        };
+    // Cargar analíticas cuando se abre la sección
+    function loadAnalytics() {
+        const period = document.getElementById('periodSelector').value;
+        
+        // Mostrar indicador de carga
+        document.getElementById('totalServices').textContent = '...';
+        document.getElementById('totalMaintenances').textContent = '...';
+        document.getElementById('totalRevenue').textContent = '...';
+        document.getElementById('avgTime').textContent = '...';
+        
+        fetch(`/api/tech_analytics?period=${period}`)
+            .then(res => res.json())
+            .then(data => {
+                analyticsData = data;
+                updateAnalyticsSummary(data);
+                updateServiceDistributionChart(data);
+                updateTimelineChart();
+                updateTopClients(data);
+                updateTopServicesChart(data);
+            })
+            .catch(err => {
+                console.error('Error cargando analíticas:', err);
+                alert('Error al cargar las analíticas');
+            });
     }
 
-    function getTouchPos(canvas, touch) {
-        const rect = canvas.getBoundingClientRect();
-        return {
-            x: (touch.clientX - rect.left) / (rect.width / canvas.width),
-            y: (touch.clientY - rect.top) / (rect.height / canvas.height)
-        };
+    function updateAnalyticsSummary(data) {
+        document.getElementById('totalServices').textContent = data.total_services || 0;
+        document.getElementById('totalMaintenances').textContent = data.total_maintenances || 0;
+        document.getElementById('totalRevenue').textContent = (data.total_revenue || 0).toLocaleString('es-ES') + '€';
+        document.getElementById('avgTime').textContent = (data.avg_time || 0) + 'h';
     }
 
-    canvas.addEventListener('mousedown', (e) => {
-        isDrawing = true;
-        const pos = getMousePos(canvas, e);
-        [lastX, lastY] = [pos.x, pos.y];
-    });
-
-    canvas.addEventListener('mousemove', (e) => {
-        if (!isDrawing) return;
-        const pos = getMousePos(canvas, e);
+    function updateServiceDistributionChart(data) {
+        const ctx = document.getElementById('serviceDistributionChart');
         
-        ctx.strokeStyle = '#000';
-        ctx.lineWidth = 2;
-        ctx.lineCap = 'round';
-        
-        ctx.beginPath();
-        ctx.moveTo(lastX, lastY);
-        ctx.lineTo(pos.x, pos.y);
-        ctx.stroke();
-        
-        [lastX, lastY] = [pos.x, pos.y];
-    });
-
-    canvas.addEventListener('mouseup', () => {
-        isDrawing = false;
-        document.getElementById('signatureData').value = canvas.toDataURL();
-    });
-
-    // Touch support
-    canvas.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        const touch = e.touches[0];
-        const pos = getTouchPos(canvas, touch);
-        isDrawing = true;
-        [lastX, lastY] = [pos.x, pos.y];
-    });
-
-    canvas.addEventListener('touchmove', (e) => {
-        e.preventDefault();
-        if (!isDrawing) return;
-        const touch = e.touches[0];
-        const pos = getTouchPos(canvas, touch);
-        
-        ctx.strokeStyle = '#000';
-        ctx.lineWidth = 2;
-        ctx.lineCap = 'round';
-        
-        ctx.beginPath();
-        ctx.moveTo(lastX, lastY);
-        ctx.lineTo(pos.x, pos.y);
-        ctx.stroke();
-        
-        [lastX, lastY] = [pos.x, pos.y];
-    });
-
-    canvas.addEventListener('touchend', () => {
-        isDrawing = false;
-        document.getElementById('signatureData').value = canvas.toDataURL();
-    });
-
-    function clearSignature() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        document.getElementById('signatureData').value = '';
-    }
-
-    // Validación antes de enviar
-    document.querySelector('form[action="/save_report"]').addEventListener('submit', function(e) {
-        const signatureData = document.getElementById('signatureData').value;
-        if (!signatureData) {
-            e.preventDefault();
-            alert('Por favor, solicita la firma del cliente antes de cerrar el parte. Es obligatoria.');
-            return false;
+        if (pieChart) {
+            pieChart.destroy();
         }
-    });
+
+        const distribution = data.service_distribution || {};
+        const labels = Object.keys(distribution);
+        const values = Object.values(distribution);
+        
+        const colors = [
+            '#f37021', '#4bc0c0', '#ff6384', '#36a2eb', '#ffcd56',
+            '#9966ff', '#ff9f40', '#4dc9f6', '#f67019', '#8549ba'
+        ];
+
+        pieChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: values,
+                    backgroundColor: colors.slice(0, labels.length),
+                    borderColor: '#161616',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            color: '#ffffff',
+                            padding: 15,
+                            font: { size: 11 }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.parsed || 0;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = ((value / total) * 100).toFixed(1);
+                                return `${label}: ${value} (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function updateTimelineChart() {
+        const ctx = document.getElementById('timelineChart');
+        const metric = document.getElementById('metricSelector').value;
+        
+        if (lineChart) {
+            lineChart.destroy();
+        }
+
+        if (!analyticsData || !analyticsData.timeline) {
+            return;
+        }
+
+        const timeline = analyticsData.timeline;
+        const labels = timeline.map(t => t.date);
+        let data, label, color;
+
+        if (metric === 'services') {
+            data = timeline.map(t => t.services);
+            label = 'Servicios Realizados';
+            color = '#4bc0c0';
+        } else if (metric === 'revenue') {
+            data = timeline.map(t => t.revenue);
+            label = 'Ingresos (€)';
+            color = '#36a2eb';
+        } else if (metric === 'maintenances') {
+            data = timeline.map(t => t.maintenances);
+            label = 'Mantenimientos';
+            color = '#ffcd56';
+        }
+
+        lineChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: label,
+                    data: data,
+                    borderColor: color,
+                    backgroundColor: color + '33',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        labels: { color: '#ffffff' }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { color: '#aaaaaa' },
+                        grid: { color: '#333333' }
+                    },
+                    x: {
+                        ticks: { color: '#aaaaaa' },
+                        grid: { color: '#333333' }
+                    }
+                }
+            }
+        });
+    }
+
+    function updateTopClients(data) {
+        const container = document.getElementById('topClients');
+        const topClients = data.top_clients || [];
+        
+        if (topClients.length === 0) {
+            container.innerHTML = `
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                    No hay datos disponibles
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = topClients.map((client, index) => `
+            <div class="list-group-item bg-dark border-secondary text-white d-flex justify-content-between align-items-center mb-2">
+                <div>
+                    <span class="badge bg-info me-2">${index + 1}</span>
+                    <strong>${client.name}</strong>
+                </div>
+                <span class="badge bg-warning text-dark">${client.count} servicios</span>
+            </div>
+        `).join('');
+    }
+
+    function updateTopServicesChart(data) {
+        const ctx = document.getElementById('topServicesChart');
+        
+        if (barChart) {
+            barChart.destroy();
+        }
+
+        const topServices = data.top_services || {};
+        const labels = Object.keys(topServices);
+        const values = Object.values(topServices);
+
+        barChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Cantidad',
+                    data: values,
+                    backgroundColor: '#f37021',
+                    borderColor: '#f37021',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                indexAxis: 'y',
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        ticks: { color: '#aaaaaa' },
+                        grid: { color: '#333333' }
+                    },
+                    y: {
+                        ticks: { color: '#aaaaaa' },
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+    }
+
+    // Cargar analíticas cuando se muestra la sección
+    const originalShowSection = window.showSection;
+    window.showSection = function(sectionId) {
+        originalShowSection(sectionId);
+        if (sectionId === 'section-analytics') {
+            setTimeout(() => loadAnalytics(), 100);
+        }
+    };
 </script>
 </body>
 </html>
