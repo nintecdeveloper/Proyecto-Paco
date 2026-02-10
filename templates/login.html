@@ -101,6 +101,35 @@
             color: #ff8787;
             font-size: 0.9rem;
         }
+
+        .alert-success {
+            background-color: rgba(25, 135, 84, 0.2);
+            border: 1px solid #198754;
+            color: #75ff9e;
+        }
+
+        .forgot-password-link {
+            color: var(--osla-orange);
+            text-decoration: none;
+            font-size: 0.85rem;
+            transition: 0.2s;
+        }
+
+        .forgot-password-link:hover {
+            color: #d95d14;
+            text-decoration: underline;
+        }
+
+        .back-to-login {
+            color: #adb5bd;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: 0.2s;
+        }
+
+        .back-to-login:hover {
+            color: var(--osla-orange);
+        }
     </style>
 </head>
 <body>
@@ -114,28 +143,67 @@
         {% with messages = get_flashed_messages(with_categories=true) %}
           {% if messages %}
             {% for category, message in messages %}
-              <div class="alert alert-dismissible fade show text-start" role="alert">
+              <div class="alert alert-{{ category }} alert-dismissible fade show text-start" role="alert">
                 <i class="bi bi-exclamation-circle-fill me-2"></i> {{ message }}
               </div>
             {% endfor %}
           {% endif %}
         {% endwith %}
 
-        <form method="POST">
+        <!-- Formulario de Login -->
+        <form method="POST" id="loginForm">
             <div class="mb-3 text-start">
                 <label class="form-label">USUARIO</label>
                 <input type="text" name="username" class="form-control" placeholder="Nombre de usuario" required>
             </div>
-            <div class="mb-4 text-start">
+            <div class="mb-3 text-start">
                 <label class="form-label">CONTRASEÑA</label>
                 <input type="password" name="password" class="form-control" placeholder="Escribe tu contraseña" required>
+            </div>
+            <div class="mb-4 text-end">
+                <a href="#" class="forgot-password-link" onclick="showForgotPassword(); return false;">
+                    <i class="bi bi-question-circle me-1"></i>¿Olvidaste tu contraseña?
+                </a>
             </div>
             <button type="submit" class="btn btn-osla w-100">
                 Entrar <i class="bi bi-box-arrow-in-right ms-2"></i>
             </button>
         </form>
+
+        <!-- Formulario de Recuperación de Contraseña -->
+        <form method="POST" action="/forgot_password" id="forgotPasswordForm" style="display: none;">
+            <div class="mb-3 text-start">
+                <label class="form-label">CORREO ELECTRÓNICO</label>
+                <input type="email" name="email" class="form-control" placeholder="tu@email.com" required>
+            </div>
+            <div class="mb-3 text-start">
+                <p class="text-muted small mb-0">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Te enviaremos un enlace para restablecer tu contraseña
+                </p>
+            </div>
+            <button type="submit" class="btn btn-osla w-100 mb-3">
+                Enviar enlace <i class="bi bi-envelope ms-2"></i>
+            </button>
+            <div class="text-center">
+                <span class="back-to-login" onclick="showLogin()">
+                    <i class="bi bi-arrow-left me-1"></i>Volver al login
+                </span>
+            </div>
+        </form>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function showForgotPassword() {
+            document.getElementById('loginForm').style.display = 'none';
+            document.getElementById('forgotPasswordForm').style.display = 'block';
+        }
+
+        function showLogin() {
+            document.getElementById('loginForm').style.display = 'block';
+            document.getElementById('forgotPasswordForm').style.display = 'none';
+        }
+    </script>
 </body>
 </html>
