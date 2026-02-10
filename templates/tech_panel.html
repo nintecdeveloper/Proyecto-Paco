@@ -786,5 +786,104 @@
         renderFileList();
     }
 </script>
+
+<script>
+    // Firma Digital
+    const canvas = document.getElementById('signatureCanvas');
+    const ctx = canvas.getContext('2d');
+    let isDrawing = false;
+    let lastX = 0;
+    let lastY = 0;
+
+    function getMousePos(canvas, evt) {
+        const rect = canvas.getBoundingClientRect();
+        return {
+            x: (evt.clientX - rect.left) / (rect.width / canvas.width),
+            y: (evt.clientY - rect.top) / (rect.height / canvas.height)
+        };
+    }
+
+    function getTouchPos(canvas, touch) {
+        const rect = canvas.getBoundingClientRect();
+        return {
+            x: (touch.clientX - rect.left) / (rect.width / canvas.width),
+            y: (touch.clientY - rect.top) / (rect.height / canvas.height)
+        };
+    }
+
+    canvas.addEventListener('mousedown', (e) => {
+        isDrawing = true;
+        const pos = getMousePos(canvas, e);
+        [lastX, lastY] = [pos.x, pos.y];
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+        if (!isDrawing) return;
+        const pos = getMousePos(canvas, e);
+        
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        
+        ctx.beginPath();
+        ctx.moveTo(lastX, lastY);
+        ctx.lineTo(pos.x, pos.y);
+        ctx.stroke();
+        
+        [lastX, lastY] = [pos.x, pos.y];
+    });
+
+    canvas.addEventListener('mouseup', () => {
+        isDrawing = false;
+        document.getElementById('signatureData').value = canvas.toDataURL();
+    });
+
+    // Touch support
+    canvas.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        const touch = e.touches[0];
+        const pos = getTouchPos(canvas, touch);
+        isDrawing = true;
+        [lastX, lastY] = [pos.x, pos.y];
+    });
+
+    canvas.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        if (!isDrawing) return;
+        const touch = e.touches[0];
+        const pos = getTouchPos(canvas, touch);
+        
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        
+        ctx.beginPath();
+        ctx.moveTo(lastX, lastY);
+        ctx.lineTo(pos.x, pos.y);
+        ctx.stroke();
+        
+        [lastX, lastY] = [pos.x, pos.y];
+    });
+
+    canvas.addEventListener('touchend', () => {
+        isDrawing = false;
+        document.getElementById('signatureData').value = canvas.toDataURL();
+    });
+
+    function clearSignature() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        document.getElementById('signatureData').value = '';
+    }
+
+    // Validación antes de enviar
+    document.querySelector('form[action="/save_report"]').addEventListener('submit', function(e) {
+        const signatureData = document.getElementById('signatureData').value;
+        if (!signatureData) {
+            e.preventDefault();
+            alert('Por favor, solicita la firma del cliente antes de cerrar el parte. Es obligatoria.');
+            return false;
+        }
+    });
+</script>
 </body>
 </html>

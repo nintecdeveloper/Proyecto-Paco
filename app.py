@@ -31,22 +31,32 @@ class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), unique=True, nullable=False)
     password_hash = db.Column(db.String(128))
-    role = db.Column(db.String(20)) # 'admin' o 'tech'
+    role = db.Column(db.String(20))  # 'admin' o 'tech'
 
 class Client(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
+    phone = db.Column(db.String(20))  # OBLIGATORIO
+    email = db.Column(db.String(100))  # OBLIGATORIO
+    address = db.Column(db.String(250))  # OBLIGATORIO con Google Maps
+    notes = db.Column(db.Text)  # Comentarios internos
+    has_support = db.Column(db.Boolean, default=False)  # Verde=True, Rojo=False
+    support_monday_friday = db.Column(db.Boolean, default=False)
+    support_saturday = db.Column(db.Boolean, default=False)
+    support_sunday = db.Column(db.Boolean, default=False)
 
 class ServiceType(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), unique=True, nullable=False)
-    color = db.Column(db.String(7), default='#6c757d') # Hex code color
+    color = db.Column(db.String(7), default='#6c757d')  # Hex code color
 
 class Stock(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), unique=True, nullable=False)
+    name = db.Column(db.String(100), nullable=False)
     quantity = db.Column(db.Integer, default=0)
-    category = db.Column(db.String(50)) 
+    category = db.Column(db.String(50))  # Copiadoras, Cajones, TPV
+    subcategory = db.Column(db.String(50))  # Cashlogy, Cashkeeper, ATCA
+    min_stock = db.Column(db.Integer, default=5)  # Para alarmas de stock bajo
 
 class Task(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -65,13 +75,31 @@ class Task(db.Model):
     stock_quantity_used = db.Column(db.Integer, default=0)
     stock_action = db.Column(db.String(20))
 
-    status = db.Column(db.String(20), default='Completado')
+    status = db.Column(db.String(20), default='Pendiente')  # Pendiente o Completado
+    
+    # Campos para firma digital
+    signature_data = db.Column(db.Text)  # Base64 de la firma
     
     # Nuevos campos para archivos adjuntos
     attachments = db.Column(db.Text)  # JSON con lista de archivos adjuntos
+    
+    # Hora de inicio/fin real del trabajo (para tracking automático)
+    actual_start_time = db.Column(db.DateTime)
+    actual_end_time = db.Column(db.DateTime)
 
     tech = db.relationship('User', backref='tasks')
     stock_item = db.relationship('Stock', backref='tasks')
+
+class Alarm(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    alarm_type = db.Column(db.String(50))  # 'technical', 'maintenance', 'low_stock'
+    title = db.Column(db.String(100))
+    description = db.Column(db.Text)
+    client_name = db.Column(db.String(100), nullable=True)
+    stock_item_id = db.Column(db.Integer, db.ForeignKey('stock.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    is_read = db.Column(db.Boolean, default=False)
+    priority = db.Column(db.String(20), default='normal')  # low, normal, high
 
 @login_manager.user_loader
 def load_user(id):
@@ -81,17 +109,45 @@ def load_user(id):
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+def check_low_stock():
+    """Verificar stock bajo y crear alarmas"""
+    low_items = Stock.query.filter(Stock.quantity <= Stock.min_stock).all()
+    for item in low_items:
+        # Verificar si ya existe una alarma activa para este item
+        existing = Alarm.query.filter_by(
+            alarm_type='low_stock',
+            stock_item_id=item.id,
+            is_read=False
+        ).first()
+        
+        if not existing:
+            alarm = Alarm(
+                alarm_type='low_stock',
+                title=f'Stock bajo: {item.name}',
+                description=f'El stock de {item.name} está en {item.quantity} unidades (mínimo: {item.min_stock})',
+                stock_item_id=item.id,
+                priority='high'
+            )
+            db.session.add(alarm)
+    db.session.commit()
+
 # --- CONTEXT PROCESSOR ---
 @app.context_processor
 def inject_globals():
     try:
+        unread_alarms = 0
+        if current_user.is_authenticated and current_user.role == 'admin':
+            unread_alarms = Alarm.query.filter_by(is_read=False).count()
+        
         return {
-            'all_service_types': ServiceType.query.order_by(ServiceType.name).all()
+            'all_service_types': ServiceType.query.order_by(ServiceType.name).all(),
+            'unread_alarms_count': unread_alarms
         }
     except Exception as e:
         print("ERROR context_processor:", e)
         return {
-            'all_service_types': []
+            'all_service_types': [],
+            'unread_alarms_count': 0
         }
 
 # --- RUTAS PRINCIPALES ---
@@ -115,12 +171,20 @@ def dashboard():
     if current_user.role == 'admin':
         empleados = User.query.filter_by(role='tech').all()
         informes = Task.query.filter_by(status='Completado').order_by(Task.date.desc()).all()
-        inventory = Stock.query.order_by(Stock.name).all()
+        inventory = Stock.query.order_by(Stock.category, Stock.subcategory, Stock.name).all()
         clients = Client.query.order_by(Client.name).all()
-        services = ServiceType.query.order_by(ServiceType.name).all() 
-        return render_template('admin_panel.html', empleados=empleados, informes=informes, inventory=inventory, clients=clients, services=services)
+        services = ServiceType.query.order_by(ServiceType.name).all()
+        alarms = Alarm.query.order_by(Alarm.is_read.asc(), Alarm.created_at.desc()).all()
+        
+        return render_template('admin_panel.html', 
+                             empleados=empleados, 
+                             informes=informes, 
+                             inventory=inventory, 
+                             clients=clients, 
+                             services=services,
+                             alarms=alarms)
     
-    stock_items = Stock.query.all()
+    stock_items = Stock.query.order_by(Stock.category, Stock.name).all()
     pending_tasks = Task.query.filter_by(tech_id=current_user.id, status='Pendiente').order_by(Task.date).all()
     
     return render_template('tech_panel.html', 
@@ -211,287 +275,158 @@ def manage_services():
     db.session.commit()
     return redirect(url_for('dashboard'))
 
-@app.route('/manage_stock', methods=['POST'])
+@app.route('/manage_clients', methods=['POST'])
 @login_required
-def manage_stock():
-    if current_user.role != 'admin': 
+def manage_clients():
+    if current_user.role != 'admin':
         return redirect(url_for('dashboard'))
     
     action = request.form.get('action')
     
     if action == 'add':
-        existing = Stock.query.filter_by(name=request.form['name']).first()
-        if not existing:
-            db.session.add(Stock(
-                name=request.form['name'],
-                category=request.form['category'],
-                quantity=int(request.form.get('quantity', 0))
-            ))
-            flash('Artículo de stock añadido.', 'success')
+        name = request.form.get('name', '').strip()
+        phone = request.form.get('phone', '').strip()
+        email = request.form.get('email', '').strip()
+        address = request.form.get('address', '').strip()
+        
+        # Validación de campos obligatorios
+        if not name or not phone or not email or not address:
+            flash('Nombre, teléfono, email y dirección son obligatorios.', 'danger')
+            return redirect(url_for('dashboard'))
+        
+        if Client.query.filter_by(name=name).first():
+            flash('Ya existe un cliente con ese nombre.', 'warning')
         else:
-            flash('Ese artículo ya existe.', 'warning')
+            new_client = Client(
+                name=name,
+                phone=phone,
+                email=email,
+                address=address,
+                notes=request.form.get('notes', ''),
+                has_support=request.form.get('has_support') == 'on',
+                support_monday_friday=request.form.get('support_monday_friday') == 'on',
+                support_saturday=request.form.get('support_saturday') == 'on',
+                support_sunday=request.form.get('support_sunday') == 'on'
+            )
+            db.session.add(new_client)
+            db.session.commit()
+            flash('Cliente añadido correctamente.', 'success')
             
-    elif action == 'adjust':
-        item = Stock.query.get(request.form['item_id'])
-        if item:
-            qty_change = int(request.form.get('adjust_qty', request.form.get('quantity', 0)))
-            item.quantity += qty_change
-            flash(f'Stock ajustado: {item.name}', 'success')
+    elif action == 'edit':
+        client = Client.query.get(request.form['client_id'])
+        if client:
+            phone = request.form.get('phone', '').strip()
+            email = request.form.get('email', '').strip()
+            address = request.form.get('address', '').strip()
             
+            if not phone or not email or not address:
+                flash('Teléfono, email y dirección son obligatorios.', 'danger')
+                return redirect(url_for('dashboard'))
+            
+            client.name = request.form['name']
+            client.phone = phone
+            client.email = email
+            client.address = address
+            client.notes = request.form.get('notes', '')
+            client.has_support = request.form.get('has_support') == 'on'
+            client.support_monday_friday = request.form.get('support_monday_friday') == 'on'
+            client.support_saturday = request.form.get('support_saturday') == 'on'
+            client.support_sunday = request.form.get('support_sunday') == 'on'
+            db.session.commit()
+            flash('Cliente actualizado.', 'success')
+            
+    elif action == 'delete':
+        client = Client.query.get(request.form['client_id'])
+        if client:
+            db.session.delete(client)
+            db.session.commit()
+            flash('Cliente eliminado.', 'warning')
+    
+    return redirect(url_for('dashboard'))
+
+@app.route('/manage_stock', methods=['POST'])
+@login_required
+def manage_stock():
+    if current_user.role != 'admin':
+        return redirect(url_for('dashboard'))
+    
+    action = request.form.get('action')
+    
+    if action == 'add':
+        name = request.form['name']
+        category = request.form.get('category', '')
+        subcategory = request.form.get('subcategory', '')
+        quantity = int(request.form.get('quantity', 0))
+        min_stock = int(request.form.get('min_stock', 5))
+        
+        new_item = Stock(
+            name=name,
+            category=category,
+            subcategory=subcategory,
+            quantity=quantity,
+            min_stock=min_stock
+        )
+        db.session.add(new_item)
+        db.session.commit()
+        
+        # Verificar stock bajo
+        check_low_stock()
+        
+        flash('Producto añadido al inventario.', 'success')
+        
     elif action == 'edit':
         item = Stock.query.get(request.form['item_id'])
         if item:
             item.name = request.form['name']
-            item.category = request.form['category']
-            item.quantity = int(request.form['quantity'])
-            flash('Artículo actualizado.', 'success')
+            item.category = request.form.get('category', '')
+            item.subcategory = request.form.get('subcategory', '')
+            item.quantity = int(request.form.get('quantity', 0))
+            item.min_stock = int(request.form.get('min_stock', 5))
+            db.session.commit()
+            
+            # Verificar stock bajo
+            check_low_stock()
+            
+            flash('Producto actualizado.', 'success')
             
     elif action == 'delete':
         item = Stock.query.get(request.form['item_id'])
         if item:
             db.session.delete(item)
-            flash('Artículo eliminado.', 'warning')
-            
-    db.session.commit()
-    return redirect(url_for('dashboard'))
-
-@app.route('/save_report', methods=['POST'])
-@login_required
-def save_report():
-    try:
-        client_name = request.form.get('client_name')
-        service_type = request.form.get('service_type')
-        description = request.form.get('description')
-        parts_text = request.form.get('parts_text', '')
-        
-        report_date = request.form.get('date')
-        start_time = request.form.get('entry_time')
-        end_time = request.form.get('exit_time')
-        
-        # Convertir fecha
-        if report_date:
-            task_date = datetime.strptime(report_date, '%Y-%m-%d').date()
-        else:
-            task_date = date.today()
-        
-        # Procesar stock
-        stock_item_id = None
-        stock_quantity_used = 0
-        stock_action = None
-        
-        stock_id_str = request.form.get('stock_item')
-        if stock_id_str and stock_id_str != 'none':
-            stock_item_id = int(stock_id_str)
-            stock_quantity_used = int(request.form.get('stock_qty', request.form.get('stock_quantity', 0)))
-            stock_action = request.form.get('stock_action')
-            
-            item = Stock.query.get(stock_item_id)
-            if item and stock_action == 'used':
-                item.quantity -= stock_quantity_used
-                if item.quantity < 0:
-                    item.quantity = 0
-        
-        # Manejo de archivos adjuntos
-        uploaded_files = []
-        if 'attachments' in request.files:
-            files = request.files.getlist('attachments')
-            for file in files:
-                if file and file.filename and allowed_file(file.filename):
-                    filename = secure_filename(file.filename)
-                    # Añadir timestamp para evitar colisiones
-                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-                    filename = f"{timestamp}_{filename}"
-                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                    file.save(filepath)
-                    uploaded_files.append(filename)
-        
-        # Verificar si es una cita vinculada
-        linked_task_id = request.form.get('linked_task_id')
-        
-        if linked_task_id and linked_task_id != 'none':
-            # Actualizar tarea existente
-            task = Task.query.get(int(linked_task_id))
-            if task:
-                task.status = 'Completado'
-                task.end_time = end_time
-                task.parts_text = parts_text
-                task.stock_item_id = stock_item_id
-                task.stock_quantity_used = stock_quantity_used
-                task.stock_action = stock_action
-                
-                # Actualizar archivos adjuntos
-                if uploaded_files:
-                    existing_attachments = []
-                    if task.attachments:
-                        try:
-                            existing_attachments = json.loads(task.attachments)
-                        except:
-                            pass
-                    existing_attachments.extend(uploaded_files)
-                    task.attachments = json.dumps(existing_attachments)
-                
-                db.session.commit()
-                flash('Cita completada exitosamente.', 'success')
-                return redirect(url_for('dashboard'))
-        
-        # Crear nueva tarea
-        new_task = Task(
-            tech_id=current_user.id,
-            client_name=client_name,
-            service_type=service_type,
-            description=description,
-            parts_text=parts_text,
-            date=task_date,
-            start_time=start_time,
-            end_time=end_time,
-            stock_item_id=stock_item_id,
-            stock_quantity_used=stock_quantity_used,
-            stock_action=stock_action,
-            status='Completado',
-            attachments=json.dumps(uploaded_files) if uploaded_files else None
-        )
-        
-        db.session.add(new_task)
-        
-        # Añadir cliente si no existe
-        if not Client.query.filter_by(name=client_name).first():
-            db.session.add(Client(name=client_name))
-        
-        db.session.commit()
-        flash('Parte guardado exitosamente.', 'success')
-        
-    except Exception as e:
-        db.session.rollback()
-        flash(f'Error al guardar: {str(e)}', 'danger')
-    
-    return redirect(url_for('dashboard'))
-
-@app.route('/create_appointment', methods=['POST'])
-@login_required
-def create_appointment():
-    try:
-        client_name = request.form.get('client_name')
-        appt_date = request.form.get('date')
-        appt_time = request.form.get('time')
-        service_type = request.form.get('service_type')
-        notes = request.form.get('notes', '')
-        
-        if appt_date:
-            task_date = datetime.strptime(appt_date, '%Y-%m-%d').date()
-        else:
-            task_date = date.today()
-        
-        new_appointment = Task(
-            tech_id=current_user.id,
-            client_name=client_name,
-            service_type=service_type,
-            description=notes,
-            date=task_date,
-            start_time=appt_time,
-            status='Pendiente'
-        )
-        
-        db.session.add(new_appointment)
-        
-        # Añadir cliente si no existe
-        if not Client.query.filter_by(name=client_name).first():
-            db.session.add(Client(name=client_name))
-        
-        db.session.commit()
-        flash('Cita creada exitosamente.', 'success')
-        
-    except Exception as e:
-        db.session.rollback()
-        flash(f'Error al crear cita: {str(e)}', 'danger')
+            db.session.commit()
+            flash('Producto eliminado.', 'warning')
     
     return redirect(url_for('dashboard'))
 
 @app.route('/schedule_appointment', methods=['POST'])
 @login_required
 def schedule_appointment():
-    """Ruta para que el admin cree citas (usado en modalScheduleAppointment)"""
     if current_user.role != 'admin':
         return redirect(url_for('dashboard'))
     
     try:
-        tech_id = request.form.get('tech_id')
-        client_name = request.form.get('client_name')
-        appt_date = request.form.get('date')
-        appt_time = request.form.get('time')
-        service_type = request.form.get('service_type')
+        tech_id = int(request.form['tech_id'])
+        client_name = request.form['client_name']
+        task_date = datetime.strptime(request.form['date'], '%Y-%m-%d').date()
+        time = request.form.get('time', '')
+        service_type = request.form['service_type']
         notes = request.form.get('notes', '')
         
-        if appt_date:
-            task_date = datetime.strptime(appt_date, '%Y-%m-%d').date()
-        else:
-            task_date = date.today()
-        
-        new_appointment = Task(
-            tech_id=int(tech_id),
+        new_task = Task(
+            tech_id=tech_id,
             client_name=client_name,
+            date=task_date,
+            start_time=time,
             service_type=service_type,
             description=notes,
-            date=task_date,
-            start_time=appt_time,
             status='Pendiente'
         )
-        
-        db.session.add(new_appointment)
-        
-        # Añadir cliente si no existe
-        if not Client.query.filter_by(name=client_name).first():
-            db.session.add(Client(name=client_name))
-        
+        db.session.add(new_task)
         db.session.commit()
-        flash('Cita creada exitosamente.', 'success')
         
+        flash('Cita programada correctamente.', 'success')
     except Exception as e:
-        db.session.rollback()
-        flash(f'Error al crear cita: {str(e)}', 'danger')
-    
-    return redirect(url_for('dashboard'))
-
-@app.route('/create_appointment_admin', methods=['POST'])
-@login_required
-def create_appointment_admin():
-    if current_user.role != 'admin':
-        return redirect(url_for('dashboard'))
-    
-    try:
-        tech_id = request.form.get('tech_id')
-        client_name = request.form.get('client_name')
-        appt_date = request.form.get('date')
-        appt_time = request.form.get('time')
-        service_type = request.form.get('service_type')
-        notes = request.form.get('notes', '')
-        
-        if appt_date:
-            task_date = datetime.strptime(appt_date, '%Y-%m-%d').date()
-        else:
-            task_date = date.today()
-        
-        new_appointment = Task(
-            tech_id=int(tech_id),
-            client_name=client_name,
-            service_type=service_type,
-            description=notes,
-            date=task_date,
-            start_time=appt_time,
-            status='Pendiente'
-        )
-        
-        db.session.add(new_appointment)
-        
-        # Añadir cliente si no existe
-        if not Client.query.filter_by(name=client_name).first():
-            db.session.add(Client(name=client_name))
-        
-        db.session.commit()
-        flash('Cita creada exitosamente.', 'success')
-        
-    except Exception as e:
-        db.session.rollback()
-        flash(f'Error al crear cita: {str(e)}', 'danger')
+        flash(f'Error al programar cita: {str(e)}', 'danger')
     
     return redirect(url_for('dashboard'))
 
@@ -506,236 +441,244 @@ def edit_appointment(task_id):
         return redirect(url_for('dashboard'))
     
     try:
-        task.client_name = request.form.get('client_name')
-        task.date = datetime.strptime(request.form.get('date'), '%Y-%m-%d').date()
-        task.start_time = request.form.get('time')
-        task.service_type = request.form.get('service_type')
+        task.client_name = request.form['client_name']
+        task.date = datetime.strptime(request.form['date'], '%Y-%m-%d').date()
+        task.start_time = request.form.get('time', '')
+        task.service_type = request.form['service_type']
         task.description = request.form.get('notes', '')
         
-        # Añadir cliente si no existe
-        if not Client.query.filter_by(name=task.client_name).first():
-            db.session.add(Client(name=task.client_name))
-        
         db.session.commit()
-        flash('Cita actualizada exitosamente.', 'success')
-        
+        flash('Cita actualizada correctamente.', 'success')
     except Exception as e:
-        db.session.rollback()
         flash(f'Error al actualizar cita: {str(e)}', 'danger')
     
     return redirect(url_for('dashboard'))
 
-@app.route('/api/get_task/<int:task_id>')
+@app.route('/delete_appointment/<int:task_id>', methods=['POST'])
 @login_required
-def get_task(task_id):
-    task = Task.query.get(task_id)
-    if not task:
-        return jsonify({'success': False})
+def delete_appointment(task_id):
+    task = Task.query.get_or_404(task_id)
     
     # Verificar permisos
     if current_user.role != 'admin' and current_user.id != task.tech_id:
-        return jsonify({'success': False})
-    
-    return jsonify({
-        'success': True,
-        'data': {
-            'client_name': task.client_name,
-            'date': task.date.strftime('%Y-%m-%d'),
-            'start_time': task.start_time or '',
-            'time': task.start_time or '',
-            'service_type': task.service_type,
-            'description': task.description or '',
-            'notes': task.description or ''
-        }
-    })
-
-@app.route('/api/get_task_full/<int:task_id>')
-@login_required
-def get_task_full(task_id):
-    """Devuelve información completa de una tarea para rellenar el formulario de parte"""
-    task = Task.query.get(task_id)
-    if not task:
-        return jsonify({'success': False})
-    
-    # Verificar permisos
-    if current_user.role != 'admin' and current_user.id != task.tech_id:
-        return jsonify({'success': False})
-    
-    return jsonify({
-        'success': True,
-        'data': {
-            'client_name': task.client_name,
-            'date': task.date.strftime('%Y-%m-%d'),
-            'start_time': task.start_time or '',
-            'service_type': task.service_type,
-            'description': task.description or ''
-        }
-    })
-
-@app.route('/api/task_action/<int:task_id>/<action>', methods=['POST'])
-@login_required
-def task_action(task_id, action):
-    task = Task.query.get(task_id)
-    if not task:
-        return jsonify({'success': False, 'msg': 'Tarea no encontrada'})
-    
-    # Verificar permisos
-    if current_user.role != 'admin' and current_user.id != task.tech_id:
-        return jsonify({'success': False, 'msg': 'Sin permisos'})
-    
-    try:
-        if action == 'delete':
-            db.session.delete(task)
-            db.session.commit()
-            return jsonify({'success': True, 'msg': 'Tarea eliminada'})
-        
-        elif action == 'complete':
-            task.status = 'Completado'
-            db.session.commit()
-            return jsonify({'success': True, 'msg': 'Tarea completada'})
-        
-        elif action == 'reopen':
-            task.status = 'Pendiente'
-            db.session.commit()
-            return jsonify({'success': True, 'msg': 'Tarea reabierta'})
-        
-        else:
-            return jsonify({'success': False, 'msg': 'Acción no válida'})
-            
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'msg': str(e)})
-
-@app.route('/manage_clients', methods=['POST'])
-@login_required
-def manage_clients():
-    if current_user.role != 'admin': 
+        flash('No tienes permisos para eliminar esta cita.', 'danger')
         return redirect(url_for('dashboard'))
     
-    action = request.form.get('action')
-    
-    if action == 'add':
-        name = request.form.get('name', '').strip()
-        if name:
-            existing = Client.query.filter_by(name=name).first()
-            if not existing:
-                db.session.add(Client(name=name))
-                flash('Cliente añadido.', 'success')
-            else:
-                flash('Ese cliente ya existe.', 'warning')
-        
-    elif action == 'edit':
-        client_id = request.form.get('client_id')
-        new_name = request.form.get('name', '').strip()
-        client = Client.query.get(client_id)
-        
-        if client and new_name:
-            # Verificar si el nuevo nombre ya existe
-            existing = Client.query.filter_by(name=new_name).first()
-            if not existing or existing.id == client.id:
-                client.name = new_name
-                flash('Cliente actualizado.', 'success')
-            else:
-                flash('Ya existe un cliente con ese nombre.', 'warning')
-        
-    elif action == 'delete':
-        client_id = request.form.get('client_id')
-        client = Client.query.get(client_id)
-        if client:
-            db.session.delete(client)
-            flash('Cliente eliminado.', 'warning')
-    
+    db.session.delete(task)
     db.session.commit()
+    flash('Cita eliminada.', 'warning')
+    
     return redirect(url_for('dashboard'))
 
-@app.route('/export_clients')
+@app.route('/save_report', methods=['POST'])
 @login_required
-def export_clients():
-    if current_user.role != 'admin':
-        return redirect(url_for('dashboard'))
-    
-    clients = Client.query.order_by(Client.name).all()
-    data = [{'name': c.name} for c in clients]
-    
-    output = io.BytesIO()
-    output.write(json.dumps(data, indent=2, ensure_ascii=False).encode('utf-8'))
-    output.seek(0)
-    
-    return send_file(output, mimetype='application/json', as_attachment=True, download_name='clientes.json')
-
-@app.route('/import_clients', methods=['POST'])
-@login_required
-def import_clients():
-    if current_user.role != 'admin':
-        return redirect(url_for('dashboard'))
-    
-    if 'file' not in request.files:
-        flash('No se seleccionó ningún archivo', 'danger')
-        return redirect(url_for('dashboard'))
-    
-    file = request.files['file']
-    if file.filename == '':
-        flash('No se seleccionó ningún archivo', 'danger')
-        return redirect(url_for('dashboard'))
-    
+def save_report():
     try:
-        content = file.read().decode('utf-8')
-        data = json.loads(content)
+        # Obtener datos del formulario
+        linked_task_id = request.form.get('linked_task_id')
+        client_name = request.form['client_name']
+        task_date = datetime.strptime(request.form['date'], '%Y-%m-%d').date()
+        entry_time = request.form.get('entry_time', '')
+        exit_time = request.form.get('exit_time', '')
+        service_type = request.form['service_type']
+        description = request.form.get('description', '')
+        parts_text = request.form.get('parts_text', '')
+        signature_data = request.form.get('signature_data', '')
         
-        added = 0
-        skipped = 0
+        # Verificar si hay firma digital
+        if not signature_data or signature_data == '':
+            flash('La firma digital del cliente es obligatoria para cerrar el parte.', 'danger')
+            return redirect(url_for('dashboard'))
         
-        for item in data:
-            name = item.get('name', '').strip()
-            if name:
-                if not Client.query.filter_by(name=name).first():
-                    db.session.add(Client(name=name))
-                    added += 1
-                else:
-                    skipped += 1
+        # Manejo de stock
+        stock_item_id = request.form.get('stock_item')
+        stock_quantity = request.form.get('stock_quantity', 0)
+        stock_action = request.form.get('stock_action')
         
-        db.session.commit()
-        flash(f'Importación completada: {added} clientes añadidos, {skipped} ya existían', 'success')
+        if stock_item_id and stock_item_id != '':
+            stock_item_id = int(stock_item_id)
+            stock_quantity = int(stock_quantity)
+            
+            stock_item = Stock.query.get(stock_item_id)
+            if stock_item:
+                if stock_action == 'used':
+                    stock_item.quantity -= stock_quantity
+                elif stock_action == 'removed':
+                    stock_item.quantity -= stock_quantity
+        else:
+            stock_item_id = None
+            stock_quantity = 0
         
-    except json.JSONDecodeError:
-        flash('Error: El archivo JSON no es válido', 'danger')
+        # Manejo de archivos adjuntos
+        attachments_list = []
+        if 'files' in request.files:
+            files = request.files.getlist('files')
+            for file in files:
+                if file and file.filename != '' and allowed_file(file.filename):
+                    filename = secure_filename(file.filename)
+                    # Añadir timestamp para evitar colisiones
+                    timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+                    filename = f"{timestamp}_{filename}"
+                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                    file.save(filepath)
+                    attachments_list.append(filename)
+        
+        # Si está vinculado a una cita, actualizar esa tarea
+        if linked_task_id and linked_task_id != 'none':
+            task = Task.query.get(int(linked_task_id))
+            if task:
+                task.end_time = exit_time
+                task.description = description
+                task.parts_text = parts_text
+                task.stock_item_id = stock_item_id
+                task.stock_quantity_used = stock_quantity
+                task.stock_action = stock_action
+                task.status = 'Completado'
+                task.signature_data = signature_data
+                task.actual_end_time = datetime.now()
+                
+                if attachments_list:
+                    existing_attachments = []
+                    if task.attachments:
+                        try:
+                            existing_attachments = json.loads(task.attachments)
+                        except:
+                            pass
+                    existing_attachments.extend(attachments_list)
+                    task.attachments = json.dumps(existing_attachments)
+                
+                db.session.commit()
+                check_low_stock()
+                flash('Parte de trabajo guardado y vinculado a la cita.', 'success')
+        else:
+            # Crear nueva tarea (incidencia sin cita)
+            new_task = Task(
+                tech_id=current_user.id,
+                client_name=client_name,
+                date=task_date,
+                start_time=entry_time,
+                end_time=exit_time,
+                service_type=service_type,
+                description=description,
+                parts_text=parts_text,
+                stock_item_id=stock_item_id,
+                stock_quantity_used=stock_quantity,
+                stock_action=stock_action,
+                status='Completado',
+                signature_data=signature_data,
+                attachments=json.dumps(attachments_list) if attachments_list else None,
+                actual_start_time=datetime.now(),
+                actual_end_time=datetime.now()
+            )
+            db.session.add(new_task)
+            db.session.commit()
+            check_low_stock()
+            flash('Parte de trabajo guardado correctamente.', 'success')
+        
     except Exception as e:
-        flash(f'Error al importar: {str(e)}', 'danger')
+        flash(f'Error al guardar: {str(e)}', 'danger')
+        print(f"Error saving report: {e}")
     
     return redirect(url_for('dashboard'))
 
-@app.route('/api/clients_search')
+@app.route('/start_task/<int:task_id>', methods=['POST'])
 @login_required
-def search_clients():
-    query = request.args.get('q', '')
-    if len(query) < 2:
-        return jsonify([])
+def start_task(task_id):
+    """Marcar inicio de trabajo en una tarea"""
+    task = Task.query.get_or_404(task_id)
     
-    results = Client.query.filter(Client.name.ilike(f'%{query}%')).order_by(Client.name).limit(10).all()
-    return jsonify([{'name': c.name} for c in results])
+    if task.tech_id != current_user.id:
+        return jsonify({'success': False, 'msg': 'No autorizado'}), 403
+    
+    task.actual_start_time = datetime.now()
+    task.start_time = datetime.now().strftime('%H:%M')
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'msg': 'Trabajo iniciado',
+        'start_time': task.start_time
+    })
 
 @app.route('/uploads/<filename>')
 @login_required
 def uploaded_file(filename):
-    """Servir archivos adjuntos"""
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+@app.route('/api/clients')
+@login_required
+def get_clients():
+    clients = Client.query.order_by(Client.name).all()
+    return jsonify([{
+        'id': c.id, 
+        'name': c.name,
+        'phone': c.phone,
+        'email': c.email,
+        'address': c.address,
+        'has_support': c.has_support
+    } for c in clients])
+
+@app.route('/api/client/<int:client_id>')
+@login_required
+def get_client_details(client_id):
+    client = Client.query.get_or_404(client_id)
+    return jsonify({
+        'success': True,
+        'data': {
+            'id': client.id,
+            'name': client.name,
+            'phone': client.phone,
+            'email': client.email,
+            'address': client.address,
+            'notes': client.notes,
+            'has_support': client.has_support,
+            'support_monday_friday': client.support_monday_friday,
+            'support_saturday': client.support_saturday,
+            'support_sunday': client.support_sunday
+        }
+    })
+
+@app.route('/api/clients_search')
+@login_required
+def search_clients():
+    q = request.args.get('q', '').lower()
+    clients = Client.query.filter(Client.name.ilike(f'%{q}%')).limit(10).all()
+    return jsonify([{'id': c.id, 'name': c.name} for c in clients])
+
+@app.route('/api/get_task/<int:task_id>')
+@login_required
+def get_task(task_id):
+    task = Task.query.get_or_404(task_id)
+    return jsonify({
+        'success': True,
+        'data': {
+            'client_name': task.client_name,
+            'date': task.date.strftime('%Y-%m-%d'),
+            'time': task.start_time,
+            'service_type': task.service_type,
+            'notes': task.description
+        }
+    })
 
 @app.route('/print_report/<int:task_id>')
 @login_required
 def print_report(task_id):
     task = Task.query.get_or_404(task_id)
-    if current_user.role != 'admin' and current_user.id != task.tech_id:
-        return "Acceso denegado", 403
     
-    # Procesar archivos adjuntos
+    # Verificar permisos
+    if current_user.role != 'admin' and current_user.id != task.tech_id:
+        return "No autorizado", 403
+    
+    # Generar HTML de archivos adjuntos
     attachments_html = ""
     if task.attachments:
         try:
-            attachments = json.loads(task.attachments)
-            if attachments:
-                attachments_html = "<br><strong>Archivos adjuntos:</strong><br>"
-                for filename in attachments:
-                    attachments_html += f"- {filename}<br>"
+            files = json.loads(task.attachments)
+            if files:
+                attachments_html = "<div class='mt-2'><strong>Archivos adjuntos:</strong><br>"
+                for f in files:
+                    attachments_html += f"• {f}<br>"
+                attachments_html += "</div>"
         except:
             pass
         
@@ -752,6 +695,7 @@ def print_report(task_id):
             .label {{ font-weight: bold; color: #666; font-size: 0.9em; }}
             .value {{ font-size: 1.1em; margin-bottom: 15px; }}
             .box {{ background: #f9f9f9; padding: 15px; border-radius: 5px; border: 1px solid #ddd; }}
+            .signature {{ max-width: 300px; border: 1px solid #ddd; padding: 10px; }}
         </style>
     </head>
     <body onload="window.print()">
@@ -795,13 +739,20 @@ def print_report(task_id):
         </div>
         
         <div class="row mt-4">
-            <div class="col-6">
+            <div class="col-12">
                 <div class="label">MATERIAL UTILIZADO/RETIRADO</div>
                 <div class="box">
                     { f"Stock ({'USADO' if task.stock_action == 'used' else 'RETIRADO'}): {task.stock_quantity_used}x {task.stock_item.name}<br>" if task.stock_item else "" }
                     { f"Notas/Retirado: {task.parts_text}" if task.parts_text else "Sin notas adicionales" }
                     {attachments_html}
                 </div>
+            </div>
+        </div>
+        
+        <div class="mt-4">
+            <div class="label">FIRMA DEL CLIENTE</div>
+            <div class="mt-2">
+                {"<img src='" + task.signature_data + "' class='signature'>" if task.signature_data else "<div class='box'>Sin firma</div>"}
             </div>
         </div>
         
@@ -866,9 +817,6 @@ def format_events(tasks):
         })
     return jsonify(events)
 
-
-
-
 @app.route('/api/task_details/<int:task_id>')
 @login_required
 def get_task_details(task_id):
@@ -900,6 +848,7 @@ def get_task_details(task_id):
             'status': task.status,
             'tech_name': task.tech.username if task.tech else 'SIN TÉCNICO',
             'attachments': attachments_list,
+            'has_signature': bool(task.signature_data),
             'stock_info': {
                 'item_name': task.stock_item.name if task.stock_item else None,
                 'quantity': task.stock_quantity_used,
@@ -907,6 +856,109 @@ def get_task_details(task_id):
             } if task.stock_item else None
         }
     })
+
+@app.route('/api/tech_stats/<int:tech_id>')
+@login_required
+def get_tech_stats(tech_id):
+    """Análisis individual de trabajador"""
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'msg': 'No autorizado'}), 403
+    
+    tech = User.query.get_or_404(tech_id)
+    tasks = Task.query.filter_by(tech_id=tech_id, status='Completado').all()
+    
+    # Estadísticas por tipo de servicio
+    service_stats = {}
+    total_time = 0
+    
+    for task in tasks:
+        service_type = task.service_type
+        if service_type not in service_stats:
+            service_stats[service_type] = {
+                'count': 0,
+                'tasks': []
+            }
+        
+        service_stats[service_type]['count'] += 1
+        service_stats[service_type]['tasks'].append({
+            'id': task.id,
+            'client': task.client_name,
+            'date': task.date.strftime('%d/%m/%Y'),
+            'time': f"{task.start_time} - {task.end_time}",
+            'has_attachments': bool(task.attachments)
+        })
+        
+        # Calcular tiempo si está disponible
+        if task.actual_start_time and task.actual_end_time:
+            duration = (task.actual_end_time - task.actual_start_time).total_seconds() / 3600
+            total_time += duration
+    
+    return jsonify({
+        'success': True,
+        'data': {
+            'tech_name': tech.username,
+            'total_completed': len(tasks),
+            'total_hours': round(total_time, 2),
+            'service_breakdown': service_stats
+        }
+    })
+
+# --- RUTAS DE ALARMAS ---
+@app.route('/api/alarms')
+@login_required
+def get_alarms():
+    if current_user.role != 'admin':
+        return jsonify([])
+    
+    alarms = Alarm.query.order_by(Alarm.is_read.asc(), Alarm.created_at.desc()).all()
+    return jsonify([{
+        'id': a.id,
+        'type': a.alarm_type,
+        'title': a.title,
+        'description': a.description,
+        'client_name': a.client_name,
+        'created_at': a.created_at.strftime('%d/%m/%Y %H:%M'),
+        'is_read': a.is_read,
+        'priority': a.priority
+    } for a in alarms])
+
+@app.route('/mark_alarm_read/<int:alarm_id>', methods=['POST'])
+@login_required
+def mark_alarm_read(alarm_id):
+    if current_user.role != 'admin':
+        return jsonify({'success': False}), 403
+    
+    alarm = Alarm.query.get_or_404(alarm_id)
+    alarm.is_read = True
+    db.session.commit()
+    
+    return jsonify({'success': True})
+
+@app.route('/create_alarm', methods=['POST'])
+@login_required
+def create_alarm():
+    if current_user.role != 'admin':
+        return redirect(url_for('dashboard'))
+    
+    alarm_type = request.form.get('alarm_type')
+    title = request.form.get('title')
+    description = request.form.get('description')
+    client_name = request.form.get('client_name', None)
+    priority = request.form.get('priority', 'normal')
+    
+    new_alarm = Alarm(
+        alarm_type=alarm_type,
+        title=title,
+        description=description,
+        client_name=client_name,
+        priority=priority
+    )
+    db.session.add(new_alarm)
+    db.session.commit()
+    
+    flash('Alarma creada correctamente.', 'success')
+    return redirect(url_for('dashboard'))
+
 @app.route('/logout')
 def logout():
     logout_user()
@@ -926,21 +978,27 @@ with app.app_context():
     # 2. Tipos de Servicio y Colores
     if not ServiceType.query.first():
         servicios = [
+            {'name': 'Avería', 'color': '#fd7e14'},
             {'name': 'Revisión', 'color': '#0d6efd'},
             {'name': 'Instalación', 'color': '#6f42c1'},
-            {'name': 'Urgencia', 'color': '#dc3545'},
-            {'name': 'Avería', 'color': '#fd7e14'},
-            {'name': 'Mantenimiento', 'color': '#20c997'},
-            {'name': 'Otro', 'color': '#adb5bd'}
+            {'name': 'Otros servicios', 'color': '#20c997'}
         ]
         for s in servicios:
             db.session.add(ServiceType(name=s['name'], color=s['color']))
 
     # 3. Datos de ejemplo
     if not Stock.query.first():
-        db.session.add(Stock(name='Toner Genérico', category='Consumible', quantity=10))
+        db.session.add(Stock(name='Toner Genérico', category='Consumibles', quantity=10, min_stock=5))
+        
     if not Client.query.first():
-        db.session.add(Client(name='Cliente Ejemplo'))
+        db.session.add(Client(
+            name='Cliente Ejemplo',
+            phone='900123456',
+            email='ejemplo@cliente.com',
+            address='Calle Ejemplo 1, Madrid',
+            has_support=True,
+            support_monday_friday=True
+        ))
         
     db.session.commit()
 

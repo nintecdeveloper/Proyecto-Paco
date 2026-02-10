@@ -269,7 +269,73 @@
                 <div id="calendarGlobal"></div>
             </div>
 
-            <div class="tab-pane fade" id="data">
+            
+            <!-- ANÁLISIS INDIVIDUAL DE TRABAJADORES -->
+            <div class="tab-pane fade" id="analytics">
+                <h4 class="fw-bold text-white fs-5 mb-3">Análisis Individual de Trabajadores</h4>
+                
+                <div class="row g-3 mb-4">
+                    {% for u in empleados %}
+                    <div class="col-12 col-md-6 col-lg-4">
+                        <div class="card bg-dark border-secondary">
+                            <div class="card-body">
+                                <h5 class="card-title text-warning">
+                                    <i class="bi bi-person-circle me-2"></i>{{ u.username.upper() }}
+                                </h5>
+                                <button class="btn btn-sm btn-outline-info w-100" 
+                                        onclick="loadTechStats({{ u.id }}, '{{ u.username }}')">
+                                    <i class="bi bi-bar-chart-fill me-1"></i> Ver Estadísticas
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <div id="techStatsContainer" class="d-none">
+                    <div class="card bg-dark border-warning">
+                        <div class="card-header bg-warning text-dark">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h5 class="m-0">
+                                    <i class="bi bi-graph-up me-2"></i>
+                                    <span id="statsName">Trabajador</span>
+                                </h5>
+                                <button class="btn btn-sm btn-dark" onclick="closeTechStats()">
+                                    <i class="bi bi-x-circle"></i> Cerrar
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <div class="text-center p-3 bg-black rounded">
+                                        <div class="text-muted small">Trabajos Completados</div>
+                                        <div class="fs-3 fw-bold text-success" id="statsTotal">0</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="text-center p-3 bg-black rounded">
+                                        <div class="text-muted small">Horas Totales</div>
+                                        <div class="fs-3 fw-bold text-info" id="statsHours">0</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="text-center p-3 bg-black rounded">
+                                        <div class="text-muted small">Tipos de Servicio</div>
+                                        <div class="fs-3 fw-bold text-warning" id="statsServices">0</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <h6 class="text-white fw-bold mb-3">
+                                <i class="bi bi-list-task me-2"></i>Desglose por Tipo de Servicio
+                            </h6>
+                            <div id="serviceBreakdown"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+<div class="tab-pane fade" id="data">
                 <h4 class="fw-bold text-white fs-5 mb-3">Informes Técnicos Completados</h4>
                 <div class="table-responsive">
                     <table class="table table-dark table-sm">
@@ -1345,6 +1411,172 @@
             modalActionAdmin.show();
         }
     </script>
+
+    <!-- Modal de Alarmas -->
+    <div class="modal fade" id="modalAlarms" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title text-warning">
+                        <i class="bi bi-bell-fill me-2"></i>Sistema de Alarmas y Avisos
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <button class="btn btn-sm btn-warning mb-3" data-bs-toggle="modal" data-bs-target="#modalCreateAlarm">
+                        <i class="bi bi-plus-circle me-1"></i> Crear Alarma
+                    </button>
+
+                    <div id="alarmsList">
+                        {% for alarm in alarms %}
+                        <div class="alarm-item {% if alarm.is_read %}read{% endif %} priority-{{ alarm.priority }}"
+                             onclick="markAlarmRead({{ alarm.id }})">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <h6 class="text-white mb-1">
+                                        {% if alarm.alarm_type == 'technical' %}
+                                        <i class="bi bi-tools me-1"></i>
+                                        {% elif alarm.alarm_type == 'maintenance' %}
+                                        <i class="bi bi-wrench me-1"></i>
+                                        {% elif alarm.alarm_type == 'low_stock' %}
+                                        <i class="bi bi-box-seam me-1"></i>
+                                        {% endif %}
+                                        {{ alarm.title }}
+                                    </h6>
+                                    <p class="text-muted small mb-1">{{ alarm.description }}</p>
+                                    {% if alarm.client_name %}
+                                    <small class="text-info">
+                                        <i class="bi bi-person me-1"></i>{{ alarm.client_name }}
+                                    </small>
+                                    {% endif %}
+                                </div>
+                                <small class="text-muted">{{ alarm.created_at.strftime('%d/%m %H:%M') }}</small>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Crear Alarma -->
+    <div class="modal fade" id="modalCreateAlarm" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="POST" action="/create_alarm">
+                    <div class="modal-header">
+                        <h5 class="modal-title text-warning">Nueva Alarma</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Tipo de Alarma</label>
+                            <select name="alarm_type" class="form-select" required>
+                                <option value="technical">Incidencia Técnica</option>
+                                <option value="maintenance">Mantenimiento</option>
+                                <option value="low_stock">Stock Bajo</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Título</label>
+                            <input type="text" name="title" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Descripción</label>
+                            <textarea name="description" class="form-control" rows="3" required></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Cliente (Opcional)</label>
+                            <input type="text" name="client_name" class="form-control">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Prioridad</label>
+                            <select name="priority" class="form-select">
+                                <option value="low">Baja</option>
+                                <option value="normal" selected>Normal</option>
+                                <option value="high">Alta</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-warning">Crear Alarma</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+<script>
+    function toggleSupportOptions() {
+        const checkbox = document.getElementById('hasSupport');
+        const options = document.getElementById('supportOptions');
+        options.classList.toggle('d-none', !checkbox.checked);
+    }
+
+    function loadTechStats(techId, techName) {
+        document.getElementById('statsName').textContent = techName.toUpperCase();
+        document.getElementById('techStatsContainer').classList.remove('d-none');
+
+        fetch(`/api/tech_stats/${techId}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('statsTotal').textContent = data.data.total_completed;
+                    document.getElementById('statsHours').textContent = data.data.total_hours + 'h';
+                    document.getElementById('statsServices').textContent = Object.keys(data.data.service_breakdown).length;
+
+                    // Render service breakdown
+                    const breakdown = document.getElementById('serviceBreakdown');
+                    breakdown.innerHTML = '';
+
+                    for (const [service, info] of Object.entries(data.data.service_breakdown)) {
+                        const serviceCard = `
+                            <div class="card bg-black border-secondary mb-3">
+                                <div class="card-header">
+                                    <h6 class="mb-0 text-white">
+                                        <i class="bi bi-tag-fill me-2"></i>${service} 
+                                        <span class="badge bg-primary float-end">${info.count} trabajos</span>
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="list-group">
+                                        ${info.tasks.map(task => `
+                                            <div class="list-group-item bg-dark text-white border-secondary">
+                                                <div class="d-flex justify-content-between">
+                                                    <div>
+                                                        <strong>${task.client}</strong><br>
+                                                        <small class="text-muted">${task.time}</small>
+                                                    </div>
+                                                    <small class="text-muted">${task.date}</small>
+                                                </div>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        breakdown.innerHTML += serviceCard;
+                    }
+                }
+            });
+    }
+
+    function closeTechStats() {
+        document.getElementById('techStatsContainer').classList.add('d-none');
+    }
+
+    function markAlarmRead(alarmId) {
+        fetch(`/mark_alarm_read/${alarmId}`, { method: 'POST' })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                }
+            });
+    }
+</script>
 </body>
 
 </html>
