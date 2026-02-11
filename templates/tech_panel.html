@@ -98,6 +98,51 @@
             .fc-toolbar { flex-direction: column; gap: 10px; }
             .fc-toolbar-title { font-size: 1.2rem !important; }
         }
+    
+        /* Firma Digital */
+        .signature-container {
+            background: #fff;
+            border: 2px dashed #f37021;
+            border-radius: 8px;
+            padding: 10px;
+        }
+
+        .signature-canvas {
+            width: 100%;
+            height: 200px;
+            background: white;
+            touch-action: none;
+            cursor: crosshair;
+            border-radius: 4px;
+        }
+
+        /* Archivos */
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 6px;
+            margin-bottom: 8px;
+        }
+
+        .file-item .remove-file {
+            color: #dc3545;
+            cursor: pointer;
+            font-size: 1.2rem;
+        }
+
+        .file-item .remove-file:hover {
+            color: #ff4d4d;
+        }
+
+        #fileUploadArea.drag-over {
+            border-color: var(--osla-orange);
+            background-color: rgba(243, 112, 33, 0.1);
+        }
+
     </style>
 </head>
 <body>
@@ -520,6 +565,135 @@
         </form>
     </div>
 </div>
+
+
+<!-- Modal: Completar Parte de Trabajo -->
+<div class="modal fade" id="modalCompleteTask" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content bg-dark text-white">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title">
+                    <i class="bi bi-clipboard-check-fill me-2 text-success"></i>
+                    Completar Parte de Trabajo
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="completeTaskId">
+                
+                <!-- Información de la tarea -->
+                <div class="alert alert-info">
+                    <strong>Cliente:</strong> <span id="completeClientName"></span><br>
+                    <strong>Servicio:</strong> <span id="completeServiceType"></span>
+                </div>
+                
+                <!-- Descripción del trabajo -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Descripción del Trabajo Realizado *</label>
+                    <textarea id="completeDescription" class="form-control" rows="4" required 
+                              placeholder="Describe detalladamente el trabajo realizado..."></textarea>
+                </div>
+                
+                <!-- Material/Piezas -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Material Utilizado o Retirado</label>
+                    <select id="completeStockItem" class="form-select mb-2">
+                        <option value="">-- No se usó material --</option>
+                        {% for item in stock_items %}
+                        <option value="{{ item.id }}">{{ item.name }} (Stock: {{ item.quantity }})</option>
+                        {% endfor %}
+                    </select>
+                    
+                    <div id="stockDetailsDiv" style="display: none;">
+                        <div class="row">
+                            <div class="col-md-6 mb-2">
+                                <label class="form-label small">Cantidad</label>
+                                <input type="number" id="completeStockQuantity" class="form-control" min="1" value="1">
+                            </div>
+                            <div class="col-md-6 mb-2">
+                                <label class="form-label small">Acción</label>
+                                <select id="completeStockAction" class="form-select">
+                                    <option value="used">Utilizado</option>
+                                    <option value="removed">Retirado</option>
+                                    <option value="added">Añadido</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Notas adicionales -->
+                <div class="mb-3">
+                    <label class="form-label">Notas o Material Adicional</label>
+                    <input type="text" id="completeParts" class="form-control" 
+                           placeholder="Otras piezas, observaciones...">
+                </div>
+                
+                <!-- Archivos adjuntos -->
+                <div class="mb-4">
+                    <label class="form-label fw-bold">Fotos y Documentos</label>
+                    <div id="fileUploadArea" class="border border-secondary rounded p-3 text-center bg-black" 
+                         onclick="document.getElementById('fileInput').click()" style="cursor: pointer;">
+                        <i class="bi bi-cloud-upload fs-1 text-warning"></i>
+                        <p class="mb-0 mt-2">Haz clic o arrastra archivos aquí</p>
+                        <small class="text-muted">PNG, JPG, PDF, DOC - Máximo 16MB</small>
+                    </div>
+                    <input type="file" id="fileInput" multiple accept=".png,.jpg,.jpeg,.pdf,.doc,.docx" 
+                           style="display: none;" onchange="handleFileSelect(event)">
+                    <div id="fileList" class="mt-2"></div>
+                </div>
+                
+                <hr class="border-secondary">
+                
+                <!-- FIRMA DIGITAL -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold text-warning">
+                        <i class="bi bi-pen-fill me-2"></i>FIRMA DEL CLIENTE *
+                        <span class="badge bg-danger ms-2">OBLIGATORIO</span>
+                    </label>
+                    <small class="text-muted d-block mb-2">
+                        Solicite al cliente que firme en el recuadro para confirmar la asistencia y conformidad
+                    </small>
+                    
+                    <!-- Nombre del firmante -->
+                    <div class="mb-3">
+                        <label class="form-label">Nombre completo del firmante *</label>
+                        <input type="text" id="signatureClientName" class="form-control" required
+                               placeholder="Nombre y apellidos del cliente que firma">
+                    </div>
+                    
+                    <!-- Canvas de firma -->
+                    <div class="signature-container bg-white rounded p-2">
+                        <canvas id="signaturePad" class="signature-canvas"></canvas>
+                    </div>
+                    
+                    <div class="d-flex gap-2 mt-2">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearSignature()">
+                            <i class="bi bi-eraser me-1"></i>Limpiar Firma
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-info" onclick="previewSignature()">
+                            <i class="bi bi-eye me-1"></i>Vista Previa
+                        </button>
+                    </div>
+                    
+                    <div id="signaturePreview" class="mt-3" style="display: none;">
+                        <p class="small text-info mb-2">
+                            <i class="bi bi-check-circle me-1"></i>Vista previa de la firma:
+                        </p>
+                        <img id="signaturePreviewImg" class="border border-info rounded" style="max-width: 100%; height: auto; background: white;">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success" onclick="saveTaskCompletion()">
+                    <i class="bi bi-check-circle-fill me-1"></i>Completar y Guardar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
@@ -1138,6 +1312,275 @@
             setTimeout(() => loadAnalytics(), 100);
         }
     };
+
+    // ==================== FIRMA DIGITAL ====================
+    
+    let signaturePad = null;
+    let isDrawing = false;
+    let lastX = 0;
+    let lastY = 0;
+
+    function initSignaturePad() {
+        const canvas = document.getElementById('signaturePad');
+        if (!canvas) return;
+        
+        const ctx = canvas.getContext('2d');
+        
+        // Ajustar tamaño del canvas
+        const container = canvas.parentElement;
+        canvas.width = container.clientWidth - 20;
+        canvas.height = 200;
+        
+        // Configurar estilo de dibujo
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        
+        // Limpiar canvas
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Eventos de mouse
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', stopDrawing);
+        canvas.addEventListener('mouseout', stopDrawing);
+        
+        // Eventos táctiles
+        canvas.addEventListener('touchstart', handleTouch);
+        canvas.addEventListener('touchmove', handleTouch);
+        canvas.addEventListener('touchend', stopDrawing);
+    }
+
+    function startDrawing(e) {
+        isDrawing = true;
+        const rect = e.target.getBoundingClientRect();
+        lastX = e.clientX - rect.left;
+        lastY = e.clientY - rect.top;
+    }
+
+    function draw(e) {
+        if (!isDrawing) return;
+        
+        const canvas = document.getElementById('signaturePad');
+        const ctx = canvas.getContext('2d');
+        const rect = canvas.getBoundingClientRect();
+        
+        const currentX = e.clientX - rect.left;
+        const currentY = e.clientY - rect.top;
+        
+        ctx.beginPath();
+        ctx.moveTo(lastX, lastY);
+        ctx.lineTo(currentX, currentY);
+        ctx.stroke();
+        
+        lastX = currentX;
+        lastY = currentY;
+    }
+
+    function stopDrawing() {
+        isDrawing = false;
+    }
+
+    function handleTouch(e) {
+        e.preventDefault();
+        const touch = e.touches[0];
+        if (!touch) return;
+        
+        const mouseEvent = new MouseEvent(
+            e.type === 'touchstart' ? 'mousedown' : 
+            e.type === 'touchmove' ? 'mousemove' : 'mouseup',
+            {
+                clientX: touch.clientX,
+                clientY: touch.clientY,
+                bubbles: true
+            }
+        );
+        e.target.dispatchEvent(mouseEvent);
+    }
+
+    function clearSignature() {
+        const canvas = document.getElementById('signaturePad');
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        document.getElementById('signaturePreview').style.display = 'none';
+    }
+
+    function previewSignature() {
+        const canvas = document.getElementById('signaturePad');
+        const dataURL = canvas.toDataURL('image/png');
+        
+        const preview = document.getElementById('signaturePreview');
+        const previewImg = document.getElementById('signaturePreviewImg');
+        
+        previewImg.src = dataURL;
+        preview.style.display = 'block';
+    }
+
+    function isSignatureEmpty() {
+        const canvas = document.getElementById('signaturePad');
+        const ctx = canvas.getContext('2d');
+        const pixelData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+        
+        // Verificar si hay algún píxel no blanco
+        for (let i = 0; i < pixelData.length; i += 4) {
+            // Verificar si hay algún píxel que no sea blanco puro
+            if (pixelData[i] !== 255 || pixelData[i+1] !== 255 || pixelData[i+2] !== 255 || pixelData[i+3] !== 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    function getSignatureData() {
+        if (isSignatureEmpty()) {
+            return null;
+        }
+        
+        const canvas = document.getElementById('signaturePad');
+        return canvas.toDataURL('image/png');
+    }
+
+    // ==================== COMPLETAR TAREA ====================
+    
+    function openCompleteTaskModal(taskId) {
+        // Obtener detalles de la tarea
+        fetch(`/api/task/${taskId}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    const task = data.data;
+                    
+                    document.getElementById('completeTaskId').value = taskId;
+                    document.getElementById('completeClientName').textContent = task.client_name;
+                    document.getElementById('completeServiceType').textContent = task.service_type;
+                    document.getElementById('completeDescription').value = task.description || '';
+                    
+                    // Limpiar firma y archivos
+                    clearSignature();
+                    document.getElementById('signatureClientName').value = task.client_name;
+                    selectedFiles = [];
+                    renderFileList();
+                    
+                    // Mostrar modal
+                    const modal = new bootstrap.Modal(document.getElementById('modalCompleteTask'));
+                    modal.show();
+                    
+                    // Inicializar firma después de que el modal esté visible
+                    setTimeout(initSignaturePad, 300);
+                } else {
+                    alert('Error al cargar datos de la tarea');
+                }
+            })
+            .catch(err => {
+                console.error('Error:', err);
+                alert('Error al cargar la tarea');
+            });
+    }
+
+    function saveTaskCompletion() {
+        const taskId = document.getElementById('completeTaskId').value;
+        const description = document.getElementById('completeDescription').value.trim();
+        const parts = document.getElementById('completeParts').value.trim();
+        
+        // VALIDACIONES
+        if (!description) {
+            alert('Por favor, describe el trabajo realizado');
+            document.getElementById('completeDescription').focus();
+            return;
+        }
+        
+        const signatureClientName = document.getElementById('signatureClientName').value.trim();
+        const signatureData = getSignatureData();
+        
+        if (!signatureClientName) {
+            alert('Por favor, ingresa el nombre completo del cliente que firma');
+            document.getElementById('signatureClientName').focus();
+            return;
+        }
+        
+        if (!signatureData) {
+            alert('⚠️ La firma del cliente es OBLIGATORIA\n\nPor favor, solicita al cliente que firme en el recuadro para confirmar la asistencia.');
+            return;
+        }
+        
+        // Recopilar datos de stock
+        const stockItemId = document.getElementById('completeStockItem').value;
+        const stockQuantity = document.getElementById('completeStockQuantity').value;
+        const stockAction = document.getElementById('completeStockAction').value;
+        
+        // Preparar datos
+        const data = {
+            description: description,
+            parts: parts,
+            signature: signatureData,
+            signature_client_name: signatureClientName,
+            stock_item_id: stockItemId || null,
+            stock_quantity: stockQuantity || 0,
+            stock_action: stockAction,
+            attachments: [] // Los archivos se suben por separado
+        };
+        
+        // Subir archivos primero si hay
+        if (selectedFiles.length > 0) {
+            uploadTaskFiles(taskId)
+                .then(() => completeTaskFinal(taskId, data))
+                .catch(err => {
+                    console.error('Error subiendo archivos:', err);
+                    alert('Error al subir archivos adjuntos');
+                });
+        } else {
+            completeTaskFinal(taskId, data);
+        }
+    }
+
+    function uploadTaskFiles(taskId) {
+        const promises = selectedFiles.map(file => {
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            return fetch(`/upload_task_file/${taskId}`, {
+                method: 'POST',
+                body: formData
+            }).then(res => res.json());
+        });
+        
+        return Promise.all(promises);
+    }
+
+    function completeTaskFinal(taskId, data) {
+        fetch(`/complete_task/${taskId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        })
+        .then(res => res.json())
+        .then(result => {
+            if (result.success) {
+                alert('✅ Parte completado y firmado correctamente');
+                location.reload();
+            } else {
+                alert('Error: ' + result.msg);
+            }
+        })
+        .catch(err => {
+            console.error('Error:', err);
+            alert('Error al completar el parte');
+        });
+    }
+
+    // Mostrar/ocultar detalles de stock
+    document.getElementById('completeStockItem')?.addEventListener('change', function() {
+        const div = document.getElementById('stockDetailsDiv');
+        div.style.display = this.value ? 'block' : 'none';
+    });
+
+
 </script>
 </body>
 </html>

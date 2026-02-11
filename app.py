@@ -92,6 +92,8 @@ class Task(db.Model):
     
     # Campos para firma digital
     signature_data = db.Column(db.Text)  # Base64 de la firma
+    signature_client_name = db.Column(db.String(100))  # Nombre del cliente que firma
+    signature_timestamp = db.Column(db.DateTime)  # Fecha y hora de la firma
     
     # Nuevos campos para archivos adjuntos
     attachments = db.Column(db.Text)  # JSON con lista de archivos adjuntos
@@ -709,6 +711,8 @@ def complete_task(task_id):
         return jsonify({'success': False, 'msg': 'La firma del cliente es obligatoria'}), 400
     
     task.signature_data = data['signature']
+    task.signature_client_name = data.get('signature_client_name', task.client_name)
+    task.signature_timestamp = datetime.now()
     task.parts_text = data.get('parts', '')
     task.description = data.get('description', task.description)
     
@@ -821,7 +825,8 @@ def get_all_tasks():
                 'service_type': service_type.name if service_type else 'Sin tipo',
                 'status': task.status,
                 'tech_id': task.tech_id,
-                'tech_name': task.tech.username if task.tech else 'Sin asignar'
+                'tech_name': task.tech.username if task.tech else 'Sin asignar',
+                'has_signature': bool(task.signature_data)
             }
         })
     
@@ -879,6 +884,8 @@ def get_task_details(task_id):
             'tech_id': task.tech_id,
             'attachments': attachments_list,
             'has_signature': bool(task.signature_data),
+            'signature_client_name': task.signature_client_name,
+            'signature_timestamp': task.signature_timestamp.strftime('%d/%m/%Y %H:%M') if task.signature_timestamp else None,
             'actual_start_time': task.actual_start_time.strftime('%H:%M') if task.actual_start_time else None,
             'actual_end_time': task.actual_end_time.strftime('%H:%M') if task.actual_end_time else None,
             'stock_info': {
@@ -919,7 +926,8 @@ def get_tech_stats(tech_id):
             'client': task.client_name,
             'date': task.date.strftime('%d/%m/%Y'),
             'time': f"{task.start_time} - {task.end_time}" if task.start_time and task.end_time else 'No especificado',
-            'has_attachments': bool(task.attachments)
+            'has_attachments': bool(task.attachments),
+            'has_signature': bool(task.signature_data)
         })
         
         # Calcular tiempo si está disponible

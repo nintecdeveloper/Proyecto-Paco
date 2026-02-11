@@ -554,6 +554,31 @@
             <div class="tab-pane fade" id="config">
                 <h4 class="fw-bold text-white fs-5 mb-3">Configuración del Sistema</h4>
 
+                <!-- GESTIÓN DE CATEGORÍAS DE STOCK -->
+                <div class="card bg-dark text-white p-3 mb-3 border border-secondary">
+                    <h6 class="fw-bold mb-3">
+                        <i class="bi bi-diagram-3-fill me-2 text-info"></i>
+                        Categorías y Subcategorías de Stock
+                    </h6>
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            <button class="btn btn-sm btn-info me-2" data-bs-toggle="modal" data-bs-target="#modalAddCategory">
+                                <i class="bi bi-plus-circle-fill me-1"></i> Nueva Categoría Principal
+                            </button>
+                            <button class="btn btn-sm btn-outline-info" onclick="loadCategoriesTree()">
+                                <i class="bi bi-arrow-clockwise me-1"></i> Recargar
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="categoriesTree" class="border border-secondary rounded p-3 bg-black" style="min-height: 200px;">
+                        <div class="text-center text-muted py-3">
+                            <i class="bi bi-hourglass-split"></i> Cargando categorías...
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TIPOS DE SERVICIO -->
                 <div class="card bg-dark text-white p-3 mb-3 border border-secondary">
                     <h6 class="fw-bold mb-3"><i class="bi bi-wrench-adjustable-circle-fill me-2 text-warning"></i>
                         Tipos de Servicio</h6>
@@ -683,21 +708,56 @@
         <div class="modal-dialog">
             <div class="modal-content bg-dark text-white">
                 <div class="modal-header border-secondary">
-                    <h5 class="modal-title">Nuevo Artículo de Stock</h5>
+                    <h5 class="modal-title"><i class="bi bi-box-seam-fill me-2"></i>Nuevo Artículo de Stock</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <form method="POST" action="/manage_stock">
                     <div class="modal-body">
                         <input type="hidden" name="action" value="add">
-                        <label class="form-label">Nombre del Artículo</label>
-                        <input type="text" name="name" class="form-control mb-2" required>
-                        <label class="form-label">Categoría</label>
-                        <input type="text" name="category" class="form-control mb-2" required>
-                        <label class="form-label">Cantidad Inicial</label>
-                        <input type="number" name="quantity" class="form-control" value="0" required>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Nombre del Producto *</label>
+                            <input type="text" name="name" class="form-control" required 
+                                   placeholder="Ej: Cajón Cashlogy 1500">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Categoría * <small class="text-muted">(Obligatorio)</small></label>
+                            <select name="category_id" id="addStockCategory" class="form-select" required onchange="loadSubcategories(this.value, 'addStockSubcategory')">
+                                <option value="">-- Seleccionar Categoría --</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3" id="subcategorySection" style="display: none;">
+                            <label class="form-label">Subcategoría <small class="text-muted">(Opcional)</small></label>
+                            <select name="subcategory_id" id="addStockSubcategory" class="form-select">
+                                <option value="">-- Sin subcategoría --</option>
+                            </select>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Stock Actual *</label>
+                                <input type="number" name="quantity" class="form-control" value="0" required min="0">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Stock Mínimo *</label>
+                                <input type="number" name="min_stock" class="form-control" value="5" required min="1">
+                                <small class="text-muted">Se activará alerta cuando esté por debajo</small>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Descripción</label>
+                            <textarea name="description" class="form-control" rows="2" 
+                                      placeholder="Detalles adicionales del producto"></textarea>
+                        </div>
                     </div>
                     <div class="modal-footer border-secondary">
-                        <button type="submit" class="btn btn-warning">Añadir</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-warning">
+                            <i class="bi bi-plus-circle-fill me-1"></i>Añadir Producto
+                        </button>
                     </div>
                 </form>
             </div>
@@ -757,20 +817,93 @@
 
     <!-- Modal: Añadir Cliente -->
     <div class="modal fade" id="modalAddClient" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-lg">
             <div class="modal-content bg-dark text-white">
                 <div class="modal-header border-secondary">
-                    <h5 class="modal-title">Nuevo Cliente</h5>
+                    <h5 class="modal-title"><i class="bi bi-person-plus-fill me-2"></i>Nuevo Cliente</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <form method="POST" action="/manage_clients">
                     <div class="modal-body">
                         <input type="hidden" name="action" value="add">
-                        <label class="form-label">Nombre del Cliente</label>
-                        <input type="text" name="name" class="form-control" required>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Nombre del Cliente *</label>
+                                <input type="text" name="name" class="form-control" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Teléfono *</label>
+                                <input type="tel" name="phone" class="form-control" required 
+                                       placeholder="Ej: 912345678">
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Correo Electrónico *</label>
+                                <input type="email" name="email" class="form-control" required 
+                                       placeholder="ejemplo@email.com">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Dirección Completa *</label>
+                                <input type="text" name="address" id="clientAddress" class="form-control" required 
+                                       placeholder="Calle, número, ciudad">
+                                <a href="#" id="openGoogleMaps" class="small text-info mt-1 d-block" target="_blank" style="display:none;">
+                                    <i class="bi bi-geo-alt-fill me-1"></i>Abrir en Google Maps
+                                </a>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Notas Internas</label>
+                            <textarea name="notes" class="form-control" rows="2" 
+                                      placeholder="Comentarios internos sobre el cliente"></textarea>
+                        </div>
+                        
+                        <hr class="border-secondary">
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">¿Tiene Soporte Técnico Contratado?</label>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="hasSupportSwitch" 
+                                       name="has_support" value="true" onchange="toggleSupportOptions()">
+                                <label class="form-check-label" for="hasSupportSwitch">
+                                    Sí, tiene soporte técnico
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div id="supportOptionsDiv" style="display: none;">
+                            <label class="form-label fw-bold text-warning">Cobertura del Soporte:</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="supportMF" 
+                                       name="support_monday_friday" value="true">
+                                <label class="form-check-label" for="supportMF">
+                                    Lunes a Viernes
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="supportSat" 
+                                       name="support_saturday" value="true">
+                                <label class="form-check-label" for="supportSat">
+                                    Sábados
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="supportSun" 
+                                       name="support_sunday" value="true">
+                                <label class="form-check-label" for="supportSun">
+                                    Domingos
+                                </label>
+                            </div>
+                        </div>
                     </div>
                     <div class="modal-footer border-secondary">
-                        <button type="submit" class="btn btn-warning">Añadir</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-warning">
+                            <i class="bi bi-save-fill me-1"></i>Guardar Cliente
+                        </button>
                     </div>
                 </form>
             </div>
@@ -1077,7 +1210,58 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Modal: Añadir Categoría de Stock -->
+    <div class="modal fade" id="modalAddCategory" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">Nueva Categoría/Subcategoría</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="/manage_stock_categories" onsubmit="return validateCategoryForm()">
+                    <div class="modal-body">
+                        <input type="hidden" name="action" value="add">
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Nombre *</label>
+                            <input type="text" name="name" id="categoryName" class="form-control" required 
+                                   placeholder="Ej: TPV, Consumibles, etc.">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Tipo de Categoría</label>
+                            <select id="categoryType" class="form-select" onchange="toggleParentSelect()">
+                                <option value="main">Categoría Principal</option>
+                                <option value="sub">Subcategoría</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3" id="parentCategoryDiv" style="display: none;">
+                            <label class="form-label">Categoría Padre *</label>
+                            <select name="parent_id" id="parentCategorySelect" class="form-select">
+                                <option value="">-- Seleccionar --</option>
+                            </select>
+                        </div>
+                        
+                        <div class="alert alert-info small">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Las subcategorías se crean dentro de categorías principales existentes.
+                        </div>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-info">
+                            <i class="bi bi-plus-circle-fill me-1"></i>Crear
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         var calendar = null;
         var calendarGlobalInstance = null;
@@ -1717,6 +1901,267 @@
                 }
             });
         }
+    
+        // ==================== GESTIÓN DE CATEGORÍAS DE STOCK ====================
+        
+        function toggleParentSelect() {
+            const type = document.getElementById('categoryType').value;
+            const parentDiv = document.getElementById('parentCategoryDiv');
+            const parentSelect = document.getElementById('parentCategorySelect');
+            
+            if (type === 'sub') {
+                parentDiv.style.display = 'block';
+                parentSelect.required = true;
+                loadMainCategoriesForParent();
+            } else {
+                parentDiv.style.display = 'none';
+                parentSelect.required = false;
+                parentSelect.value = '';
+            }
+        }
+        
+        function validateCategoryForm() {
+            const type = document.getElementById('categoryType').value;
+            const parentId = document.getElementById('parentCategorySelect').value;
+            
+            if (type === 'sub' && !parentId) {
+                alert('Por favor, selecciona una categoría padre para la subcategoría');
+                return false;
+            }
+            return true;
+        }
+        
+        function loadMainCategoriesForParent() {
+            fetch('/api/stock_categories')
+                .then(res => res.json())
+                .then(data => {
+                    const select = document.getElementById('parentCategorySelect');
+                    select.innerHTML = '<option value="">-- Seleccionar --</option>';
+                    
+                    data.forEach(cat => {
+                        const option = document.createElement('option');
+                        option.value = cat.id;
+                        option.textContent = cat.name;
+                        select.appendChild(option);
+                    });
+                })
+                .catch(err => console.error('Error cargando categorías:', err));
+        }
+        
+        function loadCategoriesTree() {
+            fetch('/api/stock_categories')
+                .then(res => res.json())
+                .then(data => {
+                    updateCategoriesTreeView(data);
+                    updateCategorySelectors(data);
+                })
+                .catch(err => {
+                    console.error('Error:', err);
+                    document.getElementById('categoriesTree').innerHTML = 
+                        '<div class="text-center text-danger py-3"><i class="bi bi-exclamation-triangle me-2"></i>Error cargando categorías</div>';
+                });
+        }
+        
+        function updateCategoriesTreeView(categories) {
+            const container = document.getElementById('categoriesTree');
+            if (!container) return;
+            
+            if (categories.length === 0) {
+                container.innerHTML = '<div class="text-center text-muted py-3"><i class="bi bi-inbox me-2"></i>No hay categorías creadas</div>';
+                return;
+            }
+            
+            let html = '<div class="list-group">';
+            categories.forEach(cat => {
+                html += buildCategoryTreeHTML(cat, 0);
+            });
+            html += '</div>';
+            
+            container.innerHTML = html;
+        }
+        
+        function buildCategoryTreeHTML(cat, level) {
+            const indent = level * 20;
+            const hasChildren = cat.children && cat.children.length > 0;
+            const icon = hasChildren ? 'folder-fill' : 'folder2';
+            const itemCount = cat.items ? cat.items.length : 0;
+            
+            let html = `
+                <div class="list-group-item bg-dark border-secondary mb-2" style="margin-left: ${indent}px;">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <i class="bi bi-${icon} text-warning me-2"></i>
+                            <strong class="text-white">${cat.name}</strong>
+                            <span class="badge bg-info ms-2">${itemCount} productos</span>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-outline-success me-1" onclick="addSubcategoryTo(${cat.id}, '${cat.name}')" title="Añadir subcategoría">
+                                <i class="bi bi-plus-circle"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteCategory(${cat.id}, '${cat.name}', ${itemCount})" title="Eliminar">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            if (hasChildren) {
+                cat.children.forEach(child => {
+                    html += buildCategoryTreeHTML(child, level + 1);
+                });
+            }
+            
+            return html;
+        }
+        
+        function addSubcategoryTo(parentId, parentName) {
+            document.getElementById('categoryType').value = 'sub';
+            document.getElementById('parentCategorySelect').value = parentId;
+            toggleParentSelect();
+            
+            const modal = new bootstrap.Modal(document.getElementById('modalAddCategory'));
+            modal.show();
+            
+            document.getElementById('categoryName').placeholder = `Nueva subcategoría de ${parentName}`;
+        }
+        
+        function deleteCategory(id, name, itemCount) {
+            if (itemCount > 0) {
+                if (!confirm(`La categoría "${name}" tiene ${itemCount} productos. ¿Estás seguro de eliminarla? Los productos NO se eliminarán.`)) {
+                    return;
+                }
+            } else {
+                if (!confirm(`¿Eliminar la categoría "${name}"?`)) {
+                    return;
+                }
+            }
+            
+            const formData = new FormData();
+            formData.append('action', 'delete');
+            formData.append('category_id', id);
+            
+            fetch('/manage_stock_categories', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    loadCategoriesTree();
+                    alert('Categoría eliminada correctamente');
+                } else {
+                    alert('Error al eliminar: ' + (data.msg || 'Error desconocido'));
+                }
+            })
+            .catch(err => {
+                console.error('Error:', err);
+                alert('Error al eliminar categoría');
+            });
+        }
+        
+        function updateCategorySelectors(categories) {
+            // Actualizar selector en modal de añadir stock
+            const addStockSelect = document.getElementById('addStockCategory');
+            if (addStockSelect) {
+                addStockSelect.innerHTML = '<option value="">-- Seleccionar Categoría --</option>';
+                addCategoryOptionsToSelect(addStockSelect, categories);
+            }
+        }
+        
+        function addCategoryOptionsToSelect(select, categories, prefix = '') {
+            categories.forEach(cat => {
+                const option = document.createElement('option');
+                option.value = cat.id;
+                option.textContent = prefix + cat.name;
+                option.dataset.hasChildren = cat.children && cat.children.length > 0;
+                select.appendChild(option);
+                
+                // No añadir subcategorías aquí, se cargarán dinámicamente
+            });
+        }
+        
+        function loadSubcategories(categoryId, targetSelectId) {
+            const subcategorySection = document.getElementById('subcategorySection');
+            const subcategorySelect = document.getElementById(targetSelectId);
+            
+            if (!categoryId) {
+                subcategorySection.style.display = 'none';
+                return;
+            }
+            
+            fetch('/api/stock_categories')
+                .then(res => res.json())
+                .then(data => {
+                    const category = findCategoryById(data, parseInt(categoryId));
+                    
+                    if (category && category.children && category.children.length > 0) {
+                        subcategorySection.style.display = 'block';
+                        subcategorySelect.innerHTML = '<option value="">-- Sin subcategoría --</option>';
+                        
+                        category.children.forEach(sub => {
+                            const option = document.createElement('option');
+                            option.value = sub.id;
+                            option.textContent = sub.name;
+                            subcategorySelect.appendChild(option);
+                        });
+                    } else {
+                        subcategorySection.style.display = 'none';
+                        subcategorySelect.innerHTML = '<option value="">-- Sin subcategoría --</option>';
+                    }
+                })
+                .catch(err => console.error('Error cargando subcategorías:', err));
+        }
+        
+        function findCategoryById(categories, id) {
+            for (let cat of categories) {
+                if (cat.id === id) return cat;
+                if (cat.children) {
+                    const found = findCategoryById(cat.children, id);
+                    if (found) return found;
+                }
+            }
+            return null;
+        }
+        
+        // ==================== FUNCIONES DE SOPORTE TÉCNICO ====================
+        
+        function toggleSupportOptions() {
+            const checkbox = document.getElementById('hasSupportSwitch');
+            const div = document.getElementById('supportOptionsDiv');
+            div.style.display = checkbox.checked ? 'block' : 'none';
+        }
+        
+        // ==================== GOOGLE MAPS ====================
+        
+        document.getElementById('clientAddress')?.addEventListener('input', function() {
+            const address = this.value.trim();
+            const link = document.getElementById('openGoogleMaps');
+            
+            if (address) {
+                const encoded = encodeURIComponent(address);
+                link.href = `https://www.google.com/maps/search/?api=1&query=${encoded}`;
+                link.style.display = 'block';
+            } else {
+                link.style.display = 'none';
+            }
+        });
+        
+        // ==================== INICIALIZACIÓN ====================
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            // Cargar categorías al inicio
+            loadCategoriesTree();
+            
+            // Recargar cuando se abre el modal de añadir stock
+            const modalAddStock = document.getElementById('modalAddStock');
+            if (modalAddStock) {
+                modalAddStock.addEventListener('show.bs.modal', function() {
+                    loadCategoriesTree();
+                });
+            }
+        });
+
     </script>
 </body>
 
