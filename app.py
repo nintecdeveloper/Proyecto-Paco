@@ -177,15 +177,20 @@ def inject_globals():
         if current_user.is_authenticated and current_user.role == 'admin':
             unread_alarms = Alarm.query.filter_by(is_read=False).count()
         
+        # Obtener técnicos para pasar al template
+        employees = User.query.filter_by(role='tech').all() if current_user.is_authenticated and current_user.role == 'admin' else []
+        
         return {
             'all_service_types': ServiceType.query.order_by(ServiceType.name).all(),
-            'unread_alarms_count': unread_alarms
+            'unread_alarms_count': unread_alarms,
+            'employees': employees  # AÑADIDO para las analíticas
         }
     except Exception as e:
         print("ERROR context_processor:", e)
         return {
             'all_service_types': [],
-            'unread_alarms_count': 0
+            'unread_alarms_count': 0,
+            'employees': []
         }
 
 # --- RUTAS PRINCIPALES ---
@@ -475,9 +480,22 @@ def manage_stock():
         min_stock = int(request.form.get('min_stock', 5))
         description = request.form.get('description', '')
         
+        # CORRECCIÓN: Asegurar que category_id sea válido
+        final_category_id = None
+        if category_id and category_id.strip():
+            try:
+                final_category_id = int(category_id)
+                # Verificar que la categoría existe
+                if not StockCategory.query.get(final_category_id):
+                    flash('Categoría no válida.', 'danger')
+                    return redirect(url_for('dashboard'))
+            except ValueError:
+                flash('ID de categoría no válido.', 'danger')
+                return redirect(url_for('dashboard'))
+        
         new_item = Stock(
             name=name,
-            category_id=int(category_id) if category_id and category_id != '' else None,
+            category_id=final_category_id,
             quantity=quantity,
             min_stock=min_stock,
             description=description
@@ -492,7 +510,11 @@ def manage_stock():
         item = Stock.query.get(item_id)
         if item:
             item.name = request.form.get('name')
-            item.category_id = int(request.form.get('category_id')) if request.form.get('category_id') else None
+            category_id = request.form.get('category_id')
+            if category_id and category_id.strip():
+                item.category_id = int(category_id)
+            else:
+                item.category_id = None
             item.quantity = int(request.form.get('quantity', 0))
             item.min_stock = int(request.form.get('min_stock', 5))
             item.description = request.form.get('description', '')
@@ -607,7 +629,7 @@ def create_task():
 def update_task(task_id):
     task = Task.query.get_or_404(task_id)
     
-    # Verificar permisos
+    # Verificar permisos - IMPORTANTE: Mantener coherencia de rol
     if current_user.role != 'admin' and current_user.id != task.tech_id:
         flash('No tienes permisos para editar esta tarea.', 'danger')
         return redirect(url_for('dashboard'))
@@ -656,6 +678,7 @@ def update_task(task_id):
 def delete_task(task_id):
     task = Task.query.get_or_404(task_id)
     
+    # Verificar permisos - IMPORTANTE: Mantener coherencia de rol
     if current_user.role != 'admin' and current_user.id != task.tech_id:
         return jsonify({'success': False, 'msg': 'No autorizado'}), 403
     
@@ -832,12 +855,20 @@ def get_all_tasks():
     
     return jsonify(events)
 
-@app.route('/api/clients')
+# NUEVO ENDPOINT: Búsqueda de clientes
+@app.route('/api/clients_search')
 @login_required
-def get_clients():
-    """API para autocompletado de clientes"""
-    query = request.args.get('q', '')
-    clients = Client.query.filter(Client.name.contains(query)).limit(10).all()
+def api_clients_search():
+    """API para autocompletado de clientes con búsqueda mejorada"""
+    query = request.args.get('q', '').strip()
+    
+    if len(query) < 2:
+        return jsonify([])
+    
+    # Búsqueda con LIKE para coincidencias parciales (case-insensitive)
+    clients = Client.query.filter(
+        Client.name.ilike(f'%{query}%')
+    ).order_by(Client.name).limit(10).all()
     
     return jsonify([{
         'id': c.id,
@@ -847,6 +878,12 @@ def get_clients():
         'address': c.address,
         'has_support': c.has_support
     } for c in clients])
+
+@app.route('/api/clients')
+@login_required
+def get_clients():
+    """API para autocompletado de clientes (alias del anterior para compatibilidad)"""
+    return api_clients_search()
 
 @app.route('/api/task/<int:task_id>')
 @login_required

@@ -866,7 +866,16 @@
 
     function performTaskAction(action) {
         const id = document.getElementById('evtId').value;
-        if(!confirm('¿Confirmar acción?')) return;
+        
+        // Si la acción es completar, abrir el modal de completar con firma
+        if (action === 'complete') {
+            modalAction.hide();
+            openCompleteTaskModal(id);
+            return;
+        }
+        
+        // Para otras acciones (delete), continuar normalmente
+        if (!confirm('¿Confirmar acción?')) return;
 
         fetch(`/api/task_action/${id}/${action}`, { method: 'POST' })
         .then(res => res.json())
