@@ -44,6 +44,7 @@ class Client(db.Model):
     phone = db.Column(db.String(20), nullable=False)  # OBLIGATORIO
     email = db.Column(db.String(100), nullable=False)  # OBLIGATORIO
     address = db.Column(db.String(250), nullable=False)  # OBLIGATORIO con Google Maps
+    link = db.Column(db.String(500), nullable=True)  # Enlace/URL opcional del cliente
     notes = db.Column(db.Text)  # Comentarios internos
     has_support = db.Column(db.Boolean, default=False)  # Verde=True, Rojo=False
     support_monday_friday = db.Column(db.Boolean, default=False)
@@ -375,6 +376,7 @@ def manage_clients():
         phone = request.form.get('phone')
         email = request.form.get('email')
         address = request.form.get('address')
+        link = request.form.get('link', '').strip()
         notes = request.form.get('notes', '')
         has_support = request.form.get('has_support') == 'true'
         support_mf = request.form.get('support_monday_friday') == 'true'
@@ -390,11 +392,16 @@ def manage_clients():
             flash('Ya existe un cliente con ese nombre.', 'danger')
             return redirect(url_for('dashboard'))
         
+        # Validar URL si se proporciona
+        if link and not (link.startswith('http://') or link.startswith('https://')):
+            link = 'https://' + link  # Añadir https:// si no tiene protocolo
+        
         new_client = Client(
             name=name,
             phone=phone,
             email=email,
             address=address,
+            link=link if link else None,
             notes=notes,
             has_support=has_support,
             support_monday_friday=support_mf,
@@ -413,6 +420,11 @@ def manage_clients():
             client.phone = request.form.get('phone')
             client.email = request.form.get('email')
             client.address = request.form.get('address')
+            link = request.form.get('link', '').strip()
+            # Validar y normalizar URL
+            if link and not (link.startswith('http://') or link.startswith('https://')):
+                link = 'https://' + link
+            client.link = link if link else None
             client.notes = request.form.get('notes', '')
             client.has_support = request.form.get('has_support') == 'true'
             client.support_monday_friday = request.form.get('support_monday_friday') == 'true'
@@ -982,6 +994,100 @@ def get_tech_stats(tech_id):
         }
     })
 
+@app.route('/api/admin_analytics')
+@login_required
+def get_admin_analytics():
+    """Estadísticas globales para el administrador"""
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'msg': 'No autorizado'}), 403
+    
+    # Parámetros opcionales
+    tech_id = request.args.get('tech_id', type=int)
+    period = request.args.get('period', 'all')  # all, month, week
+    
+    # Construir query base
+    query = Task.query
+    
+    # Filtrar por técnico si se especifica
+    if tech_id:
+        query = query.filter_by(tech_id=tech_id)
+    
+    # Filtrar por período
+    from datetime import timedelta
+    if period == 'week':
+        week_ago = date.today() - timedelta(days=7)
+        query = query.filter(Task.date >= week_ago)
+    elif period == 'month':
+        month_ago = date.today() - timedelta(days=30)
+        query = query.filter(Task.date >= month_ago)
+    
+    # Obtener todas las tareas filtradas
+    all_tasks = query.all()
+    completed_tasks = query.filter_by(status='Completado').all()
+    pending_tasks = query.filter_by(status='Pendiente').all()
+    
+    # Estadísticas por tipo de servicio (para gráfico circular)
+    task_types = {}
+    total_for_percentage = len(completed_tasks) if completed_tasks else 1
+    
+    for task in completed_tasks:
+        service_type = ServiceType.query.get(task.service_type_id) if task.service_type_id else None
+        service_name = service_type.name if service_type else 'Sin tipo'
+        service_color = service_type.color if service_type else '#6c757d'
+        
+        if service_name not in task_types:
+            task_types[service_name] = {
+                'count': 0,
+                'color': service_color,
+                'percentage': 0
+            }
+        
+        task_types[service_name]['count'] += 1
+    
+    # Calcular porcentajes
+    for service_name in task_types:
+        count = task_types[service_name]['count']
+        task_types[service_name]['percentage'] = round((count / total_for_percentage) * 100, 1)
+    
+    # Tareas por mes (últimos 6 meses)
+    monthly_tasks = []
+    for i in range(5, -1, -1):
+        month_date = date.today() - timedelta(days=i*30)
+        month_start = month_date.replace(day=1)
+        if i > 0:
+            next_month = month_date + timedelta(days=30)
+            month_end = next_month.replace(day=1)
+        else:
+            month_end = date.today()
+        
+        month_tasks = Task.query.filter(
+            Task.date >= month_start,
+            Task.date < month_end,
+            Task.status == 'Completado'
+        )
+        if tech_id:
+            month_tasks = month_tasks.filter_by(tech_id=tech_id)
+        
+        monthly_tasks.append({
+            'month': month_start.strftime('%b'),
+            'count': month_tasks.count()
+        })
+    
+    # Obtener técnicos activos
+    active_techs = User.query.filter_by(role='tech').count()
+    
+    return jsonify({
+        'success': True,
+        'data': {
+            'total_tasks': len(all_tasks),
+            'completed_tasks': len(completed_tasks),
+            'pending_tasks': len(pending_tasks),
+            'active_technicians': active_techs,
+            'task_types': task_types,  # Para gráfico circular
+            'monthly_tasks': monthly_tasks  # Para gráfico de línea
+        }
+    })
+
 @app.route('/api/stock_categories')
 @login_required
 def get_stock_categories():
@@ -1072,6 +1178,19 @@ def uploaded_file(filename):
 with app.app_context():
     # Primero creamos las tablas (la estructura)
     db.create_all()
+    
+    # Migración: Añadir columna 'link' a Client si no existe
+    try:
+        from sqlalchemy import inspect
+        inspector = inspect(db.engine)
+        columns = [col['name'] for col in inspector.get_columns('client')]
+        if 'link' not in columns:
+            with db.engine.connect() as conn:
+                conn.execute(db.text('ALTER TABLE client ADD COLUMN link VARCHAR(500)'))
+                conn.commit()
+                print("✓ Columna 'link' añadida a la tabla 'client'")
+    except Exception as e:
+        print(f"Nota: Migración de 'link': {e}")
     
     # 1. Usuarios
     if not User.query.filter_by(username='admin').first():

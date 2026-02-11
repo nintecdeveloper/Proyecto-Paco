@@ -190,6 +190,8 @@
             <li class="nav-item"><button class="nav-link w-100" data-bs-toggle="tab"
                     data-bs-target="#data">INFORMES</button></li>
             <li class="nav-item"><button class="nav-link w-100" data-bs-toggle="tab"
+                    data-bs-target="#statistics">ESTADÍSTICAS</button></li>
+            <li class="nav-item"><button class="nav-link w-100" data-bs-toggle="tab"
                     data-bs-target="#stock">STOCK</button></li>
             <li class="nav-item"><button class="nav-link w-100" data-bs-toggle="tab"
                     data-bs-target="#clients">CLIENTES</button></li>
@@ -309,6 +311,120 @@
                 </div>
             </div>
 
+            <!-- TAB ESTADÍSTICAS -->
+            <div class="tab-pane fade" id="statistics">
+                <h4 class="fw-bold text-white fs-5 mb-4">
+                    <i class="bi bi-graph-up-arrow me-2 text-info"></i>Estadísticas Globales
+                </h4>
+                
+                <!-- Filtros -->
+                <div class="card bg-dark border-secondary mb-4">
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label text-white fw-bold">Técnico</label>
+                                <select id="statsFilterTech" class="form-select bg-black text-white border-secondary">
+                                    <option value="">Todos los técnicos</option>
+                                    {% for emp in empleados %}
+                                    <option value="{{ emp.id }}">{{ emp.username }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label text-white fw-bold">Período</label>
+                                <select id="statsFilterPeriod" class="form-select bg-black text-white border-secondary">
+                                    <option value="all">Todo el historial</option>
+                                    <option value="month">Último mes</option>
+                                    <option value="week">Última semana</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 d-flex align-items-end">
+                                <button class="btn btn-info w-100" onclick="loadAdminStatistics()">
+                                    <i class="bi bi-arrow-clockwise me-1"></i>Actualizar Estadísticas
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- KPIs -->
+                <div class="row g-3 mb-4" id="statsKPIs">
+                    <div class="col-md-3">
+                        <div class="card bg-dark border-info">
+                            <div class="card-body text-center">
+                                <i class="bi bi-clipboard-check fs-1 text-info"></i>
+                                <h3 class="text-white mt-2 mb-0" id="kpiTotalTasks">-</h3>
+                                <small class="text-muted">Total Tareas</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-dark border-success">
+                            <div class="card-body text-center">
+                                <i class="bi bi-check-circle fs-1 text-success"></i>
+                                <h3 class="text-white mt-2 mb-0" id="kpiCompletedTasks">-</h3>
+                                <small class="text-muted">Completadas</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-dark border-warning">
+                            <div class="card-body text-center">
+                                <i class="bi bi-hourglass-split fs-1 text-warning"></i>
+                                <h3 class="text-white mt-2 mb-0" id="kpiPendingTasks">-</h3>
+                                <small class="text-muted">Pendientes</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-dark border-secondary">
+                            <div class="card-body text-center">
+                                <i class="bi bi-people fs-1 text-secondary"></i>
+                                <h3 class="text-white mt-2 mb-0" id="kpiActiveTechs">-</h3>
+                                <small class="text-muted">Técnicos Activos</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Gráficos -->
+                <div class="row g-3">
+                    <!-- Gráfico Circular de Tipos de Tareas -->
+                    <div class="col-md-6">
+                        <div class="card bg-dark border-secondary">
+                            <div class="card-header bg-black border-secondary">
+                                <h6 class="text-white fw-bold mb-0">
+                                    <i class="bi bi-pie-chart-fill me-2 text-warning"></i>
+                                    Distribución por Tipo de Servicio
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="taskTypesPieChart" style="max-height: 300px;"></canvas>
+                                <div id="noPieData" class="text-center text-muted py-5" style="display: none;">
+                                    <i class="bi bi-info-circle fs-1"></i>
+                                    <p class="mt-2">No hay datos disponibles</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Gráfico de Línea de Tareas Mensuales -->
+                    <div class="col-md-6">
+                        <div class="card bg-dark border-secondary">
+                            <div class="card-header bg-black border-secondary">
+                                <h6 class="text-white fw-bold mb-0">
+                                    <i class="bi bi-graph-up me-2 text-info"></i>
+                                    Evolución Mensual de Tareas
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="monthlyTasksChart" style="max-height: 300px;"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- SECCIÓN ANALÍTICAS - REMOVIDA -->
             <!-- Las analíticas ahora se muestran individualmente por técnico desde la tarjeta de cada uno en EQUIPO -->
 
@@ -353,42 +469,86 @@
                 </div>
 
                 <input type="text" id="clientSearchInput" class="form-control mb-3"
-                    placeholder="🔍 Buscar cliente..." onkeyup="filterClientsTable()">
+                    placeholder="🔍 Buscar cliente..." onkeyup="filterClientsView()">
 
-                <div class="table-responsive">
-                    <table class="table table-dark table-sm" id="clientsTable">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Nombre</th>
-                                <th>Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for c in clients %}
-                            <tr>
-                                <td>{{ c.id }}</td>
-                                <td class="client-name-cell">{{ c.name }}</td>
-                                <td>
-                                    <button class="btn btn-sm btn-outline-warning"
-                                        data-client-id="{{ c.id }}"
-                                        data-client-name="{{ c.name }}"
-                                        onclick="openEditClientModal(this.dataset.clientId, this.dataset.clientName)">
-                                        <i class="bi bi-pencil-fill"></i>
+                <div class="row g-3" id="clientsCardContainer">
+                    {% for c in clients %}
+                    <div class="col-12 col-md-6 col-lg-4 client-card-wrapper" data-client-name="{{ c.name|lower }}" data-client-phone="{{ c.phone }}" data-client-email="{{ c.email }}">
+                        <div class="card bg-dark border-secondary text-white h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h6 class="card-title text-warning fw-bold mb-0">{{ c.name }}</h6>
+                                    {% if c.has_support %}
+                                    <span class="badge bg-success">
+                                        <i class="bi bi-shield-check"></i> Soporte
+                                    </span>
+                                    {% else %}
+                                    <span class="badge bg-danger">
+                                        <i class="bi bi-shield-x"></i> Sin Soporte
+                                    </span>
+                                    {% endif %}
+                                </div>
+                                
+                                <hr class="border-secondary my-2">
+                                
+                                <div class="small mb-1">
+                                    <i class="bi bi-telephone-fill text-info me-2"></i>
+                                    <a href="tel:{{ c.phone }}" class="text-decoration-none text-white">{{ c.phone }}</a>
+                                </div>
+                                
+                                <div class="small mb-1">
+                                    <i class="bi bi-envelope-fill text-info me-2"></i>
+                                    <a href="mailto:{{ c.email }}" class="text-decoration-none text-white">{{ c.email }}</a>
+                                </div>
+                                
+                                <div class="small mb-2">
+                                    <i class="bi bi-geo-alt-fill text-info me-2"></i>
+                                    <span class="text-muted">{{ c.address }}</span>
+                                </div>
+                                
+                                {% if c.link %}
+                                <div class="mb-2">
+                                    <a href="{{ c.link }}" target="_blank" class="btn btn-sm btn-outline-info w-100">
+                                        <i class="bi bi-link-45deg me-1"></i>Abrir Enlace
+                                    </a>
+                                </div>
+                                {% endif %}
+                                
+                                {% if c.notes %}
+                                <div class="small text-muted fst-italic border-top border-secondary pt-2 mt-2">
+                                    <i class="bi bi-sticky-fill me-1"></i>{{ c.notes|truncate(60) }}
+                                </div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="card-footer bg-black border-secondary">
+                                <div class="d-flex gap-2">
+                                    <button class="btn btn-sm btn-outline-warning flex-fill"
+                                        onclick="openEditClientModalFull({{ c.id }}, '{{ c.name }}', '{{ c.phone }}', '{{ c.email }}', '{{ c.address }}', '{{ c.link or '' }}', '{{ c.notes or '' }}', {{ c.has_support|lower }}, {{ c.support_monday_friday|lower }}, {{ c.support_saturday|lower }}, {{ c.support_sunday|lower }})">
+                                        <i class="bi bi-pencil-fill"></i> Editar
                                     </button>
-                                    <form method="POST" action="/manage_clients" class="d-inline">
+                                    <form method="POST" action="/manage_clients" class="flex-fill">
                                         <input type="hidden" name="action" value="delete">
                                         <input type="hidden" name="client_id" value="{{ c.id }}">
-                                        <button class="btn btn-sm btn-outline-danger"
-                                            onclick="return confirm('¿Eliminar este cliente?')">
-                                            <i class="bi bi-trash-fill"></i>
+                                        <button class="btn btn-sm btn-outline-danger w-100"
+                                            onclick="return confirm('¿Eliminar cliente {{ c.name }}?')">
+                                            <i class="bi bi-trash-fill"></i> Eliminar
                                         </button>
                                     </form>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    
+                    {% if clients|length == 0 %}
+                    <div class="col-12">
+                        <div class="alert alert-info text-center">
+                            <i class="bi bi-info-circle me-2"></i>No hay clientes registrados aún. 
+                            Haz clic en "Nuevo Cliente" para añadir uno.
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
 
@@ -687,13 +847,22 @@
                                        placeholder="ejemplo@email.com">
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label class="form-label">Dirección Completa *</label>
-                                <input type="text" name="address" id="clientAddress" class="form-control" required 
-                                       placeholder="Calle, número, ciudad">
-                                <a href="#" id="openGoogleMaps" class="small text-info mt-1 d-block" target="_blank" style="display:none;">
-                                    <i class="bi bi-geo-alt-fill me-1"></i>Abrir en Google Maps
-                                </a>
+                                <label class="form-label">Enlace/URL (Opcional)</label>
+                                <input type="url" name="link" class="form-control" 
+                                       placeholder="https://ejemplo.com">
+                                <small class="text-muted">
+                                    <i class="bi bi-info-circle me-1"></i>Portal web, sistema interno, etc.
+                                </small>
                             </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Dirección Completa *</label>
+                            <input type="text" name="address" id="clientAddress" class="form-control" required 
+                                   placeholder="Calle, número, ciudad">
+                            <a href="#" id="openGoogleMaps" class="small text-info mt-1 d-block" target="_blank" style="display:none;">
+                                <i class="bi bi-geo-alt-fill me-1"></i>Abrir en Google Maps
+                            </a>
                         </div>
                         
                         <div class="mb-3">
@@ -753,21 +922,93 @@
 
     <!-- Modal: Editar Cliente -->
     <div class="modal fade" id="modalEditClient" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-lg">
             <div class="modal-content bg-dark text-white">
                 <div class="modal-header border-secondary">
-                    <h5 class="modal-title">Editar Cliente</h5>
+                    <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>Editar Cliente</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <form method="POST" action="/manage_clients">
                     <div class="modal-body">
                         <input type="hidden" name="action" value="edit">
                         <input type="hidden" name="client_id" id="editClientId">
-                        <label class="form-label">Nombre del Cliente</label>
-                        <input type="text" name="name" id="editClientName" class="form-control" required>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Nombre del Cliente *</label>
+                                <input type="text" name="name" id="editClientName" class="form-control" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Teléfono *</label>
+                                <input type="tel" name="phone" id="editClientPhone" class="form-control" required>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Correo Electrónico *</label>
+                                <input type="email" name="email" id="editClientEmail" class="form-control" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Enlace/URL (Opcional)</label>
+                                <input type="url" name="link" id="editClientLink" class="form-control" 
+                                       placeholder="https://ejemplo.com">
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Dirección Completa *</label>
+                            <input type="text" name="address" id="editClientAddress" class="form-control" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Notas Internas</label>
+                            <textarea name="notes" id="editClientNotes" class="form-control" rows="2"></textarea>
+                        </div>
+                        
+                        <hr class="border-secondary">
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">¿Tiene Soporte Técnico Contratado?</label>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="editHasSupport" 
+                                       name="has_support" value="true" onchange="toggleEditSupportOptions()">
+                                <label class="form-check-label" for="editHasSupport">
+                                    Sí, tiene soporte técnico
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div id="editSupportOptionsDiv" style="display: none;">
+                            <label class="form-label fw-bold text-warning">Cobertura del Soporte:</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="editSupportMF" 
+                                       name="support_monday_friday" value="true">
+                                <label class="form-check-label" for="editSupportMF">
+                                    Lunes a Viernes
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="editSupportSat" 
+                                       name="support_saturday" value="true">
+                                <label class="form-check-label" for="editSupportSat">
+                                    Sábados
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="editSupportSun" 
+                                       name="support_sunday" value="true">
+                                <label class="form-check-label" for="editSupportSun">
+                                    Domingos
+                                </label>
+                            </div>
+                        </div>
                     </div>
                     <div class="modal-footer border-secondary">
-                        <button type="submit" class="btn btn-warning">Guardar Cambios</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-warning">
+                            <i class="bi bi-save-fill me-1"></i>Guardar Cambios
+                        </button>
                     </div>
                 </form>
             </div>
@@ -1314,6 +1555,24 @@
             document.getElementById('editClientName').value = name;
             new bootstrap.Modal(document.getElementById('modalEditClient')).show();
         }
+        
+        // Nueva función completa para editar clientes con todos los campos
+        function openEditClientModalFull(id, name, phone, email, address, link, notes, hasSupport, supportMF, supportSat, supportSun) {
+            document.getElementById('editClientId').value = id;
+            document.getElementById('editClientName').value = name;
+            document.getElementById('editClientPhone').value = phone;
+            document.getElementById('editClientEmail').value = email;
+            document.getElementById('editClientAddress').value = address;
+            document.getElementById('editClientLink').value = link || '';
+            document.getElementById('editClientNotes').value = notes || '';
+            document.getElementById('editHasSupport').checked = hasSupport;
+            document.getElementById('editSupportMF').checked = supportMF;
+            document.getElementById('editSupportSat').checked = supportSat;
+            document.getElementById('editSupportSun').checked = supportSun;
+            
+            toggleEditSupportOptions();
+            new bootstrap.Modal(document.getElementById('modalEditClient')).show();
+        }
 
         function openEditServiceModal(id, name, color) {
             document.getElementById('editServiceId').value = id;
@@ -1364,23 +1623,24 @@
             });
         }
 
-        function filterClientsTable() {
-            var input, filter, table, tr, td, i, txtValue;
-            input = document.getElementById("clientSearchInput");
-            filter = input.value.toUpperCase();
-            table = document.getElementById("clientsTable");
-            tr = table.getElementsByTagName("tr");
-            for (i = 0; i < tr.length; i++) {
-                td = tr[i].getElementsByClassName("client-name-cell")[0];
-                if (td) {
-                    txtValue = td.textContent || td.innerText;
-                    if (txtValue.toUpperCase().indexOf(filter) > -1) {
-                        tr[i].style.display = "";
-                    } else {
-                        tr[i].style.display = "none";
-                    }
+        function filterClientsView() {
+            const input = document.getElementById("clientSearchInput");
+            const filter = input.value.toLowerCase();
+            const cards = document.querySelectorAll('.client-card-wrapper');
+            
+            cards.forEach(card => {
+                const name = card.dataset.clientName || '';
+                const phone = card.dataset.clientPhone || '';
+                const email = card.dataset.clientEmail || '';
+                
+                const textContent = (name + ' ' + phone + ' ' + email).toLowerCase();
+                
+                if (textContent.indexOf(filter) > -1) {
+                    card.style.display = '';
+                } else {
+                    card.style.display = 'none';
                 }
-            }
+            });
         }
 
         function openEditAdminModal() {
@@ -1999,6 +2259,12 @@
             div.style.display = checkbox.checked ? 'block' : 'none';
         }
         
+        function toggleEditSupportOptions() {
+            const checkbox = document.getElementById('editHasSupport');
+            const div = document.getElementById('editSupportOptionsDiv');
+            div.style.display = checkbox.checked ? 'block' : 'none';
+        }
+        
         // ==================== GOOGLE MAPS ====================
         
         document.getElementById('clientAddress')?.addEventListener('input', function() {
@@ -2013,6 +2279,181 @@
                 link.style.display = 'none';
             }
         });
+        
+        // ==================== ESTADÍSTICAS GLOBALES ====================
+        
+        let taskTypesPieChart = null;
+        let monthlyTasksChart = null;
+        
+        function loadAdminStatistics() {
+            const techId = document.getElementById('statsFilterTech').value;
+            const period = document.getElementById('statsFilterPeriod').value;
+            
+            let url = '/api/admin_analytics?';
+            if (techId) url += `tech_id=${techId}&`;
+            if (period) url += `period=${period}`;
+            
+            fetch(url)
+                .then(res => res.json())
+                .then(response => {
+                    if (response.success) {
+                        const data = response.data;
+                        
+                        // Actualizar KPIs
+                        document.getElementById('kpiTotalTasks').textContent = data.total_tasks;
+                        document.getElementById('kpiCompletedTasks').textContent = data.completed_tasks;
+                        document.getElementById('kpiPendingTasks').textContent = data.pending_tasks;
+                        document.getElementById('kpiActiveTechs').textContent = data.active_technicians;
+                        
+                        // Crear gráfico circular de tipos de tareas
+                        createTaskTypesPieChart(data.task_types);
+                        
+                        // Crear gráfico de línea de tareas mensuales
+                        createMonthlyTasksChart(data.monthly_tasks);
+                    } else {
+                        alert('Error al cargar estadísticas: ' + response.msg);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error al conectar con el servidor');
+                });
+        }
+        
+        function createTaskTypesPieChart(taskTypes) {
+            const canvas = document.getElementById('taskTypesPieChart');
+            const noDataDiv = document.getElementById('noPieData');
+            
+            // Si no hay datos
+            if (!taskTypes || Object.keys(taskTypes).length === 0) {
+                canvas.style.display = 'none';
+                noDataDiv.style.display = 'block';
+                return;
+            }
+            
+            canvas.style.display = 'block';
+            noDataDiv.style.display = 'none';
+            
+            // Preparar datos
+            const labels = [];
+            const counts = [];
+            const colors = [];
+            
+            for (const [name, info] of Object.entries(taskTypes)) {
+                labels.push(name);
+                counts.push(info.count);
+                colors.push(info.color);
+            }
+            
+            // Destruir gráfico anterior si existe
+            if (taskTypesPieChart) {
+                taskTypesPieChart.destroy();
+            }
+            
+            // Crear nuevo gráfico
+            const ctx = canvas.getContext('2d');
+            taskTypesPieChart = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: counts,
+                        backgroundColor: colors,
+                        borderColor: '#1e1e1e',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                color: '#fff',
+                                padding: 15,
+                                font: {
+                                    size: 12
+                                }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.parsed || 0;
+                                    const percentage = taskTypes[label].percentage || 0;
+                                    return `${label}: ${value} (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function createMonthlyTasksChart(monthlyData) {
+            const canvas = document.getElementById('monthlyTasksChart');
+            
+            if (!monthlyData || monthlyData.length === 0) {
+                return;
+            }
+            
+            const labels = monthlyData.map(m => m.month);
+            const counts = monthlyData.map(m => m.count);
+            
+            // Destruir gráfico anterior si existe
+            if (monthlyTasksChart) {
+                monthlyTasksChart.destroy();
+            }
+            
+            // Crear nuevo gráfico
+            const ctx = canvas.getContext('2d');
+            monthlyTasksChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Tareas Completadas',
+                        data: counts,
+                        borderColor: '#0d6efd',
+                        backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                color: '#fff',
+                                stepSize: 1
+                            },
+                            grid: {
+                                color: '#333'
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                color: '#fff'
+                            },
+                            grid: {
+                                color: '#333'
+                            }
+                        }
+                    }
+                }
+            });
+        }
         
         // ==================== INICIALIZACIÓN ====================
         

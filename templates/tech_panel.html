@@ -503,44 +503,52 @@
 <!-- Modal: Nueva Cita (Técnico) -->
 <div class="modal fade" id="modalNewAppointmentTech" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
-        <form action="/create_appointment" method="POST" class="modal-content bg-dark border-warning text-white">
+        <div class="modal-content bg-dark border-warning text-white">
             <div class="modal-header border-0">
                 <h5 class="modal-title">Nueva Cita</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
-                <div class="mb-3 position-relative">
-                    <label class="form-label">Cliente</label>
-                    <input type="text" name="client_name" id="modalFieldClient" class="form-control" required autocomplete="off">
-                    <div id="modalListClient" class="suggestions-list"></div>
-                </div>
-                <div class="row g-2 mb-3">
-                    <div class="col-7">
-                        <label class="form-label">Fecha</label>
-                        <input type="date" name="date" id="modalDateInput" class="form-control" required>
+            <form id="formNewAppointmentTech" onsubmit="submitNewAppointment(event)">
+                <div class="modal-body">
+                    <div class="mb-3 position-relative">
+                        <label class="form-label">Cliente</label>
+                        <input type="text" name="client_name" id="modalFieldClient" class="form-control" required autocomplete="off">
+                        <div id="modalListClient" class="suggestions-list"></div>
                     </div>
-                    <div class="col-5">
-                        <label class="form-label">Hora</label>
-                        <input type="time" name="time" class="form-control" required>
+                    <div class="row g-2 mb-3">
+                        <div class="col-7">
+                            <label class="form-label">Fecha</label>
+                            <input type="date" name="date" id="modalDateInput" class="form-control" required>
+                        </div>
+                        <div class="col-5">
+                            <label class="form-label">Hora Inicio</label>
+                            <input type="time" name="start_time" id="modalStartTime" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Hora Fin (Estimada)</label>
+                        <input type="time" name="end_time" id="modalEndTime" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Tipo de Servicio</label>
+                        <select name="service_type_id" id="modalServiceType" class="form-select" required>
+                            {% for s in all_service_types %}
+                            <option value="{{ s.id }}">{{ s.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Descripción/Notas</label>
+                        <textarea name="description" class="form-control" rows="3" placeholder="Detalles de la cita..."></textarea>
                     </div>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">Tipo de Servicio</label>
-                    <select name="service_type" class="form-select" required>
-                        {% for s in all_service_types %}
-                        <option value="{{ s.name }}">{{ s.name }}</option>
-                        {% endfor %}
-                    </select>
+                <div class="modal-footer border-0">
+                    <button type="submit" class="btn btn-warning w-100 fw-bold">
+                        <i class="bi bi-calendar-plus me-1"></i>Agendar Cita
+                    </button>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">Notas</label>
-                    <textarea name="notes" class="form-control" rows="3"></textarea>
-                </div>
-            </div>
-            <div class="modal-footer border-0">
-                <button type="submit" class="btn btn-warning w-100 fw-bold">Agendar Cita</button>
-            </div>
-        </form>
+            </form>
+        </div>
     </div>
 </div>
 
@@ -777,6 +785,56 @@
         
         // Abrir el modal de nueva cita
         new bootstrap.Modal(document.getElementById('modalNewAppointmentTech')).show();
+    }
+
+    // Función para enviar nueva cita al backend
+    function submitNewAppointment(event) {
+        event.preventDefault();
+        
+        const form = event.target;
+        const formData = new FormData(form);
+        
+        // Preparar datos para enviar a /create_task
+        const data = {
+            tech_id: '{{ current_user.id }}',  // ID del técnico actual
+            client_name: formData.get('client_name'),
+            date: formData.get('date'),
+            start_time: formData.get('start_time'),
+            end_time: formData.get('end_time'),
+            service_type_id: formData.get('service_type_id'),
+            description: formData.get('description') || ''
+        };
+        
+        fetch('/create_task', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                // Cerrar modal
+                bootstrap.Modal.getInstance(document.getElementById('modalNewAppointmentTech')).hide();
+                
+                // Limpiar formulario
+                form.reset();
+                
+                // Recargar calendario
+                if (calendar) {
+                    calendar.refetchEvents();
+                }
+                
+                alert('✓ Cita agendada correctamente');
+            } else {
+                alert('Error al agendar cita: ' + (result.msg || 'Error desconocido'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error al conectar con el servidor');
+        });
     }
 
     function renderTaskList() {
