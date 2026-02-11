@@ -144,14 +144,15 @@
           {% if messages %}
             {% for category, message in messages %}
               <div class="alert alert-{{ category }} alert-dismissible fade show text-start" role="alert">
-                <i class="bi bi-exclamation-circle-fill me-2"></i> {{ message }}
+                <i class="bi bi-{% if category == 'success' %}check-circle{% else %}exclamation-circle{% endif %}-fill me-2"></i> 
+                {{ message }}
               </div>
             {% endfor %}
           {% endif %}
         {% endwith %}
 
         <!-- Formulario de Login -->
-        <form method="POST" id="loginForm">
+        <form method="POST" action="/login" id="loginForm">
             <div class="mb-3 text-start">
                 <label class="form-label">USUARIO</label>
                 <input type="text" name="username" class="form-control" placeholder="Nombre de usuario" required>
@@ -204,6 +205,15 @@
             document.getElementById('loginForm').style.display = 'block';
             document.getElementById('forgotPasswordForm').style.display = 'none';
         }
+
+        // Cerrar alertas automáticamente después de 8 segundos
+        setTimeout(function() {
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(alert => {
+                const bsAlert = new bootstrap.Alert(alert);
+                bsAlert.close();
+            });
+        }, 8000);
     </script>
 </body>
 </html>
