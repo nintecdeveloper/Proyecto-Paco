@@ -55,6 +55,9 @@ class ServiceType(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), unique=True, nullable=False)
     color = db.Column(db.String(7), default='#6c757d')
+    
+    def __repr__(self):
+        return f"{self.name}"
 
 class StockCategory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -361,9 +364,6 @@ def manage_clients():
         link = request.form.get('link', '').strip()
         notes = request.form.get('notes', '')
         has_support = request.form.get('has_support') == 'true'
-        support_mf = request.form.get('support_monday_friday') == 'true'
-        support_sat = request.form.get('support_saturday') == 'true'
-        support_sun = request.form.get('support_sunday') == 'true'
         
         if not all([name, phone, email, address]):
             flash('Todos los campos obligatorios deben estar completos.', 'danger')
@@ -381,9 +381,9 @@ def manage_clients():
             link=link if link else None,
             notes=notes,
             has_support=has_support,
-            support_monday_friday=support_mf,
-            support_saturday=support_sat,
-            support_sunday=support_sun
+            support_monday_friday=False,  # Deprecated
+            support_saturday=False,       # Deprecated
+            support_sunday=False          # Deprecated
         )
         db.session.add(new_client)
         db.session.commit()
@@ -403,9 +403,10 @@ def manage_clients():
             client.link = link if link else None
             client.notes = request.form.get('notes', '')
             client.has_support = request.form.get('has_support') == 'true'
-            client.support_monday_friday = request.form.get('support_monday_friday') == 'true'
-            client.support_saturday = request.form.get('support_saturday') == 'true'
-            client.support_sunday = request.form.get('support_sunday') == 'true'
+            # Campos deprecated - ya no se procesan desde frontend
+            # client.support_monday_friday = False
+            # client.support_saturday = False
+            # client.support_sunday = False
             db.session.commit()
             flash('Cliente actualizado correctamente.', 'success')
     
@@ -1365,6 +1366,139 @@ def create_alarm():
     
     flash('Alarma creada correctamente.', 'success')
     return redirect(url_for('dashboard'))
+
+@app.route('/print_report/<int:report_id>')
+@login_required
+def print_report(report_id):
+    """Endpoint para imprimir/exportar reporte de trabajo"""
+    try:
+        task = Task.query.get_or_404(report_id)
+        
+        # Verificar permisos
+        if current_user.role != 'admin' and task.tech_id != current_user.id:
+            flash('No tienes permiso para ver este reporte', 'danger')
+            return redirect(url_for('dashboard'))
+        
+        # Parsear archivos adjuntos si existen
+        attachments = []
+        if task.attachments:
+            try:
+                attachments = json.loads(task.attachments)
+            except:
+                attachments = []
+        
+        return render_template('print_report.html', 
+                             task=task,
+                             attachments=attachments)
+    except Exception as e:
+        print(f"Error printing report {report_id}: {str(e)}")
+        flash('Error al cargar el reporte', 'danger')
+        return redirect(url_for('dashboard'))
+
+@app.route('/api/task_action/<int:task_id>/<action>', methods=['POST'])
+@login_required
+def task_action(task_id, action):
+    """Endpoint unificado para acciones sobre tareas (delete, complete, cancel)"""
+    try:
+        task = Task.query.get_or_404(task_id)
+        
+        # Verificar permisos
+        if current_user.role != 'admin' and task.tech_id != current_user.id:
+            return jsonify({'success': False, 'msg': 'Sin permisos'}), 403
+        
+        if action == 'delete':
+            # Eliminar archivos adjuntos si existen
+            if task.attachments:
+                try:
+                    attachments = json.loads(task.attachments)
+                    for att in attachments:
+                        filepath = os.path.join(app.config['UPLOAD_FOLDER'], att['filename'])
+                        if os.path.exists(filepath):
+                            os.remove(filepath)
+                except Exception as e:
+                    print(f"Error deleting attachments: {e}")
+            
+            db.session.delete(task)
+            db.session.commit()
+            return jsonify({'success': True, 'msg': 'Tarea eliminada correctamente'})
+        
+        elif action == 'complete':
+            task.status = 'Completado'
+            if not task.actual_end_time:
+                task.actual_end_time = datetime.now()
+            db.session.commit()
+            return jsonify({'success': True, 'msg': 'Tarea marcada como completada'})
+        
+        elif action == 'cancel':
+            task.status = 'Cancelado'
+            db.session.commit()
+            return jsonify({'success': True, 'msg': 'Tarea cancelada'})
+        
+        else:
+            return jsonify({'success': False, 'msg': f'Acción desconocida: {action}'}), 400
+            
+    except Exception as e:
+        print(f"Error in task_action: {str(e)}")
+        db.session.rollback()
+        return jsonify({'success': False, 'msg': 'Error del servidor'}), 500
+
+@app.route('/schedule_appointment', methods=['POST'])
+@login_required
+def schedule_appointment():
+    """Endpoint para agendar nueva cita desde el panel admin"""
+    try:
+        if current_user.role != 'admin':
+            flash('Solo administradores pueden agendar citas', 'danger')
+            return redirect(url_for('dashboard'))
+        
+        tech_id = request.form.get('tech_id')
+        client_name = request.form.get('client_name')
+        date_str = request.form.get('date')
+        time_str = request.form.get('time')
+        service_type_name = request.form.get('service_type')
+        notes = request.form.get('notes', '')
+        
+        # Validaciones
+        if not all([tech_id, client_name, date_str, time_str, service_type_name]):
+            flash('Todos los campos son obligatorios', 'danger')
+            return redirect(url_for('dashboard'))
+        
+        # Buscar o crear cliente
+        client = Client.query.filter_by(name=client_name).first()
+        client_id = client.id if client else None
+        
+        # Buscar tipo de servicio
+        service_type = ServiceType.query.filter_by(name=service_type_name).first()
+        if not service_type:
+            flash('Tipo de servicio no válido', 'danger')
+            return redirect(url_for('dashboard'))
+        
+        # Convertir fecha
+        task_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        
+        # Crear tarea
+        new_task = Task(
+            tech_id=int(tech_id),
+            client_id=client_id,
+            client_name=client_name,
+            description=notes,
+            date=task_date,
+            start_time=time_str,
+            service_type_id=service_type.id,
+            status='Pendiente'
+        )
+        
+        db.session.add(new_task)
+        db.session.commit()
+        
+        flash('Cita agendada correctamente', 'success')
+        return redirect(url_for('dashboard'))
+        
+    except Exception as e:
+        print(f"Error scheduling appointment: {str(e)}")
+        db.session.rollback()
+        flash('Error al agendar la cita', 'danger')
+        return redirect(url_for('dashboard'))
 
 @app.route('/logout')
 def logout():

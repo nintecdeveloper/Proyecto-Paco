@@ -295,13 +295,13 @@
                             <tr>
                                 <td>{{ r.id }}</td>
                                 <td>{{ r.client_name }}</td>
-                                <td>{{ r.service_type }}</td>
+                                <td>{{ r.service_type.name if r.service_type is not string else r.service_type }}</td>
                                 <td>{{ r.date.strftime('%d/%m/%Y') }}</td>
                                 <td>{{ r.tech.username if r.tech else 'Sin técnico' }}</td>
                                 <td>
                                     <a href="/print_report/{{ r.id }}" target="_blank"
                                         class="btn btn-sm btn-outline-warning">
-                                        <i class="bi bi-printer-fill"></i>
+                                        <i class="bi bi-printer-fill"></i> Imprimir
                                     </a>
                                 </td>
                             </tr>
@@ -498,7 +498,7 @@
                                 
                                 <div class="small mb-1">
                                     <i class="bi bi-envelope-fill text-info me-2"></i>
-                                    <a href="mailto:{{ c.email }}" class="text-decoration-none text-white">{{ c.email }}</a>
+                                    <a href="/cdn-cgi/l/email-protection#fc8787dc9fd299919d9590dc8181" class="text-decoration-none text-white">{{ c.email }}</a>
                                 </div>
                                 
                                 <div class="small mb-2">
@@ -877,36 +877,15 @@
                             <label class="form-label fw-bold">¿Tiene Soporte Técnico Contratado?</label>
                             <div class="form-check form-switch">
                                 <input class="form-check-input" type="checkbox" id="hasSupportSwitch" 
-                                       name="has_support" value="true" onchange="toggleSupportOptions()">
+                                       name="has_support" value="true">
                                 <label class="form-check-label" for="hasSupportSwitch">
                                     Sí, tiene soporte técnico
                                 </label>
                             </div>
-                        </div>
-                        
-                        <div id="supportOptionsDiv" style="display: none;">
-                            <label class="form-label fw-bold text-warning">Cobertura del Soporte:</label>
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="supportMF" 
-                                       name="support_monday_friday" value="true">
-                                <label class="form-check-label" for="supportMF">
-                                    Lunes a Viernes
-                                </label>
-                            </div>
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="supportSat" 
-                                       name="support_saturday" value="true">
-                                <label class="form-check-label" for="supportSat">
-                                    Sábados
-                                </label>
-                            </div>
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="supportSun" 
-                                       name="support_sunday" value="true">
-                                <label class="form-check-label" for="supportSun">
-                                    Domingos
-                                </label>
-                            </div>
+                            <small class="text-muted">
+                                <i class="bi bi-info-circle me-1"></i>
+                                Marca esta opción si el cliente tiene contratado soporte técnico con OSLAPRINT
+                            </small>
                         </div>
                     </div>
                     <div class="modal-footer border-secondary">
@@ -972,36 +951,15 @@
                             <label class="form-label fw-bold">¿Tiene Soporte Técnico Contratado?</label>
                             <div class="form-check form-switch">
                                 <input class="form-check-input" type="checkbox" id="editHasSupport" 
-                                       name="has_support" value="true" onchange="toggleEditSupportOptions()">
+                                       name="has_support" value="true">
                                 <label class="form-check-label" for="editHasSupport">
                                     Sí, tiene soporte técnico
                                 </label>
                             </div>
-                        </div>
-                        
-                        <div id="editSupportOptionsDiv" style="display: none;">
-                            <label class="form-label fw-bold text-warning">Cobertura del Soporte:</label>
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="editSupportMF" 
-                                       name="support_monday_friday" value="true">
-                                <label class="form-check-label" for="editSupportMF">
-                                    Lunes a Viernes
-                                </label>
-                            </div>
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="editSupportSat" 
-                                       name="support_saturday" value="true">
-                                <label class="form-check-label" for="editSupportSat">
-                                    Sábados
-                                </label>
-                            </div>
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="editSupportSun" 
-                                       name="support_sunday" value="true">
-                                <label class="form-check-label" for="editSupportSun">
-                                    Domingos
-                                </label>
-                            </div>
+                            <small class="text-muted">
+                                <i class="bi bi-info-circle me-1"></i>
+                                Marca esta opción si el cliente tiene contratado soporte técnico con OSLAPRINT
+                            </small>
                         </div>
                     </div>
                     <div class="modal-footer border-secondary">
@@ -1343,7 +1301,7 @@
     </div>
 
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <!-- Modal: Estadísticas del Técnico -->
 <div class="modal fade" id="modalTechStats" tabindex="-1">
@@ -1520,18 +1478,49 @@
         // --- GESTIÓN DE ACCIONES ---
         function performAdminTaskAction(action) {
             const id = document.getElementById('evtId').value;
-            if (!confirm('¿Confirmar acción administrativa?')) return;
+            
+            const actionNames = {
+                'complete': 'completar',
+                'delete': 'eliminar',
+                'cancel': 'cancelar'
+            };
+            
+            const actionName = actionNames[action] || action;
+            
+            if (!confirm(`¿Confirmar ${actionName} esta tarea?`)) return;
 
             fetch(`/api/task_action/${id}/${action}`, { method: 'POST' })
-                .then(res => res.json())
+                .then(res => {
+                    if (!res.ok) {
+                        throw new Error(`HTTP error! status: ${res.status}`);
+                    }
+                    return res.json();
+                })
                 .then(data => {
                     if (data.success) {
+                        // Mostrar mensaje de éxito
+                        const successMsg = action === 'delete' ? 'Tarea eliminada correctamente' : 
+                                         action === 'complete' ? 'Tarea marcada como completada' : 
+                                         'Acción completada correctamente';
+                        
+                        // Refrescar calendarios PRIMERO
                         if (calendar) calendar.refetchEvents();
                         if (calendarGlobalInstance) calendarGlobalInstance.refetchEvents();
+                        
+                        // Cerrar modal
                         modalActionAdmin.hide();
+                        
+                        // Mostrar confirmación después de cerrar modal
+                        setTimeout(() => {
+                            alert('✓ ' + successMsg);
+                        }, 100);
                     } else {
-                        alert('Error: ' + data.msg);
+                        alert('❌ Error: ' + (data.msg || 'No se pudo completar la acción'));
                     }
+                })
+                .catch(err => {
+                    console.error('Error en performAdminTaskAction:', err);
+                    alert('❌ Error de conexión. Por favor, intenta de nuevo.');
                 });
         }
 
@@ -2253,18 +2242,6 @@
         
         // ==================== FUNCIONES DE SOPORTE TÉCNICO ====================
         
-        function toggleSupportOptions() {
-            const checkbox = document.getElementById('hasSupportSwitch');
-            const div = document.getElementById('supportOptionsDiv');
-            div.style.display = checkbox.checked ? 'block' : 'none';
-        }
-        
-        function toggleEditSupportOptions() {
-            const checkbox = document.getElementById('editHasSupport');
-            const div = document.getElementById('editSupportOptionsDiv');
-            div.style.display = checkbox.checked ? 'block' : 'none';
-        }
-        
         // ==================== GOOGLE MAPS ====================
         
         document.getElementById('clientAddress')?.addEventListener('input', function() {
@@ -2689,13 +2666,5 @@
                 stockTabButton.addEventListener('click', function() {
                     setTimeout(() => loadStockTree(), 100);
                 });
-                // Cargar al inicio
-                loadStockTree();
             }
-        }, 1000);
-
-
-    </script>
-</body>
-
-</html>
+        })

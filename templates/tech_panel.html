@@ -1118,10 +1118,25 @@
 
         function deleteFromList(id) {
             if (!confirm('¿Eliminar esta tarea terminada?')) return;
+            
             fetch(`/api/task_action/${id}/delete`, { method: 'POST' })
-                .then(res => res.json())
+                .then(res => {
+                    if (!res.ok) {
+                        throw new Error(`HTTP error! status: ${res.status}`);
+                    }
+                    return res.json();
+                })
                 .then(data => {
-                    if (data.success) calendar.refetchEvents(); // Esto recargará lista y calendario
+                    if (data.success) {
+                        calendar.refetchEvents(); // Recargar calendario y lista
+                        alert('✓ Tarea eliminada correctamente');
+                    } else {
+                        alert('❌ Error: ' + (data.msg || 'No se pudo eliminar la tarea'));
+                    }
+                })
+                .catch(err => {
+                    console.error('Error:', err);
+                    alert('❌ Error de conexión. Por favor, intenta de nuevo.');
                 });
         }
 
@@ -1149,17 +1164,38 @@
             }
 
             // Para otras acciones (delete), continuar normalmente
-            if (!confirm('¿Confirmar acción?')) return;
+            const actionNames = {
+                'delete': 'eliminar',
+                'cancel': 'cancelar'
+            };
+            const actionName = actionNames[action] || action;
+            
+            if (!confirm(`¿Confirmar ${actionName} esta tarea?`)) return;
 
             fetch(`/api/task_action/${id}/${action}`, { method: 'POST' })
-                .then(res => res.json())
+                .then(res => {
+                    if (!res.ok) {
+                        throw new Error(`HTTP error! status: ${res.status}`);
+                    }
+                    return res.json();
+                })
                 .then(data => {
                     if (data.success) {
                         calendar.refetchEvents();
                         modalAction.hide();
+                        
+                        // Mostrar mensaje de éxito
+                        setTimeout(() => {
+                            const successMsg = action === 'delete' ? 'Tarea eliminada correctamente' : 'Acción completada correctamente';
+                            alert('✓ ' + successMsg);
+                        }, 100);
                     } else {
-                        alert('Error: ' + data.msg);
+                        alert('❌ Error: ' + (data.msg || 'No se pudo completar la acción'));
                     }
+                })
+                .catch(err => {
+                    console.error('Error en performTaskAction:', err);
+                    alert('❌ Error de conexión. Por favor, intenta de nuevo.');
                 });
         }
 
