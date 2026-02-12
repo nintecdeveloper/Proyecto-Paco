@@ -922,8 +922,19 @@
             document.querySelectorAll('[id^="section-"], #home-menu').forEach(el => el.classList.add('d-none'));
             document.getElementById(id).classList.remove('d-none');
 
+            // Inicializar calendario si es necesario
             if (id === 'section-agenda' && !calendar) {
                 setTimeout(() => initCalendar(), 100);
+            }
+
+            // Inicializar firma cuando se muestra la sección de parte
+            if (id === 'section-parte') {
+                setTimeout(() => mainSignaturePad.init(), 100);
+            }
+
+            // Cargar analíticas cuando se muestra la sección
+            if (id === 'section-analytics') {
+                setTimeout(() => loadAnalytics(), 100);
             }
         }
 
@@ -1577,14 +1588,6 @@
         }
 
         // Cargar analíticas cuando se muestra la sección
-        const originalShowSection = window.showSection;
-        window.showSection = function (sectionId) {
-            originalShowSection(sectionId);
-            if (sectionId === 'section-analytics') {
-                setTimeout(() => loadAnalytics(), 100);
-            }
-        };
-
         // ==================== FIRMA DIGITAL ====================
 
         // Firma para el FORMULARIO PRINCIPAL (section-parte)
@@ -1724,28 +1727,6 @@
         }
 
         // Inicializar firma cuando se muestra la sección de parte
-        const originalShowSection = window.showSection;
-        window.showSection = function(sectionId) {
-            if (typeof originalShowSection === 'function') {
-                originalShowSection(sectionId);
-            } else {
-                document.querySelectorAll('[id^="section-"], #home-menu').forEach(el => el.classList.add('d-none'));
-                document.getElementById(sectionId).classList.remove('d-none');
-            }
-
-            if (sectionId === 'section-parte') {
-                setTimeout(() => mainSignaturePad.init(), 100);
-            }
-
-            if (sectionId === 'section-agenda' && !calendar) {
-                setTimeout(() => initCalendar(), 100);
-            }
-
-            if (sectionId === 'section-analytics') {
-                setTimeout(() => loadAnalytics(), 100);
-            }
-        };
-
         // VALIDACIÓN DEL FORMULARIO ANTES DE ENVIAR
         document.addEventListener('DOMContentLoaded', function() {
             const reportForm = document.querySelector('form[action="/save_report"]');
