@@ -550,28 +550,21 @@
 
             <!-- Tarjetas de Resumen -->
             <div class="row g-3 mb-4">
-                <div class="col-md-3 col-6">
+                <div class="col-md-4 col-6">
                     <div class="card bg-dark border-secondary p-3 text-center">
                         <i class="bi bi-clipboard-check fs-1 text-success mb-2"></i>
                         <h2 class="text-white fw-bold mb-0" id="totalServices">0</h2>
                         <small class="text-muted">Servicios Totales</small>
                     </div>
                 </div>
-                <div class="col-md-3 col-6">
+                <div class="col-md-4 col-6">
                     <div class="card bg-dark border-secondary p-3 text-center">
                         <i class="bi bi-tools fs-1 text-warning mb-2"></i>
                         <h2 class="text-white fw-bold mb-0" id="totalMaintenances">0</h2>
                         <small class="text-muted">Mantenimientos</small>
                     </div>
                 </div>
-                <div class="col-md-3 col-6">
-                    <div class="card bg-dark border-secondary p-3 text-center">
-                        <i class="bi bi-cash-stack fs-1 text-info mb-2"></i>
-                        <h2 class="text-white fw-bold mb-0" id="totalRevenue">0€</h2>
-                        <small class="text-muted">Ingresos Estimados</small>
-                    </div>
-                </div>
-                <div class="col-md-3 col-6">
+                <div class="col-md-4 col-6">
                     <div class="card bg-dark border-secondary p-3 text-center">
                         <i class="bi bi-clock-history fs-1 text-danger mb-2"></i>
                         <h2 class="text-white fw-bold mb-0" id="avgTime">0h</h2>
@@ -599,7 +592,6 @@
                             <select id="metricSelector" class="form-select form-select-sm"
                                 onchange="updateTimelineChart()">
                                 <option value="services">Servicios Realizados</option>
-                                <option value="revenue">Ingresos Totales</option>
                                 <option value="maintenances">Mantenimientos</option>
                             </select>
                         </div>
@@ -608,22 +600,9 @@
                 </div>
             </div>
 
-            <!-- Top Clientes -->
+            <!-- Tipos de Servicio Más Frecuentes - Ancho Completo -->
             <div class="row g-3">
-                <div class="col-lg-6">
-                    <div class="card bg-dark border-secondary p-4">
-                        <h5 class="text-white fw-bold mb-3"><i class="bi bi-people-fill me-2"></i>Top 5 Clientes</h5>
-                        <div id="topClients" class="list-group">
-                            <div class="text-center text-muted py-5">
-                                <i class="bi bi-hourglass-split fs-1 d-block mb-2"></i>
-                                Cargando datos...
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Tipos de Servicio Más Frecuentes -->
-                <div class="col-lg-6">
+                <div class="col-12">
                     <div class="card bg-dark border-secondary p-4">
                         <h5 class="text-white fw-bold mb-3"><i class="bi bi-bar-chart me-2"></i>Servicios Más Frecuentes
                         </h5>
@@ -1403,7 +1382,6 @@
             // Mostrar indicador de carga
             document.getElementById('totalServices').textContent = '...';
             document.getElementById('totalMaintenances').textContent = '...';
-            document.getElementById('totalRevenue').textContent = '...';
             document.getElementById('avgTime').textContent = '...';
 
             fetch(`/api/tech_analytics?period=${period}`)
@@ -1413,7 +1391,6 @@
                     updateAnalyticsSummary(data);
                     updateServiceDistributionChart(data);
                     updateTimelineChart();
-                    updateTopClients(data);
                     updateTopServicesChart(data);
                 })
                 .catch(err => {
@@ -1425,7 +1402,6 @@
         function updateAnalyticsSummary(data) {
             document.getElementById('totalServices').textContent = data.total_services || 0;
             document.getElementById('totalMaintenances').textContent = data.total_maintenances || 0;
-            document.getElementById('totalRevenue').textContent = (data.total_revenue || 0).toLocaleString('es-ES') + '€';
             document.getElementById('avgTime').textContent = (data.avg_time || 0) + 'h';
         }
 
@@ -1504,10 +1480,6 @@
                 data = timeline.map(t => t.services);
                 label = 'Servicios Realizados';
                 color = '#4bc0c0';
-            } else if (metric === 'revenue') {
-                data = timeline.map(t => t.revenue);
-                label = 'Ingresos (€)';
-                color = '#36a2eb';
             } else if (metric === 'maintenances') {
                 data = timeline.map(t => t.maintenances);
                 label = 'Mantenimientos';
@@ -1551,31 +1523,6 @@
                     }
                 }
             });
-        }
-
-        function updateTopClients(data) {
-            const container = document.getElementById('topClients');
-            const topClients = data.top_clients || [];
-
-            if (topClients.length === 0) {
-                container.innerHTML = `
-                <div class="text-center text-muted py-4">
-                    <i class="bi bi-inbox fs-1 d-block mb-2"></i>
-                    No hay datos disponibles
-                </div>
-            `;
-                return;
-            }
-
-            container.innerHTML = topClients.map((client, index) => `
-            <div class="list-group-item bg-dark border-secondary text-white d-flex justify-content-between align-items-center mb-2">
-                <div>
-                    <span class="badge bg-info me-2">${index + 1}</span>
-                    <strong>${client.name}</strong>
-                </div>
-                <span class="badge bg-warning text-dark">${client.count} servicios</span>
-            </div>
-        `).join('');
         }
 
         function updateTopServicesChart(data) {

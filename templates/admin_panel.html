@@ -214,16 +214,16 @@
                         <div class="card-emp">
                             <button class="btn-delete-user" 
                                 data-bs-toggle="modal"
-                                data-user-id="{{ u.id }}"
-                                onclick="document.getElementById('deleteUserId').value=this.dataset.userId;"
-                                data-bs-target="#modalDeleteUser"><i class="bi bi-x-circle-fill fs-4"></i></button>
+                                data-bs-target="#modalDeleteUser"
+                                onclick="document.getElementById('deleteUserId').value='{{ u.id }}';">
+                                <i class="bi bi-x-circle-fill fs-4"></i>
+                            </button>
                             <i class="bi bi-person-circle fs-1 mb-2 text-warning"></i>
                             <h5 class="mb-1 text-white fw-bold">{{ u.username }}</h5>
                             <small class="text-muted">ID: #{{ u.id }}</small>
                             <hr class="my-3" style="border-color:#333;">
                             <button class="btn btn-sm btn-primary w-100 mb-2" 
-                                data-user-id="{{ u.id }}"
-                                onclick="loadEmployeeCalendar(this.dataset.userId)">
+                                onclick="loadEmployeeCalendar({{ u.id }})">
                                 <i class="bi bi-calendar-check-fill me-1"></i> Ver Calendario
                             </button>
                             <button class="btn btn-sm btn-outline-info w-100" 
@@ -2659,12 +2659,23 @@
             });
         }
         
-        // Event listener para cargar stock tree al abrir la pestaña
-        setTimeout(() => {
+        // Event listeners para cargar stock tree y categories tree al abrir las pestañas
+        document.addEventListener('DOMContentLoaded', function() {
             const stockTabButton = document.querySelector('button[data-bs-target="#stock"]');
             if (stockTabButton) {
                 stockTabButton.addEventListener('click', function() {
                     setTimeout(() => loadStockTree(), 100);
                 });
             }
-        })
+            
+            const configTabButton = document.querySelector('button[data-bs-target="#config"]');
+            if (configTabButton) {
+                configTabButton.addEventListener('click', function() {
+                    setTimeout(() => loadCategoriesTree(), 100);
+                });
+            }
+        });
+    </script>
+</body>
+
+</html>

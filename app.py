@@ -191,104 +191,90 @@ def inject_globals():
 # --- RUTAS PRINCIPALES ---
 @app.route('/')
 def index():
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
     return redirect(url_for('login'))
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
+    
     if request.method == 'POST':
-        user = User.query.filter_by(username=request.form['username']).first()
-        if user and check_password_hash(user.password_hash, request.form['password']):
+        username = request.form.get('username')
+        password = request.form.get('password')
+        user = User.query.filter_by(username=username).first()
+        
+        if user and check_password_hash(user.password_hash, password):
             login_user(user)
             return redirect(url_for('dashboard'))
-        flash('Credenciales incorrectas.', 'danger')
+        flash('Usuario o contraseña incorrectos', 'danger')
+    
     return render_template('login.html')
-
-@app.route('/forgot_password', methods=['POST'])
-def forgot_password():
-    email = request.form.get('email')
-    user = User.query.filter_by(email=email).first()
-    
-    if not user:
-        flash('No se encontró ningún usuario con ese correo electrónico.', 'danger')
-        return redirect(url_for('login'))
-    
-    token = secrets.token_urlsafe(32)
-    user.reset_token = token
-    user.reset_token_expiry = datetime.now() + timedelta(hours=24)
-    db.session.commit()
-    
-    reset_link = url_for('reset_password', token=token, _external=True)
-    flash(f'Enlace de recuperación generado. Link: {reset_link}', 'success')
-    return redirect(url_for('login'))
-
-@app.route('/reset_password/<token>', methods=['GET', 'POST'])
-def reset_password(token):
-    user = User.query.filter_by(reset_token=token).first()
-    
-    if not user or not user.reset_token_expiry or user.reset_token_expiry < datetime.now():
-        flash('El enlace de recuperación no es válido o ha expirado.', 'danger')
-        return redirect(url_for('login'))
-    
-    if request.method == 'POST':
-        password = request.form.get('password')
-        confirm_password = request.form.get('confirm_password')
-        
-        if password != confirm_password:
-            flash('Las contraseñas no coinciden.', 'danger')
-            return render_template('reset_password.html')
-        
-        is_valid, message = validate_password(password)
-        if not is_valid:
-            flash(message, 'danger')
-            return render_template('reset_password.html')
-        
-        user.password_hash = generate_password_hash(password)
-        user.reset_token = None
-        user.reset_token_expiry = None
-        db.session.commit()
-        
-        flash('Contraseña restablecida correctamente.', 'success')
-        return redirect(url_for('login'))
-    
-    return render_template('reset_password.html')
 
 @app.route('/dashboard')
 @login_required
 def dashboard():
     if current_user.role == 'admin':
         empleados = User.query.filter_by(role='tech').all()
-        informes = Task.query.filter_by(status='Completado').order_by(Task.date.desc()).all()
-        
-        categories = StockCategory.query.filter_by(parent_id=None).all()
-        inventory = Stock.query.order_by(Stock.name).all()
-        
         clients = Client.query.order_by(Client.name).all()
-        services = ServiceType.query.order_by(ServiceType.name).all()
-        alarms = Alarm.query.order_by(Alarm.is_read.asc(), Alarm.created_at.desc()).all()
+        services = ServiceType.query.all()
+        informes = Task.query.filter_by(status='Completado').order_by(Task.date.desc()).limit(50).all()
+        stock_items = Stock.query.order_by(Stock.name).all()
         
         return render_template('admin_panel.html', 
-                             empleados=empleados, 
-                             informes=informes, 
-                             inventory=inventory,
-                             stock_categories=categories,
-                             clients=clients, 
+                             empleados=empleados,
+                             clients=clients,
                              services=services,
-                             alarms=alarms)
-    
-    # Panel técnico
-    stock_items = Stock.query.order_by(Stock.name).all()
-    pending_tasks = Task.query.filter_by(tech_id=current_user.id, status='Pendiente').order_by(Task.date).all()
-    
-    return render_template('tech_panel.html', 
-                           today_date=date.today().strftime('%Y-%m-%d'), 
-                           stock_items=stock_items,
-                           pending_tasks=pending_tasks)
+                             informes=informes,
+                             stock_items=stock_items,
+                             today_date=date.today().strftime('%Y-%m-%d'))
+    else:
+        pending_tasks = Task.query.filter_by(
+            tech_id=current_user.id, 
+            status='Pendiente'
+        ).order_by(Task.date.asc()).all()
+        
+        stock_items = Stock.query.filter(Stock.quantity > 0).order_by(Stock.name).all()
+        
+        return render_template('tech_panel.html',
+                             pending_tasks=pending_tasks,
+                             stock_items=stock_items,
+                             today_date=date.today().strftime('%Y-%m-%d'))
+
+@app.route('/change_password', methods=['POST'])
+@login_required
+def change_password():
+    try:
+        current_password = request.form.get('current_password')
+        new_password = request.form.get('new_password')
+        
+        if not check_password_hash(current_user.password_hash, current_password):
+            flash('Contraseña actual incorrecta', 'danger')
+            return redirect(url_for('dashboard'))
+        
+        is_valid, message = validate_password(new_password)
+        if not is_valid:
+            flash(message, 'danger')
+            return redirect(url_for('dashboard'))
+        
+        current_user.password_hash = generate_password_hash(new_password)
+        db.session.commit()
+        
+        flash('✅ Contraseña actualizada correctamente', 'success')
+        return redirect(url_for('dashboard'))
+        
+    except Exception as e:
+        print(f"Error changing password: {e}")
+        flash('Error al cambiar la contraseña', 'danger')
+        return redirect(url_for('dashboard'))
 
 # --- GESTIÓN DE USUARIOS ---
 @app.route('/manage_users', methods=['POST'])
 @login_required
 def manage_users():
     if current_user.role != 'admin':
+        flash('No autorizado', 'danger')
         return redirect(url_for('dashboard'))
     
     action = request.form.get('action')
@@ -300,11 +286,7 @@ def manage_users():
         role = request.form.get('role', 'tech')
         
         if User.query.filter_by(username=username).first():
-            flash('El nombre de usuario ya existe.', 'danger')
-            return redirect(url_for('dashboard'))
-        
-        if email and User.query.filter_by(email=email).first():
-            flash('El correo electrónico ya está registrado.', 'danger')
+            flash('El nombre de usuario ya existe', 'danger')
             return redirect(url_for('dashboard'))
         
         is_valid, message = validate_password(password)
@@ -320,30 +302,18 @@ def manage_users():
         )
         db.session.add(new_user)
         db.session.commit()
-        flash(f'Usuario {username} creado correctamente.', 'success')
+        flash(f'Usuario {username} creado correctamente', 'success')
     
     elif action == 'delete':
         user_id = request.form.get('user_id')
         user = User.query.get(user_id)
+        
         if user and user.id != current_user.id:
             db.session.delete(user)
             db.session.commit()
-            flash(f'Usuario eliminado.', 'success')
-    
-    elif action == 'change_password':
-        user_id = request.form.get('user_id')
-        new_password = request.form.get('new_password')
-        
-        is_valid, message = validate_password(new_password)
-        if not is_valid:
-            flash(message, 'danger')
-            return redirect(url_for('dashboard'))
-        
-        user = User.query.get(user_id)
-        if user:
-            user.password_hash = generate_password_hash(new_password)
-            db.session.commit()
-            flash('Contraseña actualizada correctamente.', 'success')
+            flash(f'Usuario {user.username} eliminado', 'success')
+        else:
+            flash('No puedes eliminar tu propio usuario', 'danger')
     
     return redirect(url_for('dashboard'))
 
@@ -352,7 +322,8 @@ def manage_users():
 @login_required
 def manage_clients():
     if current_user.role != 'admin':
-        return jsonify({'success': False, 'msg': 'No autorizado'}), 403
+        flash('No autorizado', 'danger')
+        return redirect(url_for('dashboard'))
     
     action = request.form.get('action')
     
@@ -361,17 +332,13 @@ def manage_clients():
         phone = request.form.get('phone')
         email = request.form.get('email')
         address = request.form.get('address')
-        link = request.form.get('link', '').strip()
+        link = request.form.get('link', '')
         notes = request.form.get('notes', '')
         has_support = request.form.get('has_support') == 'true'
         
-        if not all([name, phone, email, address]):
-            flash('Todos los campos obligatorios deben estar completos.', 'danger')
+        if Client.query.filter_by(name=name).first():
+            flash('Ya existe un cliente con ese nombre', 'danger')
             return redirect(url_for('dashboard'))
-        
-        # Validar y normalizar URL
-        if link and not (link.startswith('http://') or link.startswith('https://')):
-            link = 'https://' + link
         
         new_client = Client(
             name=name,
@@ -380,14 +347,11 @@ def manage_clients():
             address=address,
             link=link if link else None,
             notes=notes,
-            has_support=has_support,
-            support_monday_friday=False,  # Deprecated
-            support_saturday=False,       # Deprecated
-            support_sunday=False          # Deprecated
+            has_support=has_support
         )
         db.session.add(new_client)
         db.session.commit()
-        flash('Cliente creado correctamente.', 'success')
+        flash(f'Cliente {name} añadido correctamente', 'success')
     
     elif action == 'edit':
         client_id = request.form.get('client_id')
@@ -397,18 +361,11 @@ def manage_clients():
             client.phone = request.form.get('phone')
             client.email = request.form.get('email')
             client.address = request.form.get('address')
-            link = request.form.get('link', '').strip()
-            if link and not (link.startswith('http://') or link.startswith('https://')):
-                link = 'https://' + link
-            client.link = link if link else None
+            client.link = request.form.get('link', '') or None
             client.notes = request.form.get('notes', '')
             client.has_support = request.form.get('has_support') == 'true'
-            # Campos deprecated - ya no se procesan desde frontend
-            # client.support_monday_friday = False
-            # client.support_saturday = False
-            # client.support_sunday = False
             db.session.commit()
-            flash('Cliente actualizado correctamente.', 'success')
+            flash('Cliente actualizado correctamente', 'success')
     
     elif action == 'delete':
         client_id = request.form.get('client_id')
@@ -416,114 +373,84 @@ def manage_clients():
         if client:
             db.session.delete(client)
             db.session.commit()
-            flash('Cliente eliminado.', 'success')
+            flash('Cliente eliminado', 'success')
     
     return redirect(url_for('dashboard'))
 
-# --- GESTIÓN DE STOCK ---
-@app.route('/manage_stock_categories', methods=['POST'])
+@app.route('/export_clients')
 @login_required
-def manage_stock_categories():
+def export_clients():
     if current_user.role != 'admin':
-        return jsonify({'success': False}), 403
-    
-    action = request.form.get('action')
-    
-    if action == 'add':
-        name = request.form.get('name')
-        parent_id = request.form.get('parent_id')
-        
-        if not name:
-            return jsonify({'success': False, 'msg': 'El nombre es obligatorio'}), 400
-        
-        new_category = StockCategory(
-            name=name,
-            parent_id=int(parent_id) if parent_id and parent_id != '' else None
-        )
-        db.session.add(new_category)
-        db.session.commit()
-        return jsonify({'success': True, 'msg': 'Categoría creada correctamente'})
-    
-    elif action == 'delete':
-        category_id = request.form.get('category_id')
-        category = StockCategory.query.get(category_id)
-        if category:
-            db.session.delete(category)
-            db.session.commit()
-            return jsonify({'success': True})
-    
-    return jsonify({'success': False}), 400
-
-@app.route('/manage_stock', methods=['POST'])
-@login_required
-def manage_stock():
-    if current_user.role != 'admin':
+        flash('No autorizado', 'danger')
         return redirect(url_for('dashboard'))
     
-    action = request.form.get('action')
+    clients = Client.query.all()
+    data = [{
+        'name': c.name,
+        'phone': c.phone,
+        'email': c.email,
+        'address': c.address,
+        'link': c.link,
+        'notes': c.notes,
+        'has_support': c.has_support
+    } for c in clients]
     
-    if action == 'add':
-        name = request.form.get('name')
-        category_id = request.form.get('category_id')
-        quantity = int(request.form.get('quantity', 0))
-        min_stock = int(request.form.get('min_stock', 5))
-        description = request.form.get('description', '')
+    json_data = json.dumps(data, indent=2, ensure_ascii=False)
+    return send_file(
+        io.BytesIO(json_data.encode('utf-8')),
+        mimetype='application/json',
+        as_attachment=True,
+        download_name='clientes_oslaprint.json'
+    )
+
+@app.route('/import_clients', methods=['POST'])
+@login_required
+def import_clients():
+    if current_user.role != 'admin':
+        flash('No autorizado', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    if 'file' not in request.files:
+        flash('No se seleccionó archivo', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    file = request.files['file']
+    if file.filename == '':
+        flash('Archivo vacío', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    try:
+        data = json.load(file)
+        imported = 0
         
-        final_category_id = None
-        if category_id and category_id.strip():
-            try:
-                final_category_id = int(category_id)
-                if not StockCategory.query.get(final_category_id):
-                    flash('Categoría no válida.', 'danger')
-                    return redirect(url_for('dashboard'))
-            except ValueError:
-                flash('ID de categoría no válido.', 'danger')
-                return redirect(url_for('dashboard'))
+        for item in data:
+            if not Client.query.filter_by(name=item.get('name')).first():
+                new_client = Client(
+                    name=item.get('name'),
+                    phone=item.get('phone', ''),
+                    email=item.get('email', ''),
+                    address=item.get('address', ''),
+                    link=item.get('link'),
+                    notes=item.get('notes', ''),
+                    has_support=item.get('has_support', False)
+                )
+                db.session.add(new_client)
+                imported += 1
         
-        new_item = Stock(
-            name=name,
-            category_id=final_category_id,
-            quantity=quantity,
-            min_stock=min_stock,
-            description=description
-        )
-        db.session.add(new_item)
         db.session.commit()
-        check_low_stock()
-        flash('Producto añadido correctamente.', 'success')
-    
-    elif action == 'edit':
-        item_id = request.form.get('item_id')
-        item = Stock.query.get(item_id)
-        if item:
-            item.name = request.form.get('name')
-            category_id = request.form.get('category_id')
-            if category_id and category_id.strip():
-                item.category_id = int(category_id)
-            else:
-                item.category_id = None
-            item.quantity = int(request.form.get('quantity', 0))
-            item.min_stock = int(request.form.get('min_stock', 5))
-            item.description = request.form.get('description', '')
-            db.session.commit()
-            check_low_stock()
-            flash('Producto actualizado.', 'success')
-    
-    elif action == 'delete':
-        item_id = request.form.get('item_id')
-        item = Stock.query.get(item_id)
-        if item:
-            db.session.delete(item)
-            db.session.commit()
-            flash('Producto eliminado.', 'success')
+        flash(f'✅ Importados {imported} clientes correctamente', 'success')
+    except Exception as e:
+        print(f"Error importing clients: {e}")
+        flash('Error al importar clientes. Verifica el formato JSON.', 'danger')
     
     return redirect(url_for('dashboard'))
 
-# --- GESTIÓN DE TIPOS DE SERVICIO ---
+# --- GESTIÓN DE SERVICIOS ---
 @app.route('/manage_services', methods=['POST'])
 @login_required
 def manage_services():
     if current_user.role != 'admin':
+        flash('No autorizado', 'danger')
         return redirect(url_for('dashboard'))
     
     action = request.form.get('action')
@@ -533,13 +460,13 @@ def manage_services():
         color = request.form.get('color', '#6c757d')
         
         if ServiceType.query.filter_by(name=name).first():
-            flash('Ya existe un tipo de servicio con ese nombre.', 'danger')
+            flash('Ya existe un servicio con ese nombre', 'danger')
             return redirect(url_for('dashboard'))
         
         new_service = ServiceType(name=name, color=color)
         db.session.add(new_service)
         db.session.commit()
-        flash('Tipo de servicio creado.', 'success')
+        flash(f'Tipo de servicio "{name}" añadido', 'success')
     
     elif action == 'edit':
         service_id = request.form.get('service_id')
@@ -548,7 +475,7 @@ def manage_services():
             service.name = request.form.get('name')
             service.color = request.form.get('color')
             db.session.commit()
-            flash('Tipo de servicio actualizado.', 'success')
+            flash('Servicio actualizado', 'success')
     
     elif action == 'delete':
         service_id = request.form.get('service_id')
@@ -556,246 +483,138 @@ def manage_services():
         if service:
             db.session.delete(service)
             db.session.commit()
-            flash('Tipo de servicio eliminado.', 'success')
+            flash('Servicio eliminado', 'success')
     
     return redirect(url_for('dashboard'))
 
-# --- GESTIÓN DE TAREAS ---
-@app.route('/create_task', methods=['POST'])
+# --- GESTIÓN DE STOCK ---
+@app.route('/manage_stock', methods=['POST'])
 @login_required
-def create_task():
-    try:
-        data = request.get_json() if request.is_json else request.form
+def manage_stock():
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'msg': 'No autorizado'}), 403
+    
+    action = request.form.get('action')
+    
+    if action == 'add':
+        name = request.form.get('name')
+        category_id = request.form.get('category_id')
+        quantity = int(request.form.get('quantity', 0))
+        min_stock = int(request.form.get('min_stock', 5))
         
-        tech_id = data.get('tech_id')
-        client_name = data.get('client_name')
-        task_date = datetime.strptime(data.get('date'), '%Y-%m-%d').date()
-        start_time = data.get('start_time')
-        end_time = data.get('end_time')
-        service_type_id = data.get('service_type_id')
-        description = data.get('description', '')
-        
-        client = Client.query.filter_by(name=client_name).first()
-        
-        new_task = Task(
-            tech_id=int(tech_id) if tech_id else None,
-            client_id=client.id if client else None,
-            client_name=client_name,
-            date=task_date,
-            start_time=start_time,
-            end_time=end_time,
-            service_type_id=int(service_type_id),
-            description=description,
-            status='Pendiente'
+        new_item = Stock(
+            name=name,
+            category_id=int(category_id) if category_id else None,
+            quantity=quantity,
+            min_stock=min_stock
         )
-        
-        db.session.add(new_task)
+        db.session.add(new_item)
         db.session.commit()
+        check_low_stock()
         
-        if request.is_json:
-            return jsonify({
-                'success': True,
-                'task_id': new_task.id,
-                'msg': 'Tarea creada correctamente'
-            })
-        else:
-            flash('Tarea creada correctamente.', 'success')
-            return redirect(url_for('dashboard'))
+        return jsonify({'success': True, 'msg': 'Artículo añadido correctamente'})
     
-    except Exception as e:
-        print(f"Error creating task: {e}")
-        if request.is_json:
-            return jsonify({'success': False, 'msg': str(e)}), 500
-        else:
-            flash(f'Error al crear la tarea: {str(e)}', 'danger')
-            return redirect(url_for('dashboard'))
-
-@app.route('/update_task/<int:task_id>', methods=['POST'])
-@login_required
-def update_task(task_id):
-    task = Task.query.get_or_404(task_id)
-    
-    if current_user.role != 'admin' and current_user.id != task.tech_id:
-        flash('No tienes permisos para editar esta tarea.', 'danger')
-        return redirect(url_for('dashboard'))
-    
-    try:
-        data = request.get_json() if request.is_json else request.form
+    elif action == 'adjust':
+        item_id = request.form.get('item_id')
+        adjustment = int(request.form.get('adjustment', 0))
         
-        if 'client_name' in data:
-            task.client_name = data['client_name']
-            client = Client.query.filter_by(name=data['client_name']).first()
-            task.client_id = client.id if client else None
-        
-        if 'date' in data:
-            task.date = datetime.strptime(data['date'], '%Y-%m-%d').date()
-        if 'start_time' in data:
-            task.start_time = data['start_time']
-        if 'end_time' in data:
-            task.end_time = data['end_time']
-        if 'service_type_id' in data:
-            task.service_type_id = int(data['service_type_id'])
-        if 'description' in data:
-            task.description = data['description']
-        if 'status' in data:
-            task.status = data['status']
-        if 'tech_id' in data and current_user.role == 'admin':
-            task.tech_id = int(data['tech_id']) if data['tech_id'] else None
-        
-        db.session.commit()
-        
-        if request.is_json:
-            return jsonify({'success': True, 'msg': 'Tarea actualizada'})
-        else:
-            flash('Tarea actualizada correctamente.', 'success')
-            return redirect(url_for('dashboard'))
-    
-    except Exception as e:
-        if request.is_json:
-            return jsonify({'success': False, 'msg': str(e)}), 500
-        else:
-            flash(f'Error al actualizar tarea: {str(e)}', 'danger')
-            return redirect(url_for('dashboard'))
-
-@app.route('/delete_task/<int:task_id>', methods=['POST'])
-@login_required
-def delete_task(task_id):
-    task = Task.query.get_or_404(task_id)
-    
-    if current_user.role != 'admin' and current_user.id != task.tech_id:
-        return jsonify({'success': False, 'msg': 'No autorizado'}), 403
-    
-    db.session.delete(task)
-    db.session.commit()
-    
-    return jsonify({'success': True})
-
-@app.route('/start_task/<int:task_id>', methods=['POST'])
-@login_required
-def start_task(task_id):
-    task = Task.query.get_or_404(task_id)
-    
-    if current_user.id != task.tech_id:
-        return jsonify({'success': False, 'msg': 'No autorizado'}), 403
-    
-    task.actual_start_time = datetime.now()
-    db.session.commit()
-    
-    return jsonify({
-        'success': True,
-        'start_time': task.actual_start_time.strftime('%H:%M')
-    })
-
-@app.route('/end_task/<int:task_id>', methods=['POST'])
-@login_required
-def end_task(task_id):
-    task = Task.query.get_or_404(task_id)
-    
-    if current_user.id != task.tech_id:
-        return jsonify({'success': False, 'msg': 'No autorizado'}), 403
-    
-    task.actual_end_time = datetime.now()
-    db.session.commit()
-    
-    return jsonify({
-        'success': True,
-        'end_time': task.actual_end_time.strftime('%H:%M')
-    })
-
-@app.route('/complete_task/<int:task_id>', methods=['POST'])
-@login_required
-def complete_task(task_id):
-    task = Task.query.get_or_404(task_id)
-    
-    if current_user.id != task.tech_id:
-        return jsonify({'success': False, 'msg': 'No autorizado'}), 403
-    
-    data = request.get_json()
-    
-    # La firma es obligatoria
-    if not data.get('signature'):
-        return jsonify({'success': False, 'msg': 'La firma del cliente es obligatoria'}), 400
-    
-    task.signature_data = data['signature']
-    task.signature_client_name = data.get('signature_client_name', task.client_name)
-    task.signature_timestamp = datetime.now()
-    task.parts_text = data.get('parts', '')
-    task.description = data.get('description', task.description)
-    
-    # Manejo de stock
-    if data.get('stock_item_id'):
-        stock_item = Stock.query.get(int(data['stock_item_id']))
-        if stock_item:
-            quantity = int(data.get('stock_quantity', 0))
-            action = data.get('stock_action', 'used')
-            
-            task.stock_item_id = stock_item.id
-            task.stock_quantity_used = quantity
-            task.stock_action = action
-            
-            if action == 'used':
-                stock_item.quantity -= quantity
-            elif action == 'removed':
-                stock_item.quantity -= quantity
-            elif action == 'added':
-                stock_item.quantity += quantity
-            
+        item = Stock.query.get(item_id)
+        if item:
+            item.quantity += adjustment
             db.session.commit()
             check_low_stock()
+            return jsonify({'success': True, 'msg': 'Stock ajustado', 'new_quantity': item.quantity})
     
-    # Procesar archivos adjuntos
-    if 'attachments' in data:
-        task.attachments = json.dumps(data['attachments'])
+    elif action == 'delete':
+        item_id = request.form.get('item_id')
+        item = Stock.query.get(item_id)
+        if item:
+            db.session.delete(item)
+            db.session.commit()
+            return jsonify({'success': True, 'msg': 'Artículo eliminado'})
     
-    task.status = 'Completado'
-    if not task.actual_end_time:
-        task.actual_end_time = datetime.now()
-    
-    db.session.commit()
-    
-    return jsonify({'success': True, 'msg': 'Parte completado correctamente'})
+    return jsonify({'success': False, 'msg': 'Acción no válida'})
 
-# ====== NUEVA RUTA: SAVE_REPORT ======
+@app.route('/manage_stock_categories', methods=['POST'])
+@login_required
+def manage_stock_categories():
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'msg': 'No autorizado'}), 403
+    
+    action = request.form.get('action')
+    
+    if action == 'add':
+        name = request.form.get('name')
+        parent_id = request.form.get('parent_id')
+        
+        if StockCategory.query.filter_by(name=name).first():
+            return jsonify({'success': False, 'msg': 'Ya existe una categoría con ese nombre'})
+        
+        new_category = StockCategory(
+            name=name,
+            parent_id=int(parent_id) if parent_id else None
+        )
+        db.session.add(new_category)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'msg': 'Categoría creada correctamente'})
+    
+    elif action == 'delete':
+        category_id = request.form.get('category_id')
+        category = StockCategory.query.get(category_id)
+        
+        if category:
+            # Si tiene subcategorías, no permitir eliminar
+            if category.subcategories:
+                return jsonify({'success': False, 'msg': 'No se puede eliminar una categoría con subcategorías'})
+            
+            # Los productos se quedan sin categoría (category_id = None)
+            for item in category.items:
+                item.category_id = None
+            
+            db.session.delete(category)
+            db.session.commit()
+            
+            return jsonify({'success': True, 'msg': 'Categoría eliminada'})
+    
+    return jsonify({'success': False, 'msg': 'Acción no válida'})
+
+# --- GESTIÓN DE TAREAS Y CITAS ---
 @app.route('/save_report', methods=['POST'])
 @login_required
 def save_report():
-    """
-    Ruta para guardar un parte de trabajo desde el formulario principal
-    Incluye validación de firma digital obligatoria
-    """
+    """Guardar parte de trabajo desde el panel técnico"""
     try:
-        # Obtener datos del formulario
         linked_task_id = request.form.get('linked_task_id')
         client_name = request.form.get('client_name')
         service_type_name = request.form.get('service_type')
-        date_str = request.form.get('date')
+        task_date = datetime.strptime(request.form.get('date'), '%Y-%m-%d').date()
         entry_time = request.form.get('entry_time')
         exit_time = request.form.get('exit_time')
         description = request.form.get('description')
         parts_text = request.form.get('parts_text', '')
-        stock_action = request.form.get('stock_action', 'used')
+        
+        # Stock
         stock_item_id = request.form.get('stock_item')
         stock_qty = request.form.get('stock_qty', 0)
+        stock_action = request.form.get('stock_action', 'used')
+        
+        # Firma digital
         signature_data = request.form.get('signature_data')
-        signature_name = request.form.get('signature_name')
+        signature_name = request.form.get('signature_client_name')
         
-        # VALIDACIÓN: Firma obligatoria
-        if not signature_data or not signature_name:
-            flash('⚠️ La firma del cliente es OBLIGATORIA. Por favor, solicita la firma antes de guardar el parte.', 'danger')
+        if not signature_data:
+            flash('⚠️ La firma del cliente es obligatoria', 'danger')
             return redirect(url_for('dashboard'))
         
-        # Obtener el tipo de servicio
-        service_type = ServiceType.query.filter_by(name=service_type_name).first()
-        if not service_type:
-            flash('Tipo de servicio no válido.', 'danger')
-            return redirect(url_for('dashboard'))
-        
-        # Obtener o crear cliente
+        # Buscar cliente y servicio
         client = Client.query.filter_by(name=client_name).first()
         client_id = client.id if client else None
         
-        # Convertir fecha
-        task_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        service_type = ServiceType.query.filter_by(name=service_type_name).first()
+        if not service_type:
+            flash('Tipo de servicio no válido', 'danger')
+            return redirect(url_for('dashboard'))
         
         # Si hay una cita vinculada, actualizar esa tarea
         if linked_task_id and linked_task_id != 'none':
@@ -1076,7 +895,7 @@ def get_task_details(task_id):
         }
     })
 
-# ====== NUEVA RUTA: TECH_ANALYTICS ======
+# ====== NUEVA RUTA: TECH_ANALYTICS (CORREGIDA - SIN INGRESOS NI TOP CLIENTES) ======
 @app.route('/api/tech_analytics')
 @login_required
 def get_tech_analytics():
@@ -1100,7 +919,6 @@ def get_tech_analytics():
     # Calcular estadísticas
     total_services = len(tasks)
     total_maintenances = sum(1 for t in tasks if t.service_type and 'manten' in t.service_type.name.lower())
-    total_revenue = total_services * 50  # Estimación simple
     
     # Tiempo promedio
     total_time = 0
@@ -1140,25 +958,15 @@ def get_tech_analytics():
         timeline_data.append({
             'month': month_start.strftime('%b'),
             'services': month_tasks,
-            'revenue': month_tasks * 50,
             'maintenances': month_tasks // 3  # Estimación
         })
-    
-    # Top clientes
-    client_counts = {}
-    for task in tasks:
-        client_counts[task.client_name] = client_counts.get(task.client_name, 0) + 1
-    
-    top_clients = sorted(client_counts.items(), key=lambda x: x[1], reverse=True)[:5]
     
     return jsonify({
         'total_services': total_services,
         'total_maintenances': total_maintenances,
-        'total_revenue': total_revenue,
         'avg_time': avg_time,
         'service_distribution': service_distribution,
-        'timeline_data': timeline_data,
-        'top_clients': [{'name': name, 'count': count} for name, count in top_clients]
+        'timeline_data': timeline_data
     })
 
 @app.route('/api/tech_stats/<int:tech_id>')
@@ -1398,36 +1206,25 @@ def print_report(report_id):
 @app.route('/api/task_action/<int:task_id>/<action>', methods=['POST'])
 @login_required
 def task_action(task_id, action):
-    """Endpoint unificado para acciones sobre tareas (delete, complete, cancel)"""
+    """Endpoint para acciones sobre tareas (completar, eliminar, cancelar)"""
+    task = Task.query.get_or_404(task_id)
+    
+    # Verificar permisos
+    if current_user.role != 'admin' and task.tech_id != current_user.id:
+        return jsonify({'success': False, 'msg': 'No autorizado'}), 403
+    
     try:
-        task = Task.query.get_or_404(task_id)
-        
-        # Verificar permisos
-        if current_user.role != 'admin' and task.tech_id != current_user.id:
-            return jsonify({'success': False, 'msg': 'Sin permisos'}), 403
-        
-        if action == 'delete':
-            # Eliminar archivos adjuntos si existen
-            if task.attachments:
-                try:
-                    attachments = json.loads(task.attachments)
-                    for att in attachments:
-                        filepath = os.path.join(app.config['UPLOAD_FOLDER'], att['filename'])
-                        if os.path.exists(filepath):
-                            os.remove(filepath)
-                except Exception as e:
-                    print(f"Error deleting attachments: {e}")
-            
-            db.session.delete(task)
-            db.session.commit()
-            return jsonify({'success': True, 'msg': 'Tarea eliminada correctamente'})
-        
-        elif action == 'complete':
+        if action == 'complete':
             task.status = 'Completado'
             if not task.actual_end_time:
                 task.actual_end_time = datetime.now()
             db.session.commit()
-            return jsonify({'success': True, 'msg': 'Tarea marcada como completada'})
+            return jsonify({'success': True, 'msg': 'Tarea completada'})
+        
+        elif action == 'delete':
+            db.session.delete(task)
+            db.session.commit()
+            return jsonify({'success': True, 'msg': 'Tarea eliminada'})
         
         elif action == 'cancel':
             task.status = 'Cancelado'
@@ -1435,12 +1232,225 @@ def task_action(task_id, action):
             return jsonify({'success': True, 'msg': 'Tarea cancelada'})
         
         else:
-            return jsonify({'success': False, 'msg': f'Acción desconocida: {action}'}), 400
-            
+            return jsonify({'success': False, 'msg': 'Acción no válida'}), 400
+    
     except Exception as e:
-        print(f"Error in task_action: {str(e)}")
+        print(f"Error in task_action: {e}")
         db.session.rollback()
-        return jsonify({'success': False, 'msg': 'Error del servidor'}), 500
+        return jsonify({'success': False, 'msg': 'Error al procesar la acción'}), 500
+
+@app.route('/api/get_task/<int:task_id>')
+@login_required
+def get_task(task_id):
+    """Obtener datos de una tarea específica"""
+    task = Task.query.get_or_404(task_id)
+    
+    if current_user.role != 'admin' and task.tech_id != current_user.id:
+        return jsonify({'success': False, 'msg': 'No autorizado'}), 403
+    
+    service_type = ServiceType.query.get(task.service_type_id) if task.service_type_id else None
+    
+    return jsonify({
+        'success': True,
+        'data': {
+            'id': task.id,
+            'client_name': task.client_name,
+            'date': task.date.strftime('%Y-%m-%d'),
+            'time': task.start_time or '',
+            'service_type': service_type.name if service_type else '',
+            'notes': task.description or ''
+        }
+    })
+
+@app.route('/api/task_details/<int:task_id>')
+@login_required
+def api_task_details(task_id):
+    """Obtener detalles completos de una tarea"""
+    task = Task.query.get_or_404(task_id)
+    
+    if current_user.role != 'admin' and task.tech_id != current_user.id:
+        return jsonify({'success': False, 'msg': 'No autorizado'}), 403
+    
+    service_type = ServiceType.query.get(task.service_type_id) if task.service_type_id else None
+    
+    # Parsear attachments
+    attachments_list = []
+    if task.attachments:
+        try:
+            attachments_list = json.loads(task.attachments)
+        except:
+            pass
+    
+    return jsonify({
+        'success': True,
+        'data': {
+            'id': task.id,
+            'client_name': task.client_name,
+            'tech_name': task.tech.username if task.tech else 'Sin asignar',
+            'date': task.date.strftime('%Y-%m-%d'),
+            'start_time': task.start_time or '',
+            'end_time': task.end_time or '',
+            'service_type': service_type.name if service_type else 'Sin tipo',
+            'status': task.status,
+            'description': task.description or '',
+            'parts_text': task.parts_text or '',
+            'has_signature': bool(task.signature_data),
+            'attachments': attachments_list,
+            'stock_info': {
+                'item_name': task.stock_item.name if task.stock_item else None,
+                'quantity': task.stock_quantity_used,
+                'action': task.stock_action
+            } if task.stock_item else None
+        }
+    })
+
+@app.route('/api/admin/all_tasks')
+@login_required
+def admin_all_tasks():
+    """Endpoint para calendario global del admin"""
+    if current_user.role != 'admin':
+        return jsonify([])
+    
+    tasks = Task.query.all()
+    events = []
+    
+    for task in tasks:
+        service_type = ServiceType.query.get(task.service_type_id) if task.service_type_id else None
+        color = service_type.color if service_type else '#6c757d'
+        
+        events.append({
+            'id': task.id,
+            'title': f"{task.client_name}",
+            'start': f"{task.date}T{task.start_time}:00" if task.start_time else str(task.date),
+            'end': f"{task.date}T{task.end_time}:00" if task.end_time else str(task.date),
+            'backgroundColor': color,
+            'borderColor': color,
+            'extendedProps': {
+                'client': task.client_name,
+                'tech_name': task.tech.username if task.tech else 'Sin asignar',
+                'service_type': service_type.name if service_type else 'Sin tipo',
+                'status': task.status,
+                'desc': task.description or '',
+                'has_attachments': bool(task.attachments)
+            }
+        })
+    
+    return jsonify(events)
+
+@app.route('/api/admin/tasks/<int:tech_id>')
+@login_required
+def admin_tech_tasks(tech_id):
+    """Endpoint para calendario individual de un técnico desde admin"""
+    if current_user.role != 'admin':
+        return jsonify([])
+    
+    tasks = Task.query.filter_by(tech_id=tech_id).all()
+    events = []
+    
+    for task in tasks:
+        service_type = ServiceType.query.get(task.service_type_id) if task.service_type_id else None
+        color = service_type.color if service_type else '#6c757d'
+        
+        events.append({
+            'id': task.id,
+            'title': f"{task.client_name}",
+            'start': f"{task.date}T{task.start_time}:00" if task.start_time else str(task.date),
+            'end': f"{task.date}T{task.end_time}:00" if task.end_time else str(task.date),
+            'backgroundColor': color,
+            'borderColor': color,
+            'extendedProps': {
+                'client': task.client_name,
+                'service_type': service_type.name if service_type else 'Sin tipo',
+                'status': task.status,
+                'desc': task.description or ''
+            }
+        })
+    
+    return jsonify(events)
+
+@app.route('/create_appointment', methods=['POST'])
+@login_required
+def create_appointment():
+    """Endpoint para crear una nueva cita desde el panel técnico"""
+    try:
+        client_name = request.form.get('client_name')
+        date_str = request.form.get('date')
+        start_time = request.form.get('start_time')
+        end_time = request.form.get('end_time')
+        service_type_id = request.form.get('service_type_id')
+        description = request.form.get('description', '')
+        
+        # Validaciones
+        if not all([client_name, date_str, start_time, service_type_id]):
+            return jsonify({'success': False, 'msg': 'Faltan campos obligatorios'}), 400
+        
+        # Buscar o crear cliente
+        client = Client.query.filter_by(name=client_name).first()
+        client_id = client.id if client else None
+        
+        # Convertir fecha
+        task_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        
+        # Crear tarea
+        new_task = Task(
+            tech_id=current_user.id,
+            client_id=client_id,
+            client_name=client_name,
+            description=description,
+            date=task_date,
+            start_time=start_time,
+            end_time=end_time,
+            service_type_id=int(service_type_id),
+            status='Pendiente'
+        )
+        
+        db.session.add(new_task)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'msg': 'Cita creada correctamente',
+            'task_id': new_task.id
+        })
+        
+    except Exception as e:
+        print(f"Error creating appointment: {str(e)}")
+        db.session.rollback()
+        return jsonify({'success': False, 'msg': 'Error al crear la cita'}), 500
+
+@app.route('/edit_appointment/<int:task_id>', methods=['POST'])
+@login_required
+def edit_appointment(task_id):
+    """Endpoint para editar una cita existente"""
+    try:
+        task = Task.query.get_or_404(task_id)
+        
+        # Verificar permisos
+        if current_user.role != 'admin' and task.tech_id != current_user.id:
+            flash('No autorizado', 'danger')
+            return redirect(url_for('dashboard'))
+        
+        # Actualizar datos
+        task.client_name = request.form.get('client_name')
+        task.date = datetime.strptime(request.form.get('date'), '%Y-%m-%d').date()
+        task.start_time = request.form.get('time')
+        task.description = request.form.get('notes', '')
+        
+        # Actualizar tipo de servicio
+        service_type_name = request.form.get('service_type')
+        service_type = ServiceType.query.filter_by(name=service_type_name).first()
+        if service_type:
+            task.service_type_id = service_type.id
+        
+        db.session.commit()
+        flash('Cita actualizada correctamente', 'success')
+        return redirect(url_for('dashboard'))
+        
+    except Exception as e:
+        print(f"Error editing appointment: {str(e)}")
+        db.session.rollback()
+        flash('Error al editar la cita', 'danger')
+        return redirect(url_for('dashboard'))
 
 @app.route('/schedule_appointment', methods=['POST'])
 @login_required
