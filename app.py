@@ -212,6 +212,106 @@ def login():
     
     return render_template('login.html')
 
+@app.route('/forgot_password', methods=['POST'])
+def forgot_password():
+    """Procesar solicitud de recuperación de contraseña"""
+    try:
+        email = request.form.get('email', '').strip()
+        
+        if not email:
+            flash('Por favor ingresa tu correo electrónico', 'danger')
+            return redirect(url_for('login'))
+        
+        # Buscar usuario por email
+        user = User.query.filter_by(email=email).first()
+        
+        if not user:
+            # Por seguridad, no revelamos si el email existe o no
+            flash('Si el correo existe en nuestro sistema, recibirás un enlace de recuperación', 'info')
+            return redirect(url_for('login'))
+        
+        # Generar token único
+        reset_token = secrets.token_urlsafe(32)
+        user.reset_token = reset_token
+        user.reset_token_expiry = datetime.now() + timedelta(hours=24)
+        
+        db.session.commit()
+        
+        # En producción, aquí se enviaría un email con el enlace
+        # Por ahora, mostramos el enlace en consola para desarrollo
+        reset_link = url_for('reset_password', token=reset_token, _external=True)
+        print("\n" + "="*60)
+        print("🔐 ENLACE DE RECUPERACIÓN DE CONTRASEÑA")
+        print("="*60)
+        print(f"Usuario: {user.username}")
+        print(f"Email: {user.email}")
+        print(f"Enlace: {reset_link}")
+        print("="*60 + "\n")
+        
+        flash('Se ha generado un enlace de recuperación. Revisa la consola del servidor.', 'success')
+        return redirect(url_for('login'))
+        
+    except Exception as e:
+        print(f"Error en forgot_password: {str(e)}")
+        flash('Error al procesar la solicitud', 'danger')
+        return redirect(url_for('login'))
+
+@app.route('/reset_password/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+    """Página y procesamiento de restablecimiento de contraseña"""
+    # Verificar que el token sea válido
+    user = User.query.filter_by(reset_token=token).first()
+    
+    if not user:
+        flash('Token de recuperación inválido', 'danger')
+        return redirect(url_for('login'))
+    
+    # Verificar que el token no haya expirado
+    if user.reset_token_expiry < datetime.now():
+        flash('El token de recuperación ha expirado', 'danger')
+        # Limpiar el token expirado
+        user.reset_token = None
+        user.reset_token_expiry = None
+        db.session.commit()
+        return redirect(url_for('login'))
+    
+    if request.method == 'POST':
+        try:
+            new_password = request.form.get('password')
+            confirm_password = request.form.get('confirm_password')
+            
+            # Validar que las contraseñas coincidan
+            if new_password != confirm_password:
+                flash('Las contraseñas no coinciden', 'danger')
+                return redirect(url_for('reset_password', token=token))
+            
+            # Validar requisitos de seguridad
+            is_valid, message = validate_password(new_password)
+            if not is_valid:
+                flash(message, 'danger')
+                return redirect(url_for('reset_password', token=token))
+            
+            # Actualizar contraseña
+            user.password_hash = generate_password_hash(new_password)
+            
+            # Limpiar token
+            user.reset_token = None
+            user.reset_token_expiry = None
+            
+            db.session.commit()
+            
+            flash('✅ Contraseña restablecida correctamente. Ya puedes iniciar sesión.', 'success')
+            return redirect(url_for('login'))
+            
+        except Exception as e:
+            print(f"Error resetting password: {str(e)}")
+            flash('Error al restablecer la contraseña', 'danger')
+            return redirect(url_for('reset_password', token=token))
+    
+    # Mostrar formulario de reset
+    return render_template('reset_password.html', token=token)
+
+
 @app.route('/dashboard')
 @login_required
 def dashboard():
