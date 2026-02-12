@@ -32,7 +32,7 @@ login_manager.login_view = 'login'
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), unique=True, nullable=False)
-    email = db.Column(db.String(100), unique=True, nullable=True)  # Para recuperación de contraseña
+    email = db.Column(db.String(100), unique=True, nullable=True)
     password_hash = db.Column(db.String(128))
     role = db.Column(db.String(20))  # 'admin' o 'tech'
     reset_token = db.Column(db.String(100), unique=True, nullable=True)
@@ -41,12 +41,12 @@ class User(UserMixin, db.Model):
 class Client(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
-    phone = db.Column(db.String(20), nullable=False)  # OBLIGATORIO
-    email = db.Column(db.String(100), nullable=False)  # OBLIGATORIO
-    address = db.Column(db.String(250), nullable=False)  # OBLIGATORIO con Google Maps
-    link = db.Column(db.String(500), nullable=True)  # Enlace/URL opcional del cliente
-    notes = db.Column(db.Text)  # Comentarios internos
-    has_support = db.Column(db.Boolean, default=False)  # Verde=True, Rojo=False
+    phone = db.Column(db.String(20), nullable=False)
+    email = db.Column(db.String(100), nullable=False)
+    address = db.Column(db.String(250), nullable=False)
+    link = db.Column(db.String(500), nullable=True)  # Google Maps o URL
+    notes = db.Column(db.Text)
+    has_support = db.Column(db.Boolean, default=False)
     support_monday_friday = db.Column(db.Boolean, default=False)
     support_saturday = db.Column(db.Boolean, default=False)
     support_sunday = db.Column(db.Boolean, default=False)
@@ -54,7 +54,7 @@ class Client(db.Model):
 class ServiceType(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), unique=True, nullable=False)
-    color = db.Column(db.String(7), default='#6c757d')  # Hex code color
+    color = db.Column(db.String(7), default='#6c757d')
 
 class StockCategory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -68,7 +68,7 @@ class Stock(db.Model):
     quantity = db.Column(db.Integer, default=0)
     category_id = db.Column(db.Integer, db.ForeignKey('stock_category.id'), nullable=True)
     category = db.relationship('StockCategory', backref='items')
-    min_stock = db.Column(db.Integer, default=5)  # Para alarmas de stock bajo
+    min_stock = db.Column(db.Integer, default=5)
     description = db.Column(db.Text)
 
 class Task(db.Model):
@@ -92,14 +92,14 @@ class Task(db.Model):
     status = db.Column(db.String(20), default='Pendiente')  # Pendiente o Completado
     
     # Campos para firma digital
-    signature_data = db.Column(db.Text)  # Base64 de la firma
-    signature_client_name = db.Column(db.String(100))  # Nombre del cliente que firma
-    signature_timestamp = db.Column(db.DateTime)  # Fecha y hora de la firma
+    signature_data = db.Column(db.Text)
+    signature_client_name = db.Column(db.String(100))
+    signature_timestamp = db.Column(db.DateTime)
     
-    # Nuevos campos para archivos adjuntos
-    attachments = db.Column(db.Text)  # JSON con lista de archivos adjuntos
+    # Archivos adjuntos
+    attachments = db.Column(db.Text)  # JSON
     
-    # Hora de inicio/fin real del trabajo (para tracking automático)
+    # Tiempo real de trabajo
     actual_start_time = db.Column(db.DateTime)
     actual_end_time = db.Column(db.DateTime)
 
@@ -110,14 +110,14 @@ class Task(db.Model):
 
 class Alarm(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    alarm_type = db.Column(db.String(50))  # 'technical', 'maintenance', 'low_stock'
+    alarm_type = db.Column(db.String(50))
     title = db.Column(db.String(100))
     description = db.Column(db.Text)
     client_name = db.Column(db.String(100), nullable=True)
     stock_item_id = db.Column(db.Integer, db.ForeignKey('stock.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.now)
     is_read = db.Column(db.Boolean, default=False)
-    priority = db.Column(db.String(20), default='normal')  # low, normal, high
+    priority = db.Column(db.String(20), default='normal')
 
 @login_manager.user_loader
 def load_user(id):
@@ -128,14 +128,7 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def validate_password(password):
-    """
-    Validar que la contraseña cumpla los requisitos de seguridad:
-    - Mínimo 6 caracteres
-    - Al menos una mayúscula
-    - Al menos una minúscula
-    - Al menos un número
-    - Al menos un carácter especial
-    """
+    """Validar contraseña con requisitos de seguridad"""
     if len(password) < 6:
         return False, "La contraseña debe tener al menos 6 caracteres"
     if not re.search(r'[A-Z]', password):
@@ -145,14 +138,13 @@ def validate_password(password):
     if not re.search(r'[0-9]', password):
         return False, "La contraseña debe contener al menos un número"
     if not re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
-        return False, "La contraseña debe contener al menos un carácter especial (!@#$%^&*...)"
+        return False, "La contraseña debe contener al menos un carácter especial"
     return True, "Contraseña válida"
 
 def check_low_stock():
     """Verificar stock bajo y crear alarmas"""
     low_items = Stock.query.filter(Stock.quantity <= Stock.min_stock).all()
     for item in low_items:
-        # Verificar si ya existe una alarma activa para este item
         existing = Alarm.query.filter_by(
             alarm_type='low_stock',
             stock_item_id=item.id,
@@ -178,13 +170,12 @@ def inject_globals():
         if current_user.is_authenticated and current_user.role == 'admin':
             unread_alarms = Alarm.query.filter_by(is_read=False).count()
         
-        # Obtener técnicos para pasar al template
         employees = User.query.filter_by(role='tech').all() if current_user.is_authenticated and current_user.role == 'admin' else []
         
         return {
             'all_service_types': ServiceType.query.order_by(ServiceType.name).all(),
             'unread_alarms_count': unread_alarms,
-            'employees': employees  # AÑADIDO para las analíticas
+            'employees': employees
         }
     except Exception as e:
         print("ERROR context_processor:", e)
@@ -218,17 +209,13 @@ def forgot_password():
         flash('No se encontró ningún usuario con ese correo electrónico.', 'danger')
         return redirect(url_for('login'))
     
-    # Generar token único
     token = secrets.token_urlsafe(32)
     user.reset_token = token
     user.reset_token_expiry = datetime.now() + timedelta(hours=24)
     db.session.commit()
     
-    # En producción, aquí enviarías un email con el enlace
-    # Por ahora, mostraremos el enlace directamente
     reset_link = url_for('reset_password', token=token, _external=True)
-    
-    flash(f'Enlace de recuperación generado. En producción se enviaría por email. Link: {reset_link}', 'success')
+    flash(f'Enlace de recuperación generado. Link: {reset_link}', 'success')
     return redirect(url_for('login'))
 
 @app.route('/reset_password/<token>', methods=['GET', 'POST'])
@@ -247,19 +234,17 @@ def reset_password(token):
             flash('Las contraseñas no coinciden.', 'danger')
             return render_template('reset_password.html')
         
-        # Validar contraseña
         is_valid, message = validate_password(password)
         if not is_valid:
             flash(message, 'danger')
             return render_template('reset_password.html')
         
-        # Actualizar contraseña
         user.password_hash = generate_password_hash(password)
         user.reset_token = None
         user.reset_token_expiry = None
         db.session.commit()
         
-        flash('Contraseña restablecida correctamente. Ya puedes iniciar sesión.', 'success')
+        flash('Contraseña restablecida correctamente.', 'success')
         return redirect(url_for('login'))
     
     return render_template('reset_password.html')
@@ -271,7 +256,6 @@ def dashboard():
         empleados = User.query.filter_by(role='tech').all()
         informes = Task.query.filter_by(status='Completado').order_by(Task.date.desc()).all()
         
-        # Organizar inventario por categorías jerárquicas
         categories = StockCategory.query.filter_by(parent_id=None).all()
         inventory = Stock.query.order_by(Stock.name).all()
         
@@ -288,7 +272,7 @@ def dashboard():
                              services=services,
                              alarms=alarms)
     
-    # Panel de técnico
+    # Panel técnico
     stock_items = Stock.query.order_by(Stock.name).all()
     pending_tasks = Task.query.filter_by(tech_id=current_user.id, status='Pendiente').order_by(Task.date).all()
     
@@ -320,7 +304,6 @@ def manage_users():
             flash('El correo electrónico ya está registrado.', 'danger')
             return redirect(url_for('dashboard'))
         
-        # Validar contraseña
         is_valid, message = validate_password(password)
         if not is_valid:
             flash(message, 'danger')
@@ -348,7 +331,6 @@ def manage_users():
         user_id = request.form.get('user_id')
         new_password = request.form.get('new_password')
         
-        # Validar contraseña
         is_valid, message = validate_password(new_password)
         if not is_valid:
             flash(message, 'danger')
@@ -383,18 +365,13 @@ def manage_clients():
         support_sat = request.form.get('support_saturday') == 'true'
         support_sun = request.form.get('support_sunday') == 'true'
         
-        # Validar campos obligatorios
         if not all([name, phone, email, address]):
-            flash('Todos los campos obligatorios deben estar completos (Nombre, Teléfono, Email, Dirección).', 'danger')
+            flash('Todos los campos obligatorios deben estar completos.', 'danger')
             return redirect(url_for('dashboard'))
         
-        if Client.query.filter_by(name=name).first():
-            flash('Ya existe un cliente con ese nombre.', 'danger')
-            return redirect(url_for('dashboard'))
-        
-        # Validar URL si se proporciona
+        # Validar y normalizar URL
         if link and not (link.startswith('http://') or link.startswith('https://')):
-            link = 'https://' + link  # Añadir https:// si no tiene protocolo
+            link = 'https://' + link
         
         new_client = Client(
             name=name,
@@ -421,7 +398,6 @@ def manage_clients():
             client.email = request.form.get('email')
             client.address = request.form.get('address')
             link = request.form.get('link', '').strip()
-            # Validar y normalizar URL
             if link and not (link.startswith('http://') or link.startswith('https://')):
                 link = 'https://' + link
             client.link = link if link else None
@@ -492,12 +468,10 @@ def manage_stock():
         min_stock = int(request.form.get('min_stock', 5))
         description = request.form.get('description', '')
         
-        # CORRECCIÓN: Asegurar que category_id sea válido
         final_category_id = None
         if category_id and category_id.strip():
             try:
                 final_category_id = int(category_id)
-                # Verificar que la categoría existe
                 if not StockCategory.query.get(final_category_id):
                     flash('Categoría no válida.', 'danger')
                     return redirect(url_for('dashboard'))
@@ -600,7 +574,6 @@ def create_task():
         service_type_id = data.get('service_type_id')
         description = data.get('description', '')
         
-        # Obtener el cliente si existe
         client = Client.query.filter_by(name=client_name).first()
         
         new_task = Task(
@@ -641,7 +614,6 @@ def create_task():
 def update_task(task_id):
     task = Task.query.get_or_404(task_id)
     
-    # Verificar permisos - IMPORTANTE: Mantener coherencia de rol
     if current_user.role != 'admin' and current_user.id != task.tech_id:
         flash('No tienes permisos para editar esta tarea.', 'danger')
         return redirect(url_for('dashboard'))
@@ -651,7 +623,6 @@ def update_task(task_id):
         
         if 'client_name' in data:
             task.client_name = data['client_name']
-            # Actualizar cliente si existe
             client = Client.query.filter_by(name=data['client_name']).first()
             task.client_id = client.id if client else None
         
@@ -690,7 +661,6 @@ def update_task(task_id):
 def delete_task(task_id):
     task = Task.query.get_or_404(task_id)
     
-    # Verificar permisos - IMPORTANTE: Mantener coherencia de rol
     if current_user.role != 'admin' and current_user.id != task.tech_id:
         return jsonify({'success': False, 'msg': 'No autorizado'}), 403
     
@@ -784,6 +754,143 @@ def complete_task(task_id):
     
     return jsonify({'success': True, 'msg': 'Parte completado correctamente'})
 
+# ====== NUEVA RUTA: SAVE_REPORT ======
+@app.route('/save_report', methods=['POST'])
+@login_required
+def save_report():
+    """
+    Ruta para guardar un parte de trabajo desde el formulario principal
+    Incluye validación de firma digital obligatoria
+    """
+    try:
+        # Obtener datos del formulario
+        linked_task_id = request.form.get('linked_task_id')
+        client_name = request.form.get('client_name')
+        service_type_name = request.form.get('service_type')
+        date_str = request.form.get('date')
+        entry_time = request.form.get('entry_time')
+        exit_time = request.form.get('exit_time')
+        description = request.form.get('description')
+        parts_text = request.form.get('parts_text', '')
+        stock_action = request.form.get('stock_action', 'used')
+        stock_item_id = request.form.get('stock_item')
+        stock_qty = request.form.get('stock_qty', 0)
+        signature_data = request.form.get('signature_data')
+        signature_name = request.form.get('signature_name')
+        
+        # VALIDACIÓN: Firma obligatoria
+        if not signature_data or not signature_name:
+            flash('⚠️ La firma del cliente es OBLIGATORIA. Por favor, solicita la firma antes de guardar el parte.', 'danger')
+            return redirect(url_for('dashboard'))
+        
+        # Obtener el tipo de servicio
+        service_type = ServiceType.query.filter_by(name=service_type_name).first()
+        if not service_type:
+            flash('Tipo de servicio no válido.', 'danger')
+            return redirect(url_for('dashboard'))
+        
+        # Obtener o crear cliente
+        client = Client.query.filter_by(name=client_name).first()
+        client_id = client.id if client else None
+        
+        # Convertir fecha
+        task_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        
+        # Si hay una cita vinculada, actualizar esa tarea
+        if linked_task_id and linked_task_id != 'none':
+            task = Task.query.get(int(linked_task_id))
+            if task and task.tech_id == current_user.id:
+                # Actualizar la tarea existente
+                task.description = description
+                task.parts_text = parts_text
+                task.signature_data = signature_data
+                task.signature_client_name = signature_name
+                task.signature_timestamp = datetime.now()
+                task.status = 'Completado'
+                task.actual_end_time = datetime.now()
+                
+                # Manejar stock si aplica
+                if stock_item_id and int(stock_item_id) > 0:
+                    stock_item = Stock.query.get(int(stock_item_id))
+                    if stock_item:
+                        quantity = int(stock_qty)
+                        task.stock_item_id = stock_item.id
+                        task.stock_quantity_used = quantity
+                        task.stock_action = stock_action
+                        
+                        if stock_action == 'used' or stock_action == 'removed':
+                            stock_item.quantity -= quantity
+                        elif stock_action == 'added':
+                            stock_item.quantity += quantity
+                
+                db.session.commit()
+                check_low_stock()
+                
+                flash('✅ Parte vinculado completado y firmado correctamente.', 'success')
+                return redirect(url_for('dashboard'))
+        
+        # Si no hay cita vinculada, crear una nueva tarea completada
+        new_task = Task(
+            tech_id=current_user.id,
+            client_id=client_id,
+            client_name=client_name,
+            date=task_date,
+            start_time=entry_time,
+            end_time=exit_time,
+            service_type_id=service_type.id,
+            description=description,
+            parts_text=parts_text,
+            signature_data=signature_data,
+            signature_client_name=signature_name,
+            signature_timestamp=datetime.now(),
+            status='Completado',
+            actual_end_time=datetime.now()
+        )
+        
+        # Manejar stock
+        if stock_item_id and int(stock_item_id) > 0:
+            stock_item = Stock.query.get(int(stock_item_id))
+            if stock_item:
+                quantity = int(stock_qty)
+                new_task.stock_item_id = stock_item.id
+                new_task.stock_quantity_used = quantity
+                new_task.stock_action = stock_action
+                
+                if stock_action == 'used' or stock_action == 'removed':
+                    stock_item.quantity -= quantity
+                elif stock_action == 'added':
+                    stock_item.quantity += quantity
+        
+        db.session.add(new_task)
+        db.session.commit()
+        check_low_stock()
+        
+        # Manejar archivos adjuntos si los hay
+        if 'attachments' in request.files:
+            files = request.files.getlist('attachments')
+            uploaded_filenames = []
+            
+            for file in files:
+                if file and file.filename and allowed_file(file.filename):
+                    filename = secure_filename(file.filename)
+                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                    filename = f"task_{new_task.id}_{timestamp}_{filename}"
+                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                    file.save(filepath)
+                    uploaded_filenames.append(filename)
+            
+            if uploaded_filenames:
+                new_task.attachments = json.dumps(uploaded_filenames)
+                db.session.commit()
+        
+        flash('✅ Parte de trabajo creado y firmado correctamente.', 'success')
+        return redirect(url_for('dashboard'))
+        
+    except Exception as e:
+        print(f"Error en save_report: {e}")
+        flash(f'Error al guardar el parte: {str(e)}', 'danger')
+        return redirect(url_for('dashboard'))
+
 @app.route('/upload_task_file/<int:task_id>', methods=['POST'])
 @login_required
 def upload_task_file(task_id):
@@ -807,7 +914,6 @@ def upload_task_file(task_id):
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(filepath)
         
-        # Añadir a la lista de adjuntos
         attachments = []
         if task.attachments:
             try:
@@ -833,14 +939,12 @@ def upload_task_file(task_id):
 def get_all_tasks():
     """Obtener todas las tareas para el calendario"""
     if current_user.role == 'admin':
-        # Admin ve todas las tareas
         tech_id = request.args.get('tech_id')
         if tech_id:
             tasks = Task.query.filter_by(tech_id=int(tech_id)).all()
         else:
             tasks = Task.query.all()
     else:
-        # Técnicos solo ven sus tareas
         tasks = Task.query.filter_by(tech_id=current_user.id).all()
     
     events = []
@@ -867,17 +971,15 @@ def get_all_tasks():
     
     return jsonify(events)
 
-# NUEVO ENDPOINT: Búsqueda de clientes
 @app.route('/api/clients_search')
 @login_required
 def api_clients_search():
-    """API para autocompletado de clientes con búsqueda mejorada"""
+    """API para autocompletado de clientes"""
     query = request.args.get('q', '').strip()
     
     if len(query) < 2:
         return jsonify([])
     
-    # Búsqueda con LIKE para coincidencias parciales (case-insensitive)
     clients = Client.query.filter(
         Client.name.ilike(f'%{query}%')
     ).order_by(Client.name).limit(10).all()
@@ -888,25 +990,53 @@ def api_clients_search():
         'phone': c.phone,
         'email': c.email,
         'address': c.address,
+        'link': c.link,
         'has_support': c.has_support
     } for c in clients])
 
 @app.route('/api/clients')
 @login_required
 def get_clients():
-    """API para autocompletado de clientes (alias del anterior para compatibilidad)"""
+    """API para autocompletado de clientes (alias)"""
     return api_clients_search()
 
-@app.route('/api/task/<int:task_id>')
+# ====== NUEVA RUTA: GET_TASK_FULL ======
+@app.route('/api/get_task_full/<int:task_id>')
 @login_required
-def get_task_details(task_id):
+def get_task_full(task_id):
+    """
+    API para obtener datos completos de una tarea
+    Usado cuando se selecciona una cita en el formulario de parte
+    """
     task = Task.query.get_or_404(task_id)
     
     # Verificar permisos
     if current_user.role != 'admin' and current_user.id != task.tech_id:
         return jsonify({'success': False, 'msg': 'No autorizado'}), 403
     
-    # Procesar archivos adjuntos
+    service_type = ServiceType.query.get(task.service_type_id) if task.service_type_id else None
+    
+    return jsonify({
+        'success': True,
+        'data': {
+            'id': task.id,
+            'client_name': task.client_name,
+            'date': task.date.strftime('%Y-%m-%d'),
+            'start_time': task.start_time or '',
+            'end_time': task.end_time or '',
+            'service_type': service_type.name if service_type else '',
+            'description': task.description or ''
+        }
+    })
+
+@app.route('/api/task/<int:task_id>')
+@login_required
+def get_task_details(task_id):
+    task = Task.query.get_or_404(task_id)
+    
+    if current_user.role != 'admin' and current_user.id != task.tech_id:
+        return jsonify({'success': False, 'msg': 'No autorizado'}), 403
+    
     attachments_list = []
     if task.attachments:
         try:
@@ -945,6 +1075,91 @@ def get_task_details(task_id):
         }
     })
 
+# ====== NUEVA RUTA: TECH_ANALYTICS ======
+@app.route('/api/tech_analytics')
+@login_required
+def get_tech_analytics():
+    """Estadísticas del técnico actual (para panel técnico)"""
+    period = request.args.get('period', '30')
+    
+    # Calcular fecha de inicio según período
+    if period == 'all':
+        start_date = date(2020, 1, 1)  # Fecha arbitraria en el pasado
+    else:
+        days = int(period)
+        start_date = date.today() - timedelta(days=days)
+    
+    # Obtener tareas del técnico en el período
+    tasks = Task.query.filter(
+        Task.tech_id == current_user.id,
+        Task.status == 'Completado',
+        Task.date >= start_date
+    ).all()
+    
+    # Calcular estadísticas
+    total_services = len(tasks)
+    total_maintenances = sum(1 for t in tasks if t.service_type and 'manten' in t.service_type.name.lower())
+    total_revenue = total_services * 50  # Estimación simple
+    
+    # Tiempo promedio
+    total_time = 0
+    time_count = 0
+    for task in tasks:
+        if task.actual_start_time and task.actual_end_time:
+            duration = (task.actual_end_time - task.actual_start_time).total_seconds() / 3600
+            total_time += duration
+            time_count += 1
+    
+    avg_time = round(total_time / time_count, 1) if time_count > 0 else 0
+    
+    # Distribución por tipo de servicio
+    service_distribution = {}
+    for task in tasks:
+        service_name = task.service_type.name if task.service_type else 'Sin tipo'
+        service_distribution[service_name] = service_distribution.get(service_name, 0) + 1
+    
+    # Timeline de los últimos meses
+    timeline_data = []
+    for i in range(5, -1, -1):
+        month_date = date.today() - timedelta(days=i*30)
+        month_start = month_date.replace(day=1)
+        if i > 0:
+            next_month = month_date + timedelta(days=30)
+            month_end = next_month.replace(day=1)
+        else:
+            month_end = date.today()
+        
+        month_tasks = Task.query.filter(
+            Task.tech_id == current_user.id,
+            Task.date >= month_start,
+            Task.date < month_end,
+            Task.status == 'Completado'
+        ).count()
+        
+        timeline_data.append({
+            'month': month_start.strftime('%b'),
+            'services': month_tasks,
+            'revenue': month_tasks * 50,
+            'maintenances': month_tasks // 3  # Estimación
+        })
+    
+    # Top clientes
+    client_counts = {}
+    for task in tasks:
+        client_counts[task.client_name] = client_counts.get(task.client_name, 0) + 1
+    
+    top_clients = sorted(client_counts.items(), key=lambda x: x[1], reverse=True)[:5]
+    
+    return jsonify({
+        'total_services': total_services,
+        'total_maintenances': total_maintenances,
+        'total_revenue': total_revenue,
+        'avg_time': avg_time,
+        'service_distribution': service_distribution,
+        'timeline_data': timeline_data,
+        'top_clients': [{'name': name, 'count': count} for name, count in top_clients]
+    })
+
 @app.route('/api/tech_stats/<int:tech_id>')
 @login_required
 def get_tech_stats(tech_id):
@@ -955,7 +1170,6 @@ def get_tech_stats(tech_id):
     tech = User.query.get_or_404(tech_id)
     tasks = Task.query.filter_by(tech_id=tech_id, status='Completado').all()
     
-    # Estadísticas por tipo de servicio
     service_stats = {}
     total_time = 0
     
@@ -979,7 +1193,6 @@ def get_tech_stats(tech_id):
             'has_signature': bool(task.signature_data)
         })
         
-        # Calcular tiempo si está disponible
         if task.actual_start_time and task.actual_end_time:
             duration = (task.actual_end_time - task.actual_start_time).total_seconds() / 3600
             total_time += duration
@@ -1001,19 +1214,14 @@ def get_admin_analytics():
     if current_user.role != 'admin':
         return jsonify({'success': False, 'msg': 'No autorizado'}), 403
     
-    # Parámetros opcionales
     tech_id = request.args.get('tech_id', type=int)
-    period = request.args.get('period', 'all')  # all, month, week
+    period = request.args.get('period', 'all')
     
-    # Construir query base
     query = Task.query
     
-    # Filtrar por técnico si se especifica
     if tech_id:
         query = query.filter_by(tech_id=tech_id)
     
-    # Filtrar por período
-    from datetime import timedelta
     if period == 'week':
         week_ago = date.today() - timedelta(days=7)
         query = query.filter(Task.date >= week_ago)
@@ -1021,12 +1229,10 @@ def get_admin_analytics():
         month_ago = date.today() - timedelta(days=30)
         query = query.filter(Task.date >= month_ago)
     
-    # Obtener todas las tareas filtradas
     all_tasks = query.all()
     completed_tasks = query.filter_by(status='Completado').all()
     pending_tasks = query.filter_by(status='Pendiente').all()
     
-    # Estadísticas por tipo de servicio (para gráfico circular)
     task_types = {}
     total_for_percentage = len(completed_tasks) if completed_tasks else 1
     
@@ -1044,12 +1250,10 @@ def get_admin_analytics():
         
         task_types[service_name]['count'] += 1
     
-    # Calcular porcentajes
     for service_name in task_types:
         count = task_types[service_name]['count']
         task_types[service_name]['percentage'] = round((count / total_for_percentage) * 100, 1)
     
-    # Tareas por mes (últimos 6 meses)
     monthly_tasks = []
     for i in range(5, -1, -1):
         month_date = date.today() - timedelta(days=i*30)
@@ -1073,7 +1277,6 @@ def get_admin_analytics():
             'count': month_tasks.count()
         })
     
-    # Obtener técnicos activos
     active_techs = User.query.filter_by(role='tech').count()
     
     return jsonify({
@@ -1083,8 +1286,8 @@ def get_admin_analytics():
             'completed_tasks': len(completed_tasks),
             'pending_tasks': len(pending_tasks),
             'active_technicians': active_techs,
-            'task_types': task_types,  # Para gráfico circular
-            'monthly_tasks': monthly_tasks  # Para gráfico de línea
+            'task_types': task_types,
+            'monthly_tasks': monthly_tasks
         }
     })
 
@@ -1174,12 +1377,11 @@ def logout():
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
-# --- BLOQUE DE INICIALIZACIÓN UNIFICADO ---
+# --- BLOQUE DE INICIALIZACIÓN ---
 with app.app_context():
-    # Primero creamos las tablas (la estructura)
     db.create_all()
     
-    # Migración: Añadir columna 'link' a Client si no existe
+    # Migración: columna 'link'
     try:
         from sqlalchemy import inspect
         inspector = inspect(db.engine)
@@ -1188,11 +1390,11 @@ with app.app_context():
             with db.engine.connect() as conn:
                 conn.execute(db.text('ALTER TABLE client ADD COLUMN link VARCHAR(500)'))
                 conn.commit()
-                print("✓ Columna 'link' añadida a la tabla 'client'")
+                print("✓ Columna 'link' añadida")
     except Exception as e:
         print(f"Nota: Migración de 'link': {e}")
     
-    # 1. Usuarios
+    # Usuarios
     if not User.query.filter_by(username='admin').first():
         db.session.add(User(
             username='admin', 
@@ -1217,7 +1419,7 @@ with app.app_context():
             password_hash=generate_password_hash('Tech123!')
         ))
     
-    # 2. Tipos de Servicio y Colores
+    # Tipos de Servicio
     if ServiceType.query.count() == 0:
         servicios = [
             {'name': 'Avería', 'color': '#fd7e14'},
@@ -1228,9 +1430,8 @@ with app.app_context():
         for s in servicios:
             db.session.add(ServiceType(name=s['name'], color=s['color']))
     
-    # 3. Categorías de Stock (jerárquicas)
+    # Categorías de Stock
     if StockCategory.query.count() == 0:
-        # Categorías principales
         copiadoras = StockCategory(name='Copiadoras')
         cajones = StockCategory(name='Cajones')
         tpv = StockCategory(name='TPV')
@@ -1240,7 +1441,6 @@ with app.app_context():
         db.session.add_all([copiadoras, cajones, tpv, recicladores, consumibles])
         db.session.commit()
         
-        # Subcategorías de Cajones
         cashlogy = StockCategory(name='Cashlogy', parent_id=cajones.id)
         cashkeeper = StockCategory(name='Cashkeeper', parent_id=cajones.id)
         atca = StockCategory(name='ATCA', parent_id=cajones.id)
@@ -1248,9 +1448,8 @@ with app.app_context():
         db.session.add_all([cashlogy, cashkeeper, atca])
         db.session.commit()
     
-    # 4. Productos de Stock
+    # Productos de Stock
     if Stock.query.count() == 0:
-        # Obtener categorías
         copiadoras_cat = StockCategory.query.filter_by(name='Copiadoras').first()
         tpv_cat = StockCategory.query.filter_by(name='TPV').first()
         recicladores_cat = StockCategory.query.filter_by(name='Recicladores').first()
@@ -1277,7 +1476,7 @@ with app.app_context():
         for item in stock_items:
             db.session.add(Stock(**item))
     
-    # 5. Cliente de ejemplo
+    # Cliente de ejemplo
     if Client.query.count() == 0:
         db.session.add(Client(
             name='Cliente Ejemplo',
