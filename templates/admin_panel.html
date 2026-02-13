@@ -448,7 +448,10 @@
                             <tr>
                                 <th>Artículo</th>
                                 <th>Categoría</th>
+                                <th>Subcategoría</th>
+                                <th>Proveedor</th>
                                 <th>Cantidad</th>
+                                <th>Stock Mín.</th>
                                 <th>Acciones</th>
                             </tr>
                         </thead>
@@ -457,10 +460,15 @@
                             <tr>
                                 <td>{{ i.name }}</td>
                                 <td>{{ i.category }}</td>
+                                <td>{{ i.subcategory or '-' }}</td>
+                                <td>{{ i.supplier or '-' }}</td>
                                 <td>
-                                    <span class="badge {% if i.quantity < 5 %}bg-danger{% else %}bg-success{% endif %}">
+                                    <span class="badge {% if i.quantity <= i.min_stock %}bg-danger{% else %}bg-success{% endif %}">
                                         {{ i.quantity }}
                                     </span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-secondary">{{ i.min_stock }}</span>
                                 </td>
                                 <td>
                                     <button class="btn btn-sm btn-outline-info"
@@ -470,11 +478,7 @@
                                         <i class="bi bi-arrow-repeat"></i>
                                     </button>
                                     <button class="btn btn-sm btn-outline-warning"
-                                        data-item-id="{{ i.id }}"
-                                        data-item-name="{{ i.name }}"
-                                        data-item-category="{{ i.category }}"
-                                        data-item-quantity="{{ i.quantity }}"
-                                        onclick="openEditStockModal(this.dataset.itemId, this.dataset.itemName, this.dataset.itemCategory, this.dataset.itemQuantity)">
+                                        onclick="openEditStockModalComplete({{ i.id }}, '{{ i.name }}', '{{ i.category }}', '{{ i.subcategory or '' }}', '{{ i.supplier or '' }}', {{ i.quantity }}, {{ i.min_stock }})">
                                         <i class="bi bi-pencil-fill"></i>
                                     </button>
                                     <form method="POST" action="/manage_stock" class="d-inline">
@@ -691,10 +695,34 @@
                         <input type="hidden" name="action" value="add">
                         <label class="form-label">Nombre del Artículo</label>
                         <input type="text" name="name" class="form-control mb-2" required>
+                        
                         <label class="form-label">Categoría</label>
-                        <input type="text" name="category" class="form-control mb-2" required>
+                        <select name="category" class="form-select mb-2" required>
+                            <option value="">Seleccionar categoría</option>
+                            <option value="Consumibles">Consumibles</option>
+                            <option value="Copiadoras">Copiadoras</option>
+                            <option value="Cajones">Cajones</option>
+                            <option value="TPV">TPV</option>
+                            <option value="Recicladores">Recicladores</option>
+                            <option value="Accesorios">Accesorios</option>
+                        </select>
+                        
+                        <label class="form-label">Subcategoría (opcional)</label>
+                        <select name="subcategory" class="form-select mb-2">
+                            <option value="">Sin subcategoría</option>
+                            <option value="Cashlogy">Cashlogy</option>
+                            <option value="Cashkeeper">Cashkeeper</option>
+                            <option value="ATCA">ATCA</option>
+                        </select>
+                        
+                        <label class="form-label">Proveedor</label>
+                        <input type="text" name="supplier" class="form-control mb-2" placeholder="Nombre del proveedor">
+                        
                         <label class="form-label">Cantidad Inicial</label>
-                        <input type="number" name="quantity" class="form-control" value="0" required>
+                        <input type="number" name="quantity" class="form-control mb-2" value="0" required>
+                        
+                        <label class="form-label">Stock Mínimo (para alarmas)</label>
+                        <input type="number" name="min_stock" class="form-control" value="5" required>
                     </div>
                     <div class="modal-footer border-secondary">
                         <button type="submit" class="btn btn-warning">Añadir</button>
@@ -740,12 +768,36 @@
                     <div class="modal-body">
                         <input type="hidden" name="action" value="edit">
                         <input type="hidden" name="item_id" id="editFullId">
+                        
                         <label class="form-label">Nombre</label>
                         <input type="text" name="name" id="editFullName" class="form-control mb-2" required>
+                        
                         <label class="form-label">Categoría</label>
-                        <input type="text" name="category" id="editFullCat" class="form-control mb-2" required>
-                        <label class="form-label">Cantidad</label>
-                        <input type="number" name="quantity" id="editFullQty" class="form-control" required>
+                        <select name="category" id="editFullCat" class="form-select mb-2" required>
+                            <option value="Consumibles">Consumibles</option>
+                            <option value="Copiadoras">Copiadoras</option>
+                            <option value="Cajones">Cajones</option>
+                            <option value="TPV">TPV</option>
+                            <option value="Recicladores">Recicladores</option>
+                            <option value="Accesorios">Accesorios</option>
+                        </select>
+                        
+                        <label class="form-label">Subcategoría</label>
+                        <select name="subcategory" id="editFullSubcat" class="form-select mb-2">
+                            <option value="">Sin subcategoría</option>
+                            <option value="Cashlogy">Cashlogy</option>
+                            <option value="Cashkeeper">Cashkeeper</option>
+                            <option value="ATCA">ATCA</option>
+                        </select>
+                        
+                        <label class="form-label">Proveedor</label>
+                        <input type="text" name="supplier" id="editFullSupplier" class="form-control mb-2" placeholder="Nombre del proveedor">
+                        
+                        <label class="form-label">Cantidad Actual</label>
+                        <input type="number" name="quantity" id="editFullQty" class="form-control mb-2" required>
+                        
+                        <label class="form-label">Stock Mínimo</label>
+                        <input type="number" name="min_stock" id="editFullMinStock" class="form-control" value="5" required>
                     </div>
                     <div class="modal-footer border-secondary">
                         <button type="submit" class="btn btn-warning">Guardar Cambios</button>
@@ -1007,6 +1059,37 @@
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
+                    <!-- INFORMACIÓN DEL CLIENTE -->
+                    <div class="card bg-black border-secondary p-3 mb-3" id="clientInfoCard" style="display: none;">
+                        <h6 class="text-warning fw-bold mb-3">
+                            <i class="bi bi-person-circle me-2"></i>Información del Cliente
+                        </h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p class="mb-2 small">
+                                    <strong>Teléfono:</strong> <span id="detailClientPhone">-</span>
+                                </p>
+                                <p class="mb-2 small">
+                                    <strong>Email:</strong> <span id="detailClientEmail">-</span>
+                                </p>
+                            </div>
+                            <div class="col-md-6">
+                                <p class="mb-2 small">
+                                    <strong>Dirección:</strong> <span id="detailClientAddress">-</span>
+                                </p>
+                                <p class="mb-2 small">
+                                    <strong>Soporte:</strong> 
+                                    <span id="detailClientSupport" class="badge">N/A</span>
+                                </p>
+                            </div>
+                        </div>
+                        <div class="mt-2" id="detailClientNotes" style="display: none;">
+                            <p class="mb-1 small"><strong>Notas del cliente:</strong></p>
+                            <div class="p-2 bg-dark rounded small" id="detailClientNotesText"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- INFORMACIÓN DEL SERVICIO -->
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <p class="mb-2"><strong class="text-warning">Cliente:</strong><br>
@@ -1019,17 +1102,21 @@
                     </div>
                     
                     <div class="row mb-3">
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <p class="mb-2"><strong class="text-warning">Fecha:</strong><br>
                             <span id="detailDate"></span></p>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <p class="mb-2"><strong class="text-warning">Hora Entrada:</strong><br>
                             <span id="detailStartTime"></span></p>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <p class="mb-2"><strong class="text-warning">Hora Salida:</strong><br>
                             <span id="detailEndTime"></span></p>
+                        </div>
+                        <div class="col-md-3" id="detailDurationSection" style="display: none;">
+                            <p class="mb-2"><strong class="text-warning">Duración:</strong><br>
+                            <span id="detailDuration"></span></p>
                         </div>
                     </div>
                     
@@ -1257,6 +1344,17 @@
             document.getElementById('editFullQty').value = qty;
             new bootstrap.Modal(document.getElementById('modalEditStock')).show();
         }
+        
+        function openEditStockModalComplete(id, name, category, subcategory, supplier, qty, minStock) {
+            document.getElementById('editFullId').value = id;
+            document.getElementById('editFullName').value = name;
+            document.getElementById('editFullCat').value = category;
+            document.getElementById('editFullSubcat').value = subcategory;
+            document.getElementById('editFullSupplier').value = supplier;
+            document.getElementById('editFullQty').value = qty;
+            document.getElementById('editFullMinStock').value = minStock;
+            new bootstrap.Modal(document.getElementById('modalEditStock')).show();
+        }
 
         function openEditClientModal(id, name) {
             document.getElementById('editClientId').value = id;
@@ -1393,6 +1491,54 @@
                         document.getElementById('detailService').textContent = task.service_type;
                         document.getElementById('detailStatus').textContent = task.status;
                         document.getElementById('detailDescription').textContent = task.description || 'Sin descripción';
+                        
+                        // Información del cliente
+                        if (task.client_info) {
+                            const clientCard = document.getElementById('clientInfoCard');
+                            clientCard.style.display = 'block';
+                            
+                            document.getElementById('detailClientPhone').textContent = task.client_info.phone || 'No disponible';
+                            document.getElementById('detailClientEmail').textContent = task.client_info.email || 'No disponible';
+                            document.getElementById('detailClientAddress').textContent = task.client_info.address || 'No disponible';
+                            
+                            const supportBadge = document.getElementById('detailClientSupport');
+                            if (task.client_info.has_support) {
+                                supportBadge.className = 'badge bg-success';
+                                supportBadge.textContent = '✓ Activo';
+                                
+                                // Mostrar días de soporte
+                                let supportDays = [];
+                                if (task.client_info.support_monday_friday) supportDays.push('L-V');
+                                if (task.client_info.support_saturday) supportDays.push('Sáb');
+                                if (task.client_info.support_sunday) supportDays.push('Dom');
+                                if (supportDays.length > 0) {
+                                    supportBadge.textContent += ` (${supportDays.join(', ')})`;
+                                }
+                            } else {
+                                supportBadge.className = 'badge bg-danger';
+                                supportBadge.textContent = '✗ Sin soporte';
+                            }
+                            
+                            // Notas del cliente
+                            if (task.client_info.notes && task.client_info.notes.trim()) {
+                                document.getElementById('detailClientNotes').style.display = 'block';
+                                document.getElementById('detailClientNotesText').textContent = task.client_info.notes;
+                            } else {
+                                document.getElementById('detailClientNotes').style.display = 'none';
+                            }
+                        } else {
+                            document.getElementById('clientInfoCard').style.display = 'none';
+                        }
+                        
+                        // Duración del trabajo
+                        if (task.work_duration_seconds && task.work_duration_seconds > 0) {
+                            const hours = Math.floor(task.work_duration_seconds / 3600);
+                            const minutes = Math.floor((task.work_duration_seconds % 3600) / 60);
+                            document.getElementById('detailDurationSection').style.display = 'block';
+                            document.getElementById('detailDuration').textContent = `${hours}h ${minutes}m`;
+                        } else {
+                            document.getElementById('detailDurationSection').style.display = 'none';
+                        }
                         
                         // Material/Stock
                         if (task.stock_info) {

@@ -153,7 +153,33 @@
             <h3 class="text-warning fw-bold m-0 fs-4">Parte de Trabajo</h3>
             <button class="btn btn-outline-secondary btn-sm px-3" onclick="showSection('home-menu')">Atrás</button>
         </div>
-        <form action="/save_report" method="POST" enctype="multipart/form-data" class="card bg-dark border-secondary p-3 p-md-4">
+        
+        <!-- CRONÓMETRO -->
+        <div class="card bg-dark border-warning p-4 mb-3 text-center">
+            <h5 class="text-warning fw-bold mb-3">
+                <i class="bi bi-stopwatch me-2"></i>CRONÓMETRO DE TRABAJO
+            </h5>
+            <div class="display-3 text-white mb-3" id="timerDisplay">00:00:00</div>
+            <div class="d-flex gap-2 justify-content-center">
+                <button type="button" class="btn btn-success btn-lg" id="btnStartTimer" onclick="startTimer()">
+                    <i class="bi bi-play-fill me-1"></i> Iniciar
+                </button>
+                <button type="button" class="btn btn-danger btn-lg" id="btnStopTimer" onclick="stopTimer()" style="display: none;">
+                    <i class="bi bi-stop-fill me-1"></i> Detener
+                </button>
+                <button type="button" class="btn btn-secondary btn-lg" id="btnResetTimer" onclick="resetTimer()">
+                    <i class="bi bi-arrow-clockwise me-1"></i> Reiniciar
+                </button>
+            </div>
+            <small class="text-muted mt-3">
+                El tiempo registrado se añadirá automáticamente al parte
+            </small>
+        </div>
+        
+        <form action="/submit_part" method="POST" enctype="multipart/form-data" id="parteForm" class="card bg-dark border-secondary p-3 p-md-4">
+            
+            <!-- Campo oculto para duración del cronómetro -->
+            <input type="hidden" name="work_duration_seconds" id="workDurationSeconds" value="0">
             
             <div class="mb-3 p-3 rounded" style="background: #1f1f1f; border-left: 4px solid var(--osla-orange);">
                 <label class="form-label text-warning fw-bold mb-2 small">VINCULAR CITA (OPCIONAL)</label>
@@ -195,11 +221,11 @@
                 </div>
                 <div class="col-6 col-md-4">
                     <label class="form-label">ENTRADA</label>
-                    <input type="time" name="entry_time" id="fieldEntryTime" class="form-control" required>
+                    <input type="time" name="start_time" id="fieldEntryTime" class="form-control" required>
                 </div>
                 <div class="col-6 col-md-4">
                     <label class="form-label">SALIDA</label>
-                    <input type="time" name="exit_time" class="form-control" required>
+                    <input type="time" name="end_time" id="fieldExitTime" class="form-control" required>
                 </div>
             </div>
             
@@ -222,15 +248,20 @@
                 </div>
                 <div class="row g-2">
                     <div class="col-8">
-                        <select name="stock_item" class="form-select">
-                            <option value="">Sin artículo de stock</option>
+                        <select name="stock_item_id" id="stockItemSelect" class="form-select">
+                            <option value="0">Sin artículo de stock</option>
                             {% for item in stock_items %}
-                            <option value="{{ item.id }}">{{ item.name }} ({{ item.quantity }} disponibles)</option>
+                            <option value="{{ item.id }}" 
+                                    data-name="{{ item.name }}"
+                                    data-category="{{ item.category }}"
+                                    data-qty="{{ item.quantity }}">
+                                {{ item.name }} ({{ item.quantity }} disponibles)
+                            </option>
                             {% endfor %}
                         </select>
                     </div>
                     <div class="col-4">
-                        <input type="number" name="stock_qty" class="form-control" min="0" value="0" placeholder="Cant.">
+                        <input type="number" name="stock_quantity_used" class="form-control" min="0" value="0" placeholder="Cant.">
                     </div>
                 </div>
                 <div class="mt-2">
@@ -1138,6 +1169,85 @@
             setTimeout(() => loadAnalytics(), 100);
         }
     };
+    
+    // ============================================================
+    // FUNCIONES DEL CRONÓMETRO
+    // ============================================================
+    let timerInterval = null;
+    let timerSeconds = 0;
+    let timerRunning = false;
+    
+    function startTimer() {
+        if (timerRunning) return;
+        
+        timerRunning = true;
+        document.getElementById('btnStartTimer').style.display = 'none';
+        document.getElementById('btnStopTimer').style.display = 'inline-block';
+        
+        timerInterval = setInterval(() => {
+            timerSeconds++;
+            updateTimerDisplay();
+        }, 1000);
+    }
+    
+    function stopTimer() {
+        if (!timerRunning) return;
+        
+        timerRunning = false;
+        document.getElementById('btnStartTimer').style.display = 'inline-block';
+        document.getElementById('btnStopTimer').style.display = 'none';
+        
+        clearInterval(timerInterval);
+        
+        // Guardar duración en el campo oculto del formulario
+        document.getElementById('workDurationSeconds').value = timerSeconds;
+        
+        // Calcular y rellenar automáticamente entrada/salida si están vacías
+        const entryTime = document.getElementById('fieldEntryTime');
+        const exitTime = document.getElementById('fieldExitTime');
+        
+        if (!entryTime.value || !exitTime.value) {
+            const now = new Date();
+            const startTime = new Date(now.getTime() - (timerSeconds * 1000));
+            
+            if (!entryTime.value) {
+                entryTime.value = startTime.toTimeString().slice(0, 5);
+            }
+            if (!exitTime.value) {
+                exitTime.value = now.toTimeString().slice(0, 5);
+            }
+        }
+    }
+    
+    function resetTimer() {
+        if (timerRunning) {
+            stopTimer();
+        }
+        
+        timerSeconds = 0;
+        updateTimerDisplay();
+        document.getElementById('workDurationSeconds').value = '0';
+    }
+    
+    function updateTimerDisplay() {
+        const hours = Math.floor(timerSeconds / 3600);
+        const minutes = Math.floor((timerSeconds % 3600) / 60);
+        const seconds = timerSeconds % 60;
+        
+        const display = `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+        document.getElementById('timerDisplay').textContent = display;
+    }
+    
+    function pad(num) {
+        return String(num).padStart(2, '0');
+    }
+    
+    // Detener cronómetro al enviar el formulario
+    document.getElementById('parteForm')?.addEventListener('submit', function() {
+        if (timerRunning) {
+            stopTimer();
+        }
+    });
 </script>
 </body>
 </html>
