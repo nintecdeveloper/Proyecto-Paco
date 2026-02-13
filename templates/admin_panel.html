@@ -213,82 +213,59 @@
                     <div class="col-12 col-sm-6 col-md-4">
                         <div class="card-emp">
                             <button class="btn-delete-user" 
-                                onclick="if(confirm('¿Eliminar usuario?')){document.getElementById('deleteUserForm{{ u.id }}').submit();}">
-                                <i class="bi bi-trash-fill"></i>
-                            </button>
-                            <form id="deleteUserForm{{ u.id }}" method="POST" action="/admin_manage_user" style="display:none;">
-                                <input type="hidden" name="action" value="delete">
-                                <input type="hidden" name="del_user_id" value="{{ u.id }}">
-                            </form>
-
-                            <div class="fs-4 mb-2">
-                                <i class="bi bi-person-circle text-warning"></i>
-                            </div>
-                            <h5 class="mb-1 text-white">{{ u.username }}</h5>
-                            <span class="badge bg-secondary mb-3">{{ u.role }}</span>
-
-                            {% if u.role=='admin' %}
-                            <button class="btn btn-sm btn-outline-light w-100 mb-2" disabled>Ver Calendario</button>
-                            {% else %}
-                            <button class="btn btn-sm btn-warning w-100 mb-2" data-bs-toggle="modal"
-                                data-bs-target="#modalCalendarAdmin" onclick="loadCalendarAdmin({{ u.id }}, '{{ u.username }}')">
-                                <i class="bi bi-calendar-check me-1"></i>Ver Calendario
-                            </button>
-                            {% endif %}
-
-                            <button class="btn btn-sm btn-outline-secondary w-100" data-bs-toggle="modal"
-                                data-bs-target="#modalResetPassword" 
-                                onclick="document.getElementById('resetUserId').value='{{ u.id }}'; 
-                                         document.getElementById('resetUserName').innerText='{{ u.username }}';">
-                                <i class="bi bi-key me-1"></i>Resetear Contraseña
+                                data-bs-toggle="modal"
+                                data-user-id="{{ u.id }}"
+                                onclick="document.getElementById('deleteUserId').value=this.dataset.userId;"
+                                data-bs-target="#modalDeleteUser"><i class="bi bi-x-circle-fill fs-4"></i></button>
+                            <i class="bi bi-person-circle fs-1 mb-2 text-warning"></i>
+                            <h5 class="mb-1 text-white fw-bold">{{ u.username }}</h5>
+                            <small class="text-muted">ID: #{{ u.id }}</small>
+                            <hr class="my-3" style="border-color:#333;">
+                            <button class="btn btn-sm btn-primary w-100" 
+                                data-user-id="{{ u.id }}"
+                                onclick="loadEmployeeCalendar(this.dataset.userId)">
+                                <i class="bi bi-calendar-check-fill me-1"></i> Ver Calendario
                             </button>
                         </div>
                     </div>
                     {% endfor %}
                 </div>
+
+                <div id="calendarAdminContainer" class="mt-4" style="display:none;">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="text-white fw-bold m-0" id="empCalendarTitle">Calendario de Empleado</h5>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="closeEmployeeCalendar()">
+                            <i class="bi bi-x-circle me-1"></i> Cerrar
+                        </button>
+                    </div>
+                    <div id="calendarAdmin"></div>
+                </div>
             </div>
 
             <div class="tab-pane fade" id="global-agenda">
-                <h4 class="fw-bold text-white fs-5 mb-3">Agenda Global del Equipo</h4>
+                <div class="d-flex justify-content-between mb-3 align-items-center flex-wrap">
+                    <h4 class="fw-bold text-white fs-5 m-0">Agenda Global de Tareas</h4>
+                    <button class="btn btn-warning btn-sm fw-bold" data-bs-toggle="modal"
+                        data-bs-target="#modalScheduleAppointment">
+                        <i class="bi bi-calendar-plus-fill me-1"></i> Nueva Cita
+                    </button>
+                </div>
 
+                <!-- FILTROS DINÁMICOS POR TIPO -->
                 <div class="filter-group mb-3">
-                    <div class="row g-2 mb-2">
-                        <div class="col-auto">
-                            <strong class="text-white small">Filtrar por técnico:</strong>
-                        </div>
-                        {% for u in empleados %}
-                        {% if u.role != 'admin' %}
-                        <div class="col-auto">
-                            <input type="checkbox" class="btn-check" id="filterTech{{ u.id }}" value="{{ u.id }}" checked
-                                onchange="applyGlobalFilters()">
-                            <label class="btn btn-sm btn-outline-custom" for="filterTech{{ u.id }}"
-                                style="border-color: {{ u.color }}; color: {{ u.color }};">
-                                {{ u.username }}
-                            </label>
-                        </div>
-                        {% endif %}
-                        {% endfor %}
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <small class="text-muted fw-bold">FILTRAR POR TIPO</small>
+                        <button class="btn btn-outline-light btn-sm" onclick="checkAllFilters()">
+                            <i class="bi bi-check-all me-1"></i> Todos
+                        </button>
                     </div>
-
-                    <div class="row g-2">
-                        <div class="col-auto">
-                            <strong class="text-white small">Filtrar por estado:</strong>
-                        </div>
-                        <div class="col-auto">
-                            <input type="checkbox" class="btn-check" id="filterPendiente" value="Pendiente" checked
-                                onchange="applyGlobalFilters()">
-                            <label class="btn btn-sm btn-outline-warning" for="filterPendiente">Pendiente</label>
-                        </div>
-                        <div class="col-auto">
-                            <input type="checkbox" class="btn-check" id="filterEnProgreso" value="En Progreso" checked
-                                onchange="applyGlobalFilters()">
-                            <label class="btn btn-sm btn-outline-info" for="filterEnProgreso">En Progreso</label>
-                        </div>
-                        <div class="col-auto">
-                            <input type="checkbox" class="btn-check" id="filterCompletado" value="Completado" checked
-                                onchange="applyGlobalFilters()">
-                            <label class="btn btn-sm btn-outline-success" for="filterCompletado">Completado</label>
-                        </div>
+                    <div class="btn-group-sm d-flex flex-wrap gap-2" role="group">
+                        {% for svc in all_service_types %}
+                        <input type="checkbox" class="btn-check filter-cb" id="filter-{{ svc.id }}" value="{{ svc.name }}" checked onchange="updateGlobalFilters()">
+                        <label class="btn btn-outline-custom flex-grow-1" for="filter-{{ svc.id }}" data-color="{{ svc.color }}">
+                            {{ svc.name }}
+                        </label>
+                        {% endfor %}
                     </div>
                 </div>
 
@@ -296,69 +273,32 @@
             </div>
 
             <div class="tab-pane fade" id="data">
-                <h4 class="fw-bold text-white fs-5 mb-3">Partes de Trabajo</h4>
-
-                <div class="row mb-3">
-                    <div class="col-md-10">
-                        <form method="GET" action="/admin_panel" class="row g-2">
-                            <div class="col-md-4">
-                                <input type="date" name="start_date" class="form-control form-control-sm" 
-                                    value="{{ start_date if start_date else '' }}" placeholder="Fecha inicio">
-                            </div>
-                            <div class="col-md-4">
-                                <input type="date" name="end_date" class="form-control form-control-sm" 
-                                    value="{{ end_date if end_date else '' }}" placeholder="Fecha fin">
-                            </div>
-                            <div class="col-md-4">
-                                <button type="submit" class="btn btn-warning btn-sm w-100">
-                                    <i class="bi bi-funnel-fill me-1"></i>Filtrar
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                    <div class="col-md-2">
-                        <form method="GET" action="/download_csv" class="d-grid">
-                            <button type="submit" class="btn btn-success btn-sm">
-                                <i class="bi bi-download me-1"></i>Exportar CSV
-                            </button>
-                        </form>
-                    </div>
-                </div>
-
+                <h4 class="fw-bold text-white fs-5 mb-3">Informes Técnicos Completados</h4>
                 <div class="table-responsive">
-                    <table class="table table-dark table-hover table-sm">
+                    <table class="table table-dark table-sm">
                         <thead>
                             <tr>
-                                <th>Fecha</th>
+                                <th>ID</th>
                                 <th>Cliente</th>
                                 <th>Servicio</th>
+                                <th>Fecha</th>
                                 <th>Técnico</th>
-                                <th>Descripción</th>
-                                <th>Estado</th>
-                                <th>Acciones</th>
+                                <th>Acción</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {% for t in tareas %}
+                            {% for r in informes %}
                             <tr>
-                                <td>{{ t.date }}</td>
-                                <td>{{ t.client_name }}</td>
-                                <td>{{ t.service_type }}</td>
-                                <td>{{ t.tech_name }}</td>
-                                <td class="text-truncate" style="max-width: 200px;">{{ t.description }}</td>
+                                <td>{{ r.id }}</td>
+                                <td>{{ r.client_name }}</td>
+                                <td>{{ r.service_type }}</td>
+                                <td>{{ r.date.strftime('%d/%m/%Y') }}</td>
+                                <td>{{ r.tech.username if r.tech else 'Sin técnico' }}</td>
                                 <td>
-                                    <span class="badge 
-                                        {% if t.status=='Pendiente' %}bg-warning text-dark
-                                        {% elif t.status=='En Progreso' %}bg-info
-                                        {% else %}bg-success{% endif %}">
-                                        {{ t.status }}
-                                    </span>
-                                </td>
-                                <td>
-                                    <button class="btn btn-sm btn-outline-info" data-bs-toggle="modal"
-                                        data-bs-target="#modalTaskDetails" onclick="loadTaskDetails({{ t.id }})">
-                                        <i class="bi bi-eye"></i>
-                                    </button>
+                                    <a href="/print_report/{{ r.id }}" target="_blank"
+                                        class="btn btn-sm btn-outline-warning">
+                                        <i class="bi bi-printer-fill"></i>
+                                    </a>
                                 </td>
                             </tr>
                             {% endfor %}
@@ -367,132 +307,126 @@
                 </div>
             </div>
 
+            <!-- SECCIÓN ANALÍTICAS -->
             <div class="tab-pane fade" id="analytics">
-                <h4 class="fw-bold text-white fs-5 mb-3">Analíticas</h4>
-
-                <div class="row mb-3">
-                    <div class="col-md-10">
-                        <form class="row g-2" onsubmit="event.preventDefault(); loadAdminAnalytics();">
-                            <div class="col-md-3">
-                                <input type="date" id="adminAnalyticsStart" class="form-control form-control-sm">
-                            </div>
-                            <div class="col-md-3">
-                                <input type="date" id="adminAnalyticsEnd" class="form-control form-control-sm">
-                            </div>
-                            <div class="col-md-3">
-                                <select id="adminAnalyticsTech" class="form-select form-select-sm">
-                                    <option value="">Todos los técnicos</option>
-                                    {% for u in empleados %}
-                                    {% if u.role != 'admin' %}
-                                    <option value="{{ u.id }}">{{ u.username }}</option>
-                                    {% endif %}
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="col-md-3">
-                                <select id="adminAnalyticsStatus" class="form-select form-select-sm">
-                                    <option value="">Todos los estados</option>
-                                    <option value="Pendiente">Pendiente</option>
-                                    <option value="En Progreso">En Progreso</option>
-                                    <option value="Completado">Completado</option>
-                                </select>
-                            </div>
-                        </form>
-                    </div>
-                    <div class="col-md-2">
-                        <button class="btn btn-warning w-100 mb-2" onclick="loadAdminAnalytics()">
-                            <i class="bi bi-arrow-clockwise me-1"></i>Actualizar
-                        </button>
-                        <button class="btn btn-info w-100" onclick="showReportsList()">
-                            <i class="bi bi-list-ul me-1"></i>Vista Lista
-                        </button>
-                    </div>
-                </div>
-
-                <div class="row g-3 mb-4">
-                    <div class="col-md-3">
-                        <div class="card bg-dark border-warning">
-                            <div class="card-body text-center">
-                                <h6 class="text-warning small mb-2">TOTAL SERVICIOS</h6>
-                                <h3 class="fw-bold text-white" id="adminTotalServices">0</h3>
-                            </div>
+                <h4 class="fw-bold text-info fs-5 mb-4"><i class="bi bi-graph-up me-2"></i>Panel de Analíticas</h4>
+                
+                <!-- Selector de Técnico -->
+                <div class="card bg-dark border-secondary p-3 mb-4">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-info">TÉCNICO</label>
+                            <select id="analyticsTechSelector" class="form-select" onchange="loadAdminAnalytics()">
+                                <option value="">-- Seleccionar Técnico --</option>
+                                {% for emp in employees %}
+                                <option value="{{ emp.id }}">{{ emp.username }}</option>
+                                {% endfor %}
+                            </select>
                         </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card bg-dark border-info">
-                            <div class="card-body text-center">
-                                <h6 class="text-info small mb-2">MANTENIMIENTOS</h6>
-                                <h3 class="fw-bold text-white" id="adminTotalMaintenances">0</h3>
-                            </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold text-info">PERÍODO</label>
+                            <select id="analyticsPeriodSelector" class="form-select" onchange="loadAdminAnalytics()">
+                                <option value="7">Últimos 7 días</option>
+                                <option value="30" selected>Últimos 30 días</option>
+                                <option value="90">Últimos 3 meses</option>
+                                <option value="180">Últimos 6 meses</option>
+                                <option value="365">Último año</option>
+                                <option value="all">Todo el historial</option>
+                            </select>
                         </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card bg-dark border-success">
-                            <div class="card-body text-center">
-                                <h6 class="text-success small mb-2">INGRESOS TOTALES</h6>
-                                <h3 class="fw-bold text-white" id="adminTotalRevenue">0€</h3>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card bg-dark border-secondary">
-                            <div class="card-body text-center">
-                                <h6 class="text-secondary small mb-2">TIEMPO PROMEDIO</h6>
-                                <h3 class="fw-bold text-white" id="adminAvgTime">0h</h3>
-                            </div>
+                        <div class="col-md-2">
+                            <button class="btn btn-warning w-100" onclick="loadAdminAnalytics()">
+                                <i class="bi bi-arrow-clockwise me-1"></i>Actualizar
+                            </button>
                         </div>
                     </div>
                 </div>
 
-                <div class="row g-3 mb-4">
-                    <div class="col-md-6">
-                        <div class="card bg-dark border-secondary">
-                            <div class="card-body">
-                                <h6 class="text-warning mb-3">DISTRIBUCIÓN DE SERVICIOS</h6>
+                <!-- Mensaje inicial -->
+                <div id="analyticsPlaceholder" class="text-center text-muted py-5">
+                    <i class="bi bi-bar-chart fs-1 d-block mb-3"></i>
+                    <h5>Selecciona un técnico para ver sus analíticas</h5>
+                    <p class="small">Elige un técnico del menú desplegable para visualizar sus estadísticas de rendimiento</p>
+                </div>
+
+                <!-- Contenedor de Analíticas (oculto inicialmente) -->
+                <div id="analyticsContent" style="display: none;">
+                    <!-- Tarjetas de Resumen -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-3 col-6">
+                            <div class="card bg-dark border-secondary p-3 text-center">
+                                <i class="bi bi-clipboard-check fs-1 text-success mb-2"></i>
+                                <h2 class="text-white fw-bold mb-0" id="adminTotalServices">0</h2>
+                                <small class="text-muted">Servicios Totales</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-6">
+                            <div class="card bg-dark border-secondary p-3 text-center">
+                                <i class="bi bi-tools fs-1 text-warning mb-2"></i>
+                                <h2 class="text-white fw-bold mb-0" id="adminTotalMaintenances">0</h2>
+                                <small class="text-muted">Mantenimientos</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-6">
+                            <div class="card bg-dark border-secondary p-3 text-center">
+                                <i class="bi bi-cash-stack fs-1 text-info mb-2"></i>
+                                <h2 class="text-white fw-bold mb-0" id="adminTotalRevenue">0€</h2>
+                                <small class="text-muted">Ingresos Estimados</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-6">
+                            <div class="card bg-dark border-secondary p-3 text-center">
+                                <i class="bi bi-clock-history fs-1 text-danger mb-2"></i>
+                                <h2 class="text-white fw-bold mb-0" id="adminAvgTime">0h</h2>
+                                <small class="text-muted">Tiempo Promedio</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Gráficos -->
+                    <div class="row g-3 mb-4">
+                        <!-- Distribución de Servicios -->
+                        <div class="col-lg-6">
+                            <div class="card bg-dark border-secondary p-4">
+                                <h5 class="text-white fw-bold mb-3"><i class="bi bi-pie-chart me-2"></i>Distribución de Servicios</h5>
                                 <canvas id="adminServiceDistributionChart" style="max-height: 300px;"></canvas>
                             </div>
                         </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="card bg-dark border-secondary">
-                            <div class="card-body">
-                                <h6 class="text-warning mb-3">TOP 5 SERVICIOS MÁS REALIZADOS</h6>
-                                <canvas id="adminTopServicesChart" style="max-height: 300px;"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                </div>
 
-                <div class="row g-3 mb-4">
-                    <div class="col-12">
-                        <div class="card bg-dark border-secondary">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <h6 class="text-warning mb-0">EVOLUCIÓN TEMPORAL</h6>
-                                    <select id="adminMetricSelector" class="form-select form-select-sm w-auto"
-                                        onchange="updateAdminTimelineChart()">
-                                        <option value="services">Servicios</option>
-                                        <option value="revenue">Ingresos</option>
+                        <!-- Evolución Temporal -->
+                        <div class="col-lg-6">
+                            <div class="card bg-dark border-secondary p-4">
+                                <h5 class="text-white fw-bold mb-3"><i class="bi bi-graph-up me-2"></i>Evolución Temporal</h5>
+                                <div class="mb-3">
+                                    <select id="adminMetricSelector" class="form-select form-select-sm" onchange="updateAdminTimelineChart()">
+                                        <option value="services">Servicios Realizados</option>
+                                        <option value="revenue">Ingresos Totales</option>
                                         <option value="maintenances">Mantenimientos</option>
                                     </select>
                                 </div>
-                                <canvas id="adminTimelineChart" style="max-height: 300px;"></canvas>
+                                <canvas id="adminTimelineChart" style="max-height: 250px;"></canvas>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <div class="row g-3">
-                    <div class="col-12">
-                        <div class="card bg-dark border-secondary">
-                            <div class="card-body">
-                                <h6 class="text-warning mb-3">TOP 10 CLIENTES</h6>
+                    <!-- Top Clientes y Servicios -->
+                    <div class="row g-3">
+                        <div class="col-lg-6">
+                            <div class="card bg-dark border-secondary p-4">
+                                <h5 class="text-white fw-bold mb-3"><i class="bi bi-people-fill me-2"></i>Top 5 Clientes</h5>
                                 <div id="adminTopClients" class="list-group">
-                                    <div class="text-center text-muted py-4">
-                                        <i class="bi bi-inbox fs-1 d-block mb-2"></i>
-                                        No hay datos disponibles
+                                    <div class="text-center text-muted py-5">
+                                        <i class="bi bi-hourglass-split fs-1 d-block mb-2"></i>
+                                        Cargando datos...
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+
+                        <div class="col-lg-6">
+                            <div class="card bg-dark border-secondary p-4">
+                                <h5 class="text-white fw-bold mb-3"><i class="bi bi-bar-chart me-2"></i>Servicios Más Frecuentes</h5>
+                                <canvas id="adminTopServicesChart" style="max-height: 300px;"></canvas>
                             </div>
                         </div>
                     </div>
@@ -501,45 +435,32 @@
 
             <div class="tab-pane fade" id="stock">
                 <div class="d-flex justify-content-between mb-3 align-items-center">
-                    <h4 class="fw-bold text-white fs-5 m-0">Gestión de Stock</h4>
-                    <button class="btn btn-warning btn-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalAddStock">
-                        <i class="bi bi-plus-circle-fill me-1"></i> Añadir Producto
+                    <h4 class="fw-bold text-white fs-5 m-0">Gestión de Inventario</h4>
+                    <button class="btn btn-warning btn-sm fw-bold" data-bs-toggle="modal"
+                        data-bs-target="#modalAddStock">
+                        <i class="bi bi-plus-circle-fill me-1"></i> Nuevo Artículo
                     </button>
                 </div>
 
                 <div class="table-responsive">
-                    <table class="table table-dark table-hover">
+                    <table class="table table-dark table-sm">
                         <thead>
                             <tr>
-                                <th>Producto</th>
+                                <th>Artículo</th>
                                 <th>Categoría</th>
-                                <th>Subcategoría</th>
-                                <th>Proveedor</th>
                                 <th>Cantidad</th>
-                                <th>Stock Mínimo</th>
-                                <th>Estado</th>
                                 <th>Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {% for i in stock_items %}
+                            {% for i in inventory %}
                             <tr>
                                 <td>{{ i.name }}</td>
-                                <td>{{ i.category or '-' }}</td>
-                                <td>{{ i.subcategory or '-' }}</td>
-                                <td>{{ i.supplier or '-' }}</td>
+                                <td>{{ i.category }}</td>
                                 <td>
-                                    <strong class="{% if i.quantity < i.min_stock %}text-danger{% else %}text-success{% endif %}">
+                                    <span class="badge {% if i.quantity < 5 %}bg-danger{% else %}bg-success{% endif %}">
                                         {{ i.quantity }}
-                                    </strong>
-                                </td>
-                                <td>{{ i.min_stock }}</td>
-                                <td>
-                                    {% if i.quantity < i.min_stock %}
-                                    <span class="badge bg-danger"><i class="bi bi-exclamation-triangle-fill me-1"></i>Bajo</span>
-                                    {% else %}
-                                    <span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i>OK</span>
-                                    {% endif %}
+                                    </span>
                                 </td>
                                 <td>
                                     <button class="btn btn-sm btn-outline-info"
@@ -552,19 +473,8 @@
                                         data-item-id="{{ i.id }}"
                                         data-item-name="{{ i.name }}"
                                         data-item-category="{{ i.category }}"
-                                        data-item-subcategory="{{ i.subcategory }}"
-                                        data-item-supplier="{{ i.supplier }}"
                                         data-item-quantity="{{ i.quantity }}"
-                                        data-item-minstock="{{ i.min_stock }}"
-                                        onclick="openEditStockModal(
-                                            this.dataset.itemId, 
-                                            this.dataset.itemName, 
-                                            this.dataset.itemCategory, 
-                                            this.dataset.itemSubcategory,
-                                            this.dataset.itemSupplier,
-                                            this.dataset.itemQuantity, 
-                                            this.dataset.itemMinstock
-                                        )">
+                                        onclick="openEditStockModal(this.dataset.itemId, this.dataset.itemName, this.dataset.itemCategory, this.dataset.itemQuantity)">
                                         <i class="bi bi-pencil-fill"></i>
                                     </button>
                                     <form method="POST" action="/manage_stock" class="d-inline">
@@ -584,53 +494,52 @@
             </div>
 
             <div class="tab-pane fade" id="clients">
-                <div class="d-flex justify-content-between mb-3 align-items-center">
+                <div class="d-flex justify-content-between mb-3 align-items-center flex-wrap gap-2">
                     <h4 class="fw-bold text-white fs-5 m-0">Gestión de Clientes</h4>
-                    <button class="btn btn-warning btn-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalAddClient">
-                        <i class="bi bi-person-plus-fill me-1"></i> Añadir Cliente
-                    </button>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-warning btn-sm fw-bold" data-bs-toggle="modal"
+                            data-bs-target="#modalAddClient">
+                            <i class="bi bi-person-plus-fill me-1"></i> Nuevo Cliente
+                        </button>
+                        <a href="/export_clients" class="btn btn-outline-success btn-sm">
+                            <i class="bi bi-download me-1"></i> Exportar
+                        </a>
+                        <button class="btn btn-outline-info btn-sm" data-bs-toggle="modal"
+                            data-bs-target="#modalImportClients">
+                            <i class="bi bi-upload me-1"></i> Importar
+                        </button>
+                    </div>
                 </div>
 
+                <input type="text" id="clientSearchInput" class="form-control mb-3"
+                    placeholder="🔍 Buscar cliente..." onkeyup="filterClientsTable()">
+
                 <div class="table-responsive">
-                    <table class="table table-dark table-hover">
+                    <table class="table table-dark table-sm" id="clientsTable">
                         <thead>
                             <tr>
+                                <th>ID</th>
                                 <th>Nombre</th>
-                                <th>Teléfono</th>
-                                <th>Email</th>
-                                <th>Dirección</th>
-                                <th>Soporte</th>
                                 <th>Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for c in clients %}
                             <tr>
-                                <td>{{ c.name }}</td>
-                                <td>{{ c.phone }}</td>
-                                <td>{{ c.email }}</td>
-                                <td class="text-truncate" style="max-width: 200px;">{{ c.address }}</td>
+                                <td>{{ c.id }}</td>
+                                <td class="client-name-cell">{{ c.name }}</td>
                                 <td>
-                                    {% if c.has_support %}
-                                    <span class="badge bg-success"><i class="bi bi-check-circle-fill"></i> Sí</span>
-                                    {% else %}
-                                    <span class="badge bg-danger"><i class="bi bi-x-circle-fill"></i> No</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <button class="btn btn-sm btn-outline-warning" data-bs-toggle="modal"
-                                        data-bs-target="#modalEditClient" onclick="openEditClientModal(
-                                            '{{ c.id }}', '{{ c.name }}', '{{ c.phone }}', 
-                                            '{{ c.email }}', '{{ c.address }}', '{{ c.has_support }}', 
-                                            '{{ c.notes|replace("'", "\\'") }}'
-                                        )">
+                                    <button class="btn btn-sm btn-outline-warning"
+                                        data-client-id="{{ c.id }}"
+                                        data-client-name="{{ c.name }}"
+                                        onclick="openEditClientModal(this.dataset.clientId, this.dataset.clientName)">
                                         <i class="bi bi-pencil-fill"></i>
                                     </button>
                                     <form method="POST" action="/manage_clients" class="d-inline">
                                         <input type="hidden" name="action" value="delete">
                                         <input type="hidden" name="client_id" value="{{ c.id }}">
                                         <button class="btn btn-sm btn-outline-danger"
-                                            onclick="return confirm('¿Eliminar este cliente? Esto no eliminará sus tareas asociadas.')">
+                                            onclick="return confirm('¿Eliminar este cliente?')">
                                             <i class="bi bi-trash-fill"></i>
                                         </button>
                                     </form>
@@ -643,452 +552,126 @@
             </div>
 
             <div class="tab-pane fade" id="config">
-                <h4 class="fw-bold text-white fs-5 mb-3">Configuración</h4>
+                <h4 class="fw-bold text-white fs-5 mb-3">Configuración del Sistema</h4>
 
-                <div class="card bg-dark border-secondary mb-3">
-                    <div class="card-body">
-                        <h6 class="text-warning mb-3">
-                            <i class="bi bi-gear-fill me-2"></i>TIPOS DE SERVICIOS
-                        </h6>
-                        <form method="POST" action="/manage_service_types">
-                            <div class="input-group mb-3">
-                                <input type="text" name="new_type" class="form-control" 
-                                    placeholder="Nuevo tipo de servicio" required>
-                                <button type="submit" class="btn btn-warning">
-                                    <i class="bi bi-plus-circle me-1"></i>Añadir
-                                </button>
-                            </div>
-                        </form>
-
-                        <div class="list-group">
-                            {% for st in service_types %}
-                            <div class="list-group-item bg-dark border-secondary text-white d-flex justify-content-between align-items-center">
-                                <span>{{ st.name }}</span>
-                                <form method="POST" action="/manage_service_types" class="d-inline">
-                                    <input type="hidden" name="delete_type_id" value="{{ st.id }}">
-                                    <button type="submit" class="btn btn-sm btn-outline-danger"
-                                        onclick="return confirm('¿Eliminar este tipo de servicio?')">
-                                        <i class="bi bi-trash-fill"></i>
-                                    </button>
-                                </form>
-                            </div>
-                            {% endfor %}
-                        </div>
+                <div class="card bg-dark text-white p-3 mb-3 border border-secondary">
+                    <h6 class="fw-bold mb-3"><i class="bi bi-wrench-adjustable-circle-fill me-2 text-warning"></i>
+                        Tipos de Servicio</h6>
+                    <button class="btn btn-sm btn-warning mb-3" data-bs-toggle="modal"
+                        data-bs-target="#modalAddService">
+                        <i class="bi bi-plus-circle-fill me-1"></i> Añadir Tipo de Servicio
+                    </button>
+                    <div class="table-responsive">
+                        <table class="table table-dark table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Nombre</th>
+                                    <th>Color</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for s in services %}
+                                <tr>
+                                    <td>{{ s.name }}</td>
+                                    <td><span class="badge service-color-badge" data-bg-color="{{ s.color }}">{{ s.color }}</span></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-warning"
+                                            data-service-id="{{ s.id }}"
+                                            data-service-name="{{ s.name }}"
+                                            data-service-color="{{ s.color }}"
+                                            onclick="openEditServiceModal(this.dataset.serviceId, this.dataset.serviceName, this.dataset.serviceColor)">
+                                            <i class="bi bi-pencil-fill"></i>
+                                        </button>
+                                        <form method="POST" action="/manage_services" class="d-inline">
+                                            <input type="hidden" name="action" value="delete">
+                                            <input type="hidden" name="service_id" value="{{ s.id }}">
+                                            <button class="btn btn-sm btn-outline-danger"
+                                                onclick="return confirm('¿Eliminar este tipo de servicio?')">
+                                                <i class="bi bi-trash-fill"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- MODALES -->
     <!-- Modal: Añadir Usuario -->
     <div class="modal fade" id="modalAddUser" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content bg-dark text-white">
                 <div class="modal-header border-secondary">
-                    <h5 class="modal-title">Añadir Nuevo Usuario</h5>
+                    <h5 class="modal-title">Nuevo Usuario</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <form method="POST" action="/admin_manage_user">
+                <form method="POST" action="/manage_users">
                     <div class="modal-body">
                         <input type="hidden" name="action" value="add">
                         <label class="form-label">Usuario</label>
-                        <input type="text" name="username" class="form-control mb-3" required>
+                        <input type="text" name="username" class="form-control mb-2" required>
                         <label class="form-label">Contraseña</label>
-                        <input type="password" name="password" class="form-control mb-3" required>
+                        <input type="password" name="password" class="form-control mb-2" required>
                         <label class="form-label">Rol</label>
-                        <select name="role" class="form-select mb-3" required>
-                            <option value="tecnico">Técnico</option>
+                        <select name="role" class="form-select" required>
+                            <option value="tech">Técnico</option>
                             <option value="admin">Admin</option>
                         </select>
-                        <label class="form-label">Color (para calendario)</label>
-                        <input type="color" name="color" class="form-control mb-3" value="#f37021">
                     </div>
                     <div class="modal-footer border-secondary">
-                        <button type="submit" class="btn btn-warning">
-                            <i class="bi bi-person-plus-fill me-1"></i>Añadir
-                        </button>
+                        <button type="submit" class="btn btn-warning">Crear</button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
 
-    <!-- Modal: Resetear Contraseña -->
-    <div class="modal fade" id="modalResetPassword" tabindex="-1">
+    <!-- Modal: Eliminar Usuario -->
+    <div class="modal fade" id="modalDeleteUser" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content bg-dark text-white">
                 <div class="modal-header border-secondary">
-                    <h5 class="modal-title">Resetear Contraseña</h5>
+                    <h5 class="modal-title text-danger">Confirmar Eliminación</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <form method="POST" action="/admin_manage_user">
+                <form method="POST" action="/manage_users">
                     <div class="modal-body">
-                        <input type="hidden" name="action" value="reset_password">
-                        <input type="hidden" id="resetUserId" name="user_id">
-                        <p>Resetear contraseña para: <strong id="resetUserName"></strong></p>
-                        <label class="form-label">Nueva Contraseña</label>
-                        <input type="password" name="new_password" class="form-control" required>
+                        <input type="hidden" name="action" value="delete">
+                        <input type="hidden" name="user_id" id="deleteUserId">
+                        <p>¿Seguro que deseas eliminar este usuario? Todas sus tareas también serán eliminadas.</p>
                     </div>
                     <div class="modal-footer border-secondary">
-                        <button type="submit" class="btn btn-warning">
-                            <i class="bi bi-key me-1"></i>Resetear
-                        </button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-danger">Eliminar</button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
 
-    <!-- Modal: Cambiar Contraseña (Propia) -->
+    <!-- Modal: Cambiar Contraseña -->
     <div class="modal fade" id="modalChangePassword" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content bg-dark text-white">
                 <div class="modal-header border-secondary">
-                    <h5 class="modal-title">Cambiar mi Contraseña</h5>
+                    <h5 class="modal-title">Cambiar Contraseña</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <form method="POST" action="/change_password">
                     <div class="modal-body">
                         <label class="form-label">Contraseña Actual</label>
-                        <input type="password" name="old_password" class="form-control mb-3" required>
+                        <input type="password" name="current_password" class="form-control mb-2" required>
                         <label class="form-label">Nueva Contraseña</label>
                         <input type="password" name="new_password" class="form-control" required>
                     </div>
                     <div class="modal-footer border-secondary">
-                        <button type="submit" class="btn btn-warning">
-                            <i class="bi bi-key-fill me-1"></i>Cambiar
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal: Calendario Individual del Técnico -->
-    <div class="modal fade" id="modalCalendarAdmin" tabindex="-1">
-        <div class="modal-dialog modal-xl">
-            <div class="modal-content bg-dark text-white">
-                <div class="modal-header border-secondary">
-                    <h5 class="modal-title">Calendario de <span id="techNameCalendar"></span></h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <div id="calendarAdmin"></div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal: Acciones Admin sobre Evento -->
-    <div class="modal fade" id="modalActionAdmin" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content bg-dark text-white">
-                <div class="modal-header border-secondary">
-                    <h5 class="modal-title">Acciones sobre Tarea</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <input type="hidden" id="evtId">
-                    <p><strong>Cliente:</strong> <span id="evtClient"></span></p>
-                    <p><strong>Técnico:</strong> <span id="evtTech"></span></p>
-                    <p><strong>Servicio:</strong> <span id="evtService"></span></p>
-                    <p><strong>Estado:</strong> <span id="evtStatus"></span></p>
-                    <p><strong>Descripción:</strong> <span id="evtDesc"></span></p>
-                    
-                    <div id="attachmentsSection" style="display: none;">
-                        <p><strong>Archivos adjuntos:</strong></p>
-                        <div id="attachmentsList"></div>
-                    </div>
-
-                    <div class="d-grid gap-2">
-                        <button class="btn btn-info w-100" onclick="verDetallesCompletos()">
-                            <i class="bi bi-eye me-1"></i>Ver Detalles Completos
-                        </button>
-                        <button class="btn btn-danger w-100" onclick="eliminarTarea()">
-                            <i class="bi bi-trash-fill me-1"></i>Eliminar Tarea
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal: Detalles Completos de Tarea -->
-    <div class="modal fade" id="modalTaskDetails" tabindex="-1">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content bg-dark text-white">
-                <div class="modal-header border-secondary">
-                    <h5 class="modal-title">
-                        <i class="bi bi-clipboard-check me-2"></i>
-                        Detalles del Parte de Trabajo
-                    </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <div id="taskDetailsLoading" class="text-center py-5">
-                        <div class="spinner-border text-warning" role="status">
-                            <span class="visually-hidden">Cargando...</span>
-                        </div>
-                        <p class="mt-3 text-muted">Cargando detalles de la tarea...</p>
-                    </div>
-                    
-                    <div id="taskDetailsContent" style="display: none;">
-                        <div class="card bg-black border-secondary mb-3">
-                            <div class="card-body">
-                                <h6 class="text-warning mb-3">
-                                    <i class="bi bi-info-circle me-2"></i>INFORMACIÓN GENERAL
-                                </h6>
-                                <div class="row">
-                                    <div class="col-md-6 mb-2">
-                                        <small class="text-muted d-block">Fecha</small>
-                                        <strong id="detailDate">-</strong>
-                                    </div>
-                                    <div class="col-md-6 mb-2">
-                                        <small class="text-muted d-block">Hora</small>
-                                        <strong id="detailTime">-</strong>
-                                    </div>
-                                    <div class="col-md-6 mb-2">
-                                        <small class="text-muted d-block">Cliente</small>
-                                        <strong id="detailClient">-</strong>
-                                    </div>
-                                    <div class="col-md-6 mb-2">
-                                        <small class="text-muted d-block">Técnico</small>
-                                        <strong id="detailTech">-</strong>
-                                    </div>
-                                    <div class="col-md-6 mb-2">
-                                        <small class="text-muted d-block">Servicio</small>
-                                        <strong id="detailService">-</strong>
-                                    </div>
-                                    <div class="col-md-6 mb-2">
-                                        <small class="text-muted d-block">Estado</small>
-                                        <span id="detailStatus" class="badge">-</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="card bg-black border-secondary mb-3">
-                            <div class="card-body">
-                                <h6 class="text-info mb-2">
-                                    <i class="bi bi-file-text me-2"></i>DESCRIPCIÓN
-                                </h6>
-                                <p id="detailDescription" class="mb-0">-</p>
-                            </div>
-                        </div>
-                        
-                        <div class="card bg-black border-secondary mb-3" id="detailNotesCard" style="display: none;">
-                            <div class="card-body">
-                                <h6 class="text-success mb-2">
-                                    <i class="bi bi-sticky me-2"></i>NOTAS INTERNAS
-                                </h6>
-                                <p id="detailNotes" class="mb-0">-</p>
-                            </div>
-                        </div>
-                        
-                        <div id="detailAttachmentsCard" style="display: none;">
-                            <div class="card bg-black border-secondary">
-                                <div class="card-body">
-                                    <h6 class="text-warning mb-3">
-                                        <i class="bi bi-paperclip me-2"></i>ARCHIVOS ADJUNTOS
-                                    </h6>
-                                    <div id="detailAttachmentsList" class="list-group">
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer border-secondary">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal: Información del Cliente -->
-    <div class="modal fade" id="modalClientInfo" tabindex="-1">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content bg-dark text-white">
-                <div class="modal-header border-secondary">
-                    <h5 class="modal-title">
-                        <i class="bi bi-person-circle me-2"></i>
-                        Información del Cliente
-                    </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <!-- Indicador de carga -->
-                    <div id="clientInfoLoading" class="text-center py-5">
-                        <div class="spinner-border text-warning" role="status">
-                            <span class="visually-hidden">Cargando...</span>
-                        </div>
-                        <p class="mt-3 text-muted">Cargando información del cliente...</p>
-                    </div>
-                    
-                    <!-- Contenido de información del cliente -->
-                    <div id="clientInfoContent" style="display: none;">
-                        <!-- Información Básica -->
-                        <div class="card bg-black border-secondary mb-3">
-                            <div class="card-body">
-                                <h6 class="text-warning mb-3">
-                                    <i class="bi bi-person-badge me-2"></i>INFORMACIÓN DE CONTACTO
-                                </h6>
-                                <div class="row">
-                                    <div class="col-md-6 mb-3">
-                                        <small class="text-muted d-block">Nombre</small>
-                                        <strong id="clientInfoName">-</strong>
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <small class="text-muted d-block">Teléfono</small>
-                                        <strong id="clientInfoPhone">-</strong>
-                                        <a href="#" id="clientInfoPhoneLink" class="ms-2 small" target="_blank">
-                                            <i class="bi bi-telephone-fill"></i>
-                                        </a>
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <small class="text-muted d-block">Email</small>
-                                        <strong id="clientInfoEmail">-</strong>
-                                        <a href="#" id="clientInfoEmailLink" class="ms-2 small" target="_blank">
-                                            <i class="bi bi-envelope-fill"></i>
-                                        </a>
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <small class="text-muted d-block">Soporte Activo</small>
-                                        <span id="clientInfoSupport" class="badge">-</span>
-                                    </div>
-                                    <div class="col-12 mb-2">
-                                        <small class="text-muted d-block">Dirección</small>
-                                        <strong id="clientInfoAddress">-</strong>
-                                        <a href="#" id="clientInfoMapLink" class="ms-2 small" target="_blank">
-                                            <i class="bi bi-geo-alt-fill"></i> Ver en mapa
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Notas internas -->
-                        <div id="clientInfoNotesCard" class="card bg-black border-secondary mb-3" style="display: none;">
-                            <div class="card-body">
-                                <h6 class="text-info mb-2">
-                                    <i class="bi bi-sticky me-2"></i>NOTAS INTERNAS
-                                </h6>
-                                <p id="clientInfoNotes" class="mb-0 small">-</p>
-                            </div>
-                        </div>
-                        
-                        <!-- Historial de Servicios -->
-                        <div class="card bg-black border-secondary">
-                            <div class="card-body">
-                                <h6 class="text-success mb-3">
-                                    <i class="bi bi-clock-history me-2"></i>
-                                    HISTORIAL DE SERVICIOS 
-                                    <span id="clientInfoTotalServices" class="badge bg-success ms-2">0</span>
-                                </h6>
-                                <div id="clientInfoHistory" class="list-group">
-                                    <div class="text-center text-muted py-3">
-                                        Sin historial de servicios
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Cliente no registrado -->
-                        <div id="clientNotRegistered" style="display: none;">
-                            <div class="alert alert-warning">
-                                <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                                <strong>Cliente no registrado en el sistema</strong>
-                                <p class="mb-0 mt-2 small">
-                                    Este cliente existe como parte de una tarea, pero no está registrado en la base de datos de clientes.
-                                    Para ver información completa y historial, considera añadirlo a la lista de clientes.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer border-secondary">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal: Editar Stock Completo -->
-    <div class="modal fade" id="modalEditStock" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content bg-dark text-white">
-                <div class="modal-header border-secondary">
-                    <h5 class="modal-title">Editar Artículo de Stock</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <form method="POST" action="/manage_stock">
-                    <div class="modal-body">
-                        <input type="hidden" name="action" value="edit">
-                        <input type="hidden" name="item_id" id="editFullId">
-                        
-                        <label class="form-label">Nombre del Artículo</label>
-                        <input type="text" name="name" id="editFullName" class="form-control mb-3" required>
-                        
-                        <label class="form-label">Categoría</label>
-                        <input type="text" name="category" id="editFullCat" class="form-control mb-3" 
-                               placeholder="Ej: Consumibles, Copiadoras, Cajones">
-                        
-                        <label class="form-label">Subcategoría</label>
-                        <input type="text" name="subcategory" id="editFullSubcat" class="form-control mb-3" 
-                               placeholder="Ej: Cashlogy, Cashkeeper, ATCA">
-                        
-                        <label class="form-label">Proveedor</label>
-                        <input type="text" name="supplier" id="editFullSupplier" class="form-control mb-3" 
-                               placeholder="Nombre del proveedor">
-                        
-                        <div class="row">
-                            <div class="col-6">
-                                <label class="form-label">Cantidad Actual</label>
-                                <input type="number" name="quantity" id="editFullQty" class="form-control" required min="0">
-                            </div>
-                            <div class="col-6">
-                                <label class="form-label">Stock Mínimo</label>
-                                <input type="number" name="min_stock" id="editFullMinStock" class="form-control" required min="0" value="5">
-                            </div>
-                        </div>
-                        
-                        <small class="text-muted d-block mt-2">
-                            <i class="bi bi-info-circle me-1"></i>
-                            Se generará una alarma cuando la cantidad esté por debajo del stock mínimo
-                        </small>
-                    </div>
-                    <div class="modal-footer border-secondary">
-                        <button type="submit" class="btn btn-warning">
-                            <i class="bi bi-save me-1"></i>Guardar Cambios
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal: Ajuste Rápido de Stock -->
-    <div class="modal fade" id="modalAdjustStock" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content bg-dark text-white">
-                <div class="modal-header border-secondary">
-                    <h5 class="modal-title">Ajustar Stock</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <form method="POST" action="/manage_stock">
-                    <div class="modal-body">
-                        <input type="hidden" name="action" value="adjust">
-                        <input type="hidden" name="item_id" id="adjustItemId">
-                        <p class="text-white">Producto: <strong id="adjustItemName"></strong></p>
-                        <label class="form-label">Cantidad a añadir/restar</label>
-                        <input type="number" name="quantity" class="form-control" 
-                            placeholder="Ej: +5, -3" required>
-                        <small class="text-muted">Usa números positivos para añadir, negativos para restar</small>
-                    </div>
-                    <div class="modal-footer border-secondary">
-                        <button type="submit" class="btn btn-warning">
-                            <i class="bi bi-arrow-repeat me-1"></i>Ajustar
-                        </button>
+                        <button type="submit" class="btn btn-warning">Actualizar</button>
                     </div>
                 </form>
             </div>
@@ -1100,178 +683,94 @@
         <div class="modal-dialog">
             <div class="modal-content bg-dark text-white">
                 <div class="modal-header border-secondary">
-                    <h5 class="modal-title">Añadir Nuevo Producto al Stock</h5>
+                    <h5 class="modal-title">Nuevo Artículo de Stock</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <form method="POST" action="/manage_stock">
                     <div class="modal-body">
                         <input type="hidden" name="action" value="add">
-                        
-                        <label class="form-label">Nombre del Producto *</label>
-                        <input type="text" name="name" class="form-control mb-3" 
-                               placeholder="Ej: Toner HP 12A" required>
-                        
+                        <label class="form-label">Nombre del Artículo</label>
+                        <input type="text" name="name" class="form-control mb-2" required>
                         <label class="form-label">Categoría</label>
-                        <select name="category" class="form-select mb-3" id="addStockCategory">
-                            <option value="">Sin categoría</option>
-                            <option value="Cajones">Cajones</option>
-                            <option value="TPV">TPV</option>
-                            <option value="Copiadoras">Copiadoras</option>
-                            <option value="Consumibles">Consumibles</option>
-                            <option value="Recicladores">Recicladores</option>
-                            <option value="custom">+ Nueva categoría...</option>
-                        </select>
-                        
-                        <div id="customCategoryDiv" style="display: none;" class="mb-3">
-                            <input type="text" id="customCategory" class="form-control" 
-                                   placeholder="Escribe la nueva categoría">
-                        </div>
-                        
-                        <label class="form-label">Subcategoría</label>
-                        <select name="subcategory" class="form-select mb-3" id="addStockSubcategory">
-                            <option value="">Sin subcategoría</option>
-                        </select>
-                        
-                        <div id="customSubcategoryDiv" style="display: none;" class="mb-3">
-                            <input type="text" id="customSubcategory" class="form-control" 
-                                   placeholder="Escribe la nueva subcategoría">
-                        </div>
-                        
-                        <label class="form-label">Proveedor</label>
-                        <input type="text" name="supplier" class="form-control mb-3" 
-                               placeholder="Nombre del proveedor">
-                        
-                        <div class="row">
-                            <div class="col-6">
-                                <label class="form-label">Cantidad Inicial *</label>
-                                <input type="number" name="quantity" class="form-control" value="0" required min="0">
-                            </div>
-                            <div class="col-6">
-                                <label class="form-label">Stock Mínimo *</label>
-                                <input type="number" name="min_stock" class="form-control" value="5" required min="0">
-                            </div>
-                        </div>
-                        
-                        <small class="text-muted d-block mt-2">
-                            <i class="bi bi-info-circle me-1"></i>
-                            Se generará una alarma automática cuando la cantidad esté por debajo del stock mínimo
-                        </small>
+                        <input type="text" name="category" class="form-control mb-2" required>
+                        <label class="form-label">Cantidad Inicial</label>
+                        <input type="number" name="quantity" class="form-control" value="0" required>
                     </div>
                     <div class="modal-footer border-secondary">
-                        <button type="submit" class="btn btn-warning">
-                            <i class="bi bi-plus-circle me-1"></i>Añadir Producto
-                        </button>
+                        <button type="submit" class="btn btn-warning">Añadir</button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
 
-    <!-- Modal: Vista de Lista de Partes -->
-    <div class="modal fade" id="modalReportsList" tabindex="-1">
-        <div class="modal-dialog modal-xl">
+    <!-- Modal: Ajustar Stock -->
+    <div class="modal fade" id="modalAdjustStock" tabindex="-1">
+        <div class="modal-dialog">
             <div class="modal-content bg-dark text-white">
                 <div class="modal-header border-secondary">
-                    <h5 class="modal-title">
-                        <i class="bi bi-list-ul me-2"></i>
-                        Partes de Trabajo - Vista Lista
-                    </h5>
+                    <h5 class="modal-title">Ajustar Cantidad</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <div>
-                            <span class="text-muted">Total de partes: </span>
-                            <strong id="reportsListTotal" class="text-warning">0</strong>
-                        </div>
-                        <button class="btn btn-sm btn-success" onclick="exportReportsList()">
-                            <i class="bi bi-download me-1"></i>Exportar a CSV
-                        </button>
+                <form method="POST" action="/manage_stock">
+                    <div class="modal-body">
+                        <input type="hidden" name="action" value="adjust">
+                        <input type="hidden" name="item_id" id="adjId">
+                        <p>Artículo: <strong id="adjName"></strong></p>
+                        <label class="form-label">Cantidad a Añadir/Restar (use - para restar)</label>
+                        <input type="number" name="adjust_qty" class="form-control" required>
                     </div>
-                    
-                    <div class="table-responsive">
-                        <table class="table table-dark table-hover table-sm">
-                            <thead>
-                                <tr>
-                                    <th>Fecha</th>
-                                    <th>Cliente</th>
-                                    <th>Servicio</th>
-                                    <th>Técnico</th>
-                                    <th>Hora</th>
-                                    <th>Descripción</th>
-                                    <th>Estado</th>
-                                    <th>Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody id="reportsListBody">
-                                <tr>
-                                    <td colspan="8" class="text-center text-muted py-5">
-                                        <i class="bi bi-hourglass-split fs-1 d-block mb-2"></i>
-                                        Cargando datos...
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
+                    <div class="modal-footer border-secondary">
+                        <button type="submit" class="btn btn-warning">Ajustar</button>
                     </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Editar Stock Completo -->
+    <div class="modal fade" id="modalEditStock" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">Editar Artículo</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-footer border-secondary">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-                </div>
+                <form method="POST" action="/manage_stock">
+                    <div class="modal-body">
+                        <input type="hidden" name="action" value="edit">
+                        <input type="hidden" name="item_id" id="editFullId">
+                        <label class="form-label">Nombre</label>
+                        <input type="text" name="name" id="editFullName" class="form-control mb-2" required>
+                        <label class="form-label">Categoría</label>
+                        <input type="text" name="category" id="editFullCat" class="form-control mb-2" required>
+                        <label class="form-label">Cantidad</label>
+                        <input type="number" name="quantity" id="editFullQty" class="form-control" required>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="submit" class="btn btn-warning">Guardar Cambios</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
 
     <!-- Modal: Añadir Cliente -->
     <div class="modal fade" id="modalAddClient" tabindex="-1">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog">
             <div class="modal-content bg-dark text-white">
                 <div class="modal-header border-secondary">
-                    <h5 class="modal-title">Añadir Nuevo Cliente</h5>
+                    <h5 class="modal-title">Nuevo Cliente</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <form method="POST" action="/manage_clients">
                     <div class="modal-body">
                         <input type="hidden" name="action" value="add">
-                        
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Nombre *</label>
-                                <input type="text" name="name" class="form-control" required>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Teléfono *</label>
-                                <input type="text" name="phone" class="form-control" required>
-                            </div>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">Email *</label>
-                            <input type="email" name="email" class="form-control" required>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">Dirección *</label>
-                            <textarea name="address" class="form-control" rows="2" required></textarea>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">¿Tiene soporte activo?</label>
-                            <select name="has_support" class="form-select">
-                                <option value="0">No</option>
-                                <option value="1">Sí</option>
-                            </select>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">Notas internas</label>
-                            <textarea name="notes" class="form-control" rows="3" 
-                                placeholder="Notas internas sobre el cliente (no visibles para el cliente)"></textarea>
-                        </div>
+                        <label class="form-label">Nombre del Cliente</label>
+                        <input type="text" name="name" class="form-control" required>
                     </div>
                     <div class="modal-footer border-secondary">
-                        <button type="submit" class="btn btn-warning">
-                            <i class="bi bi-person-plus-fill me-1"></i>Añadir Cliente
-                        </button>
+                        <button type="submit" class="btn btn-warning">Añadir</button>
                     </div>
                 </form>
             </div>
@@ -1280,7 +779,7 @@
 
     <!-- Modal: Editar Cliente -->
     <div class="modal fade" id="modalEditClient" tabindex="-1">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog">
             <div class="modal-content bg-dark text-white">
                 <div class="modal-header border-secondary">
                     <h5 class="modal-title">Editar Cliente</h5>
@@ -1290,327 +789,351 @@
                     <div class="modal-body">
                         <input type="hidden" name="action" value="edit">
                         <input type="hidden" name="client_id" id="editClientId">
-                        
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Nombre *</label>
-                                <input type="text" name="name" id="editClientName" class="form-control" required>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Teléfono *</label>
-                                <input type="text" name="phone" id="editClientPhone" class="form-control" required>
-                            </div>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">Email *</label>
-                            <input type="email" name="email" id="editClientEmail" class="form-control" required>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">Dirección *</label>
-                            <textarea name="address" id="editClientAddress" class="form-control" rows="2" required></textarea>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">¿Tiene soporte activo?</label>
-                            <select name="has_support" id="editClientSupport" class="form-select">
-                                <option value="0">No</option>
-                                <option value="1">Sí</option>
-                            </select>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">Notas internas</label>
-                            <textarea name="notes" id="editClientNotes" class="form-control" rows="3" 
-                                placeholder="Notas internas sobre el cliente"></textarea>
-                        </div>
+                        <label class="form-label">Nombre del Cliente</label>
+                        <input type="text" name="name" id="editClientName" class="form-control" required>
                     </div>
                     <div class="modal-footer border-secondary">
-                        <button type="submit" class="btn btn-warning">
-                            <i class="bi bi-save me-1"></i>Guardar Cambios
-                        </button>
+                        <button type="submit" class="btn btn-warning">Guardar Cambios</button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
 
+    <!-- Modal: Importar Clientes -->
+    <div class="modal fade" id="modalImportClients" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">Importar Clientes (JSON)</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="/import_clients" enctype="multipart/form-data">
+                    <div class="modal-body">
+                        <label class="form-label">Archivo JSON</label>
+                        <input type="file" name="file" class="form-control" accept=".json" required>
+                        <small class="text-muted">Formato esperado: [{"name": "Cliente1"}, {"name":
+                            "Cliente2"}]</small>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="submit" class="btn btn-info">Importar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Añadir Tipo de Servicio -->
+    <div class="modal fade" id="modalAddService" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">Nuevo Tipo de Servicio</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="/manage_services">
+                    <div class="modal-body">
+                        <input type="hidden" name="action" value="add">
+                        <label class="form-label">Nombre</label>
+                        <input type="text" name="name" class="form-control mb-2" required>
+                        <label class="form-label">Color (Hex)</label>
+                        <input type="color" name="color" class="form-control" value="#6c757d" required>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="submit" class="btn btn-warning">Añadir</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Editar Tipo de Servicio -->
+    <div class="modal fade" id="modalEditService" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">Editar Tipo de Servicio</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="/manage_services">
+                    <div class="modal-body">
+                        <input type="hidden" name="action" value="edit">
+                        <input type="hidden" name="service_id" id="editServiceId">
+                        <label class="form-label">Nombre</label>
+                        <input type="text" name="name" id="editServiceName" class="form-control mb-2" required>
+                        <label class="form-label">Color (Hex)</label>
+                        <input type="color" name="color" id="editServiceColor" class="form-control" required>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="submit" class="btn btn-warning">Guardar Cambios</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Agendar Cita -->
+    <div class="modal fade" id="modalScheduleAppointment" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">Agendar Nueva Cita</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="/schedule_appointment">
+                    <div class="modal-body">
+                        <label class="form-label">Técnico</label>
+                        <select name="tech_id" class="form-select mb-2" required>
+                            {% for u in empleados %}
+                            <option value="{{ u.id }}">{{ u.username }}</option>
+                            {% endfor %}
+                        </select>
+                        <label class="form-label">Cliente</label>
+                        <div class="position-relative mb-2">
+                            <input type="text" name="client_name" id="scheduleClientInput" class="form-control"
+                                required autocomplete="off">
+                            <div id="scheduleClientList" class="suggestions-list"></div>
+                        </div>
+                        <label class="form-label">Fecha</label>
+                        <input type="date" name="date" class="form-control mb-2" required>
+                        <label class="form-label">Hora</label>
+                        <input type="time" name="time" class="form-control mb-2" required>
+                        <label class="form-label">Tipo de Servicio</label>
+                        <select name="service_type" class="form-select mb-2" required>
+                            {% for svc in all_service_types %}
+                            <option value="{{ svc.name }}">{{ svc.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <label class="form-label">Notas</label>
+                        <textarea name="notes" class="form-control" rows="3"></textarea>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="submit" class="btn btn-warning">Agendar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Editar Cita desde Admin -->
+    <div class="modal fade" id="modalEditAppointmentAdmin" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">Editar Cita</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" id="formEditApptAdmin">
+                    <div class="modal-body">
+                        <label class="form-label">Cliente</label>
+                        <div class="position-relative mb-2">
+                            <input type="text" name="client_name" id="editAdminClientInput" class="form-control"
+                                required autocomplete="off">
+                            <div id="editAdminClientList" class="suggestions-list"></div>
+                        </div>
+                        <label class="form-label">Fecha</label>
+                        <input type="date" name="date" id="editAdminDate" class="form-control mb-2" required>
+                        <label class="form-label">Hora</label>
+                        <input type="time" name="time" id="editAdminTime" class="form-control mb-2" required>
+                        <label class="form-label">Tipo de Servicio</label>
+                        <select name="service_type" id="editAdminService" class="form-select mb-2" required>
+                            {% for svc in all_service_types %}
+                            <option value="{{ svc.name }}">{{ svc.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <label class="form-label">Notas</label>
+                        <textarea name="notes" id="editAdminNotes" class="form-control" rows="3"></textarea>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="submit" class="btn btn-warning">Guardar Cambios</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Acciones Tarea Admin -->
+    <div class="modal fade" id="modalActionAdmin" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">Acciones sobre la Tarea</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="evtId">
+                    <p><strong>Cliente:</strong> <span id="evtClient"></span></p>
+                    <p><strong>Técnico:</strong> <span id="evtTech"></span></p>
+                    <p><strong>Servicio:</strong> <span id="evtService"></span></p>
+                    <p><strong>Estado:</strong> <span id="evtStatus"></span></p>
+                    <p><strong>Descripción:</strong><br><span id="evtDesc"></span></p>
+                    
+                    <!-- Sección de Archivos Adjuntos -->
+                    <div id="attachmentsSection" class="mt-3" style="display: none;">
+                        <hr class="border-secondary">
+                        <p class="fw-bold mb-2"><i class="bi bi-paperclip me-1"></i> Archivos Adjuntos:</p>
+                        <div id="attachmentsList" class="list-group"></div>
+                    </div>
+                    
+                    <div class="d-grid gap-2 mt-3">
+                        <button class="btn btn-info" onclick="viewTaskDetails()">
+                            <i class="bi bi-eye-fill me-1"></i> Ver Detalles Completos
+                        </button>
+                        <button class="btn btn-warning" onclick="openEditAdminModal()">
+                            <i class="bi bi-pencil-fill me-1"></i> Editar Cita
+                        </button>
+                        <button class="btn btn-success" onclick="performAdminTaskAction('complete')">
+                            <i class="bi bi-check-circle-fill me-1"></i> Marcar Completado
+                        </button>
+                        <button class="btn btn-danger" onclick="performAdminTaskAction('delete')">
+                            <i class="bi bi-trash-fill me-1"></i> Eliminar Tarea
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Modal: Detalles Completos de la Tarea -->
+    <div class="modal fade" id="modalTaskDetails" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">
+                        <i class="bi bi-file-text-fill me-2 text-warning"></i>
+                        Detalles del Parte de Trabajo
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <p class="mb-2"><strong class="text-warning">Cliente:</strong><br>
+                            <span id="detailClient"></span></p>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="mb-2"><strong class="text-warning">Técnico:</strong><br>
+                            <span id="detailTech"></span></p>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <p class="mb-2"><strong class="text-warning">Fecha:</strong><br>
+                            <span id="detailDate"></span></p>
+                        </div>
+                        <div class="col-md-4">
+                            <p class="mb-2"><strong class="text-warning">Hora Entrada:</strong><br>
+                            <span id="detailStartTime"></span></p>
+                        </div>
+                        <div class="col-md-4">
+                            <p class="mb-2"><strong class="text-warning">Hora Salida:</strong><br>
+                            <span id="detailEndTime"></span></p>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <p class="mb-2"><strong class="text-warning">Servicio:</strong><br>
+                            <span id="detailService"></span></p>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="mb-2"><strong class="text-warning">Estado:</strong><br>
+                            <span id="detailStatus"></span></p>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <p class="mb-2"><strong class="text-warning">Descripción del Trabajo:</strong></p>
+                        <div class="p-3 bg-black rounded border border-secondary" id="detailDescription"></div>
+                    </div>
+                    
+                    <div id="detailStockSection" class="mb-3" style="display: none;">
+                        <p class="mb-2"><strong class="text-warning">Material Utilizado/Retirado:</strong></p>
+                        <div class="p-3 bg-black rounded border border-secondary" id="detailStock"></div>
+                    </div>
+                    
+                    <div id="detailPartsSection" class="mb-3" style="display: none;">
+                        <p class="mb-2"><strong class="text-warning">Notas/Material Adicional:</strong></p>
+                        <div class="p-3 bg-black rounded border border-secondary" id="detailParts"></div>
+                    </div>
+                    
+                    <!-- Archivos Adjuntos -->
+                    <div id="detailAttachmentsSection" class="mb-3" style="display: none;">
+                        <p class="mb-2"><strong class="text-warning">
+                            <i class="bi bi-paperclip me-1"></i> Archivos Adjuntos:
+                        </strong></p>
+                        <div id="detailAttachmentsList" class="list-group"></div>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                    <a id="printReportLink" href="#" target="_blank" class="btn btn-warning">
+                        <i class="bi bi-printer-fill me-1"></i> Imprimir Parte
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        let calendarAdmin = null;
-        let calendarGlobal = null;
-        let currentTechId = null;
-        let modalActionAdmin = null;
-        let adminAnalyticsData = null;
-        let adminPieChart = null;
-        let adminLineChart = null;
-        let adminBarChart = null;
+        var calendar = null;
+        var calendarGlobalInstance = null;
+        var modalActionAdmin = new bootstrap.Modal(document.getElementById('modalActionAdmin'));
+        var currentEmployeeId = null;
 
-        document.addEventListener('DOMContentLoaded', function () {
-            modalActionAdmin = new bootstrap.Modal(document.getElementById('modalActionAdmin'));
-
-            const modalCalendar = document.getElementById('modalCalendarAdmin');
-            modalCalendar.addEventListener('shown.bs.modal', function () {
-                if (calendarAdmin) calendarAdmin.render();
+        // Aplicar colores dinámicos a los labels de filtros
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('label[data-color]').forEach(function(label) {
+                const color = label.dataset.color;
+                label.style.borderColor = color;
+                label.style.color = color;
             });
-
-            const tabGlobalBtn = document.getElementById('tabGlobalBtn');
-            tabGlobalBtn.addEventListener('shown.bs.tab', function () {
-                if (!calendarGlobal) {
-                    loadCalendarGlobal();
-                }
-            });
-
-            loadAdminAnalytics();
         });
 
-        function loadCalendarAdmin(techId, username) {
-            currentTechId = techId;
-            document.getElementById('techNameCalendar').innerText = username;
+        setupAutocomplete('scheduleClientInput', 'scheduleClientList');
 
-            if (calendarAdmin) {
-                calendarAdmin.destroy();
+        function loadEmployeeCalendar(userId) {
+            currentEmployeeId = userId;
+            document.getElementById('calendarAdminContainer').style.display = 'block';
+            document.getElementById('empCalendarTitle').innerText = `Calendario de Empleado #${userId}`;
+
+            if (calendar) {
+                calendar.destroy();
             }
 
-            fetch(`/api/tech_tasks?tech_id=${techId}`)
-                .then(res => res.json())
-                .then(data => {
-                    const events = data.map(t => ({
-                        id: t.id,
-                        title: t.client_name + ' - ' + t.service_type,
-                        start: t.date,
-                        backgroundColor: getColorByStatus(t.status),
-                        borderColor: getColorByStatus(t.status),
-                        extendedProps: {
-                            client: t.client_name,
-                            tech_name: t.tech_name,
-                            service_type: t.service_type,
-                            status: t.status,
-                            desc: t.description,
-                            has_attachments: t.has_attachments || false
-                        }
-                    }));
+            var calendarEl = document.getElementById('calendarAdmin');
+            var isMobile = window.innerWidth < 768;
 
-                    calendarAdmin = new FullCalendar.Calendar(document.getElementById('calendarAdmin'), {
-                        initialView: 'dayGridMonth',
-                        locale: 'es',
-                        headerToolbar: {
-                            left: 'prev,next today',
-                            center: 'title',
-                            right: 'dayGridMonth,timeGridWeek,listWeek'
-                        },
-                        events: events,
-                        eventClick: handleEventClick,
-                        height: 'auto',
-                        buttonText: {
-                            today: 'Hoy',
-                            month: 'Mes',
-                            week: 'Semana',
-                            list: 'Lista'
-                        }
-                    });
-
-                    calendarAdmin.render();
-                })
-                .catch(err => console.error('Error al cargar calendario:', err));
-        }
-
-        function loadCalendarGlobal() {
-            if (calendarGlobal) {
-                calendarGlobal.destroy();
-            }
-
-            fetch('/api/all_tasks')
-                .then(res => res.json())
-                .then(data => {
-                    const events = data.map(t => {
-                        const techColor = getTechColor(t.tech_id);
-                        return {
-                            id: t.id,
-                            title: t.tech_name + ': ' + t.client_name,
-                            start: t.date,
-                            backgroundColor: techColor,
-                            borderColor: techColor,
-                            textColor: '#fff',
-                            extendedProps: {
-                                client: t.client_name,
-                                tech_id: t.tech_id,
-                                tech_name: t.tech_name,
-                                service_type: t.service_type,
-                                status: t.status,
-                                desc: t.description,
-                                has_attachments: t.has_attachments || false
-                            }
-                        };
-                    });
-
-                    calendarGlobal = new FullCalendar.Calendar(document.getElementById('calendarGlobal'), {
-                        initialView: 'dayGridMonth',
-                        locale: 'es',
-                        headerToolbar: {
-                            left: 'prev,next today',
-                            center: 'title',
-                            right: 'dayGridMonth,timeGridWeek,listWeek'
-                        },
-                        events: events,
-                        eventClick: handleEventClick,
-                        height: 'auto',
-                        buttonText: {
-                            today: 'Hoy',
-                            month: 'Mes',
-                            week: 'Semana',
-                            list: 'Lista'
-                        }
-                    });
-
-                    calendarGlobal.render();
-                })
-                .catch(err => console.error('Error al cargar calendario global:', err));
-        }
-
-        function getTechColor(techId) {
-            const techColors = JSON.parse('{{ tech_colors_json|safe }}');
-            return techColors[techId] || '#999999';
-        }
-
-        function getColorByStatus(status) {
-            if (status === 'Pendiente') return '#ffc107';
-            if (status === 'En Progreso') return '#0dcaf0';
-            if (status === 'Completado') return '#28a745';
-            return '#6c757d';
-        }
-
-        function applyGlobalFilters() {
-            if (!calendarGlobal) return;
-
-            const selectedTechs = [];
-            document.querySelectorAll('[id^="filterTech"]:checked').forEach(cb => {
-                selectedTechs.push(parseInt(cb.value));
+            calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: isMobile ? 'listWeek' : 'dayGridMonth',
+                locale: 'es',
+                headerToolbar: {
+                    left: 'prev,next',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek,listWeek'
+                },
+                height: 'auto',
+                events: `/api/admin/tasks/${userId}`,
+                eventClick: handleEventClick,
+                dateClick: handleAdminDateClick,
+                selectable: true,
+                eventContent: function (arg) {
+                    let statusIcon = arg.event.extendedProps.status === 'Completado' ? '✅' : '⏳';
+                    return { html: `<div class="fc-content overflow-hidden text-truncate">${statusIcon} ${arg.event.title}</div>` };
+                }
             });
-
-            const selectedStatuses = [];
-            document.querySelectorAll('[id^="filter"][id*="Pendiente"]:checked, [id^="filter"][id*="EnProgreso"]:checked, [id^="filter"][id*="Completado"]:checked').forEach(cb => {
-                selectedStatuses.push(cb.value);
-            });
-
-            fetch('/api/all_tasks')
-                .then(res => res.json())
-                .then(data => {
-                    const filteredEvents = data
-                        .filter(t => selectedTechs.includes(t.tech_id))
-                        .filter(t => selectedStatuses.includes(t.status))
-                        .map(t => {
-                            const techColor = getTechColor(t.tech_id);
-                            return {
-                                id: t.id,
-                                title: t.tech_name + ': ' + t.client_name,
-                                start: t.date,
-                                backgroundColor: techColor,
-                                borderColor: techColor,
-                                textColor: '#fff',
-                                extendedProps: {
-                                    client: t.client_name,
-                                    tech_id: t.tech_id,
-                                    tech_name: t.tech_name,
-                                    service_type: t.service_type,
-                                    status: t.status,
-                                    desc: t.description,
-                                    has_attachments: t.has_attachments || false
-                                }
-                            };
-                        });
-
-                    calendarGlobal.removeAllEvents();
-                    calendarGlobal.addEventSource(filteredEvents);
-                })
-                .catch(err => console.error('Error al filtrar:', err));
+            calendar.render();
         }
 
-        function showClientInfoFromTask(clientName) {
-            if (!clientName) {
-                alert('No hay información de cliente para esta tarea');
-                return;
+        function closeEmployeeCalendar() {
+            document.getElementById('calendarAdminContainer').style.display = 'none';
+            if (calendar) {
+                calendar.destroy();
+                calendar = null;
             }
-            
-            const modal = new bootstrap.Modal(document.getElementById('modalClientInfo'));
-            modal.show();
-            
-            document.getElementById('clientInfoLoading').style.display = 'block';
-            document.getElementById('clientInfoContent').style.display = 'none';
-            
-            fetch(`/api/client_by_name?name=${encodeURIComponent(clientName)}`)
-                .then(res => res.json())
-                .then(data => {
-                    document.getElementById('clientInfoLoading').style.display = 'none';
-                    document.getElementById('clientInfoContent').style.display = 'block';
-                    
-                    if (data.success && data.data.is_registered) {
-                        document.getElementById('clientNotRegistered').style.display = 'none';
-                        document.getElementById('clientInfoName').textContent = data.data.name;
-                        document.getElementById('clientInfoPhone').textContent = data.data.phone;
-                        document.getElementById('clientInfoPhoneLink').href = `tel:${data.data.phone}`;
-                        document.getElementById('clientInfoEmail').textContent = data.data.email;
-                        document.getElementById('clientInfoEmailLink').href = `mailto:${data.data.email}`;
-                        document.getElementById('clientInfoAddress').textContent = data.data.address;
-                        document.getElementById('clientInfoMapLink').href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(data.data.address)}`;
-                        
-                        const supportBadge = document.getElementById('clientInfoSupport');
-                        if (data.data.has_support) {
-                            supportBadge.className = 'badge bg-success';
-                            supportBadge.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i>Sí';
-                        } else {
-                            supportBadge.className = 'badge bg-danger';
-                            supportBadge.innerHTML = '<i class="bi bi-x-circle-fill me-1"></i>No';
-                        }
-                        
-                        if (data.data.notes && data.data.notes.trim() !== '') {
-                            document.getElementById('clientInfoNotesCard').style.display = 'block';
-                            document.getElementById('clientInfoNotes').textContent = data.data.notes;
-                        } else {
-                            document.getElementById('clientInfoNotesCard').style.display = 'none';
-                        }
-                        
-                        document.getElementById('clientInfoTotalServices').textContent = data.data.total_services;
-                        const historyDiv = document.getElementById('clientInfoHistory');
-                        
-                        if (data.data.tasks_history && data.data.tasks_history.length > 0) {
-                            historyDiv.innerHTML = '';
-                            data.data.tasks_history.forEach(task => {
-                                const item = document.createElement('div');
-                                item.className = 'list-group-item bg-dark border-secondary mb-2';
-                                item.innerHTML = `
-                                    <div class="d-flex justify-content-between align-items-start">
-                                        <div>
-                                            <strong class="text-white">${task.service_type}</strong>
-                                            <small class="text-muted d-block">${task.date} - ${task.tech_name}</small>
-                                            <small class="text-muted">${task.description}</small>
-                                        </div>
-                                        <span class="badge ${task.status === 'Completado' ? 'bg-success' : 'bg-warning'}">${task.status}</span>
-                                    </div>
-                                `;
-                                historyDiv.appendChild(item);
-                            });
-                        } else {
-                            historyDiv.innerHTML = '<div class="text-center text-muted py-3">Sin historial de servicios</div>';
-                        }
-                    } else {
-                        document.getElementById('clientNotRegistered').style.display = 'block';
-                        document.getElementById('clientInfoName').textContent = clientName;
-                        document.getElementById('clientInfoPhone').textContent = 'No disponible';
-                        document.getElementById('clientInfoEmail').textContent = 'No disponible';
-                        document.getElementById('clientInfoAddress').textContent = 'No disponible';
-                        document.getElementById('clientInfoSupport').className = 'badge bg-secondary';
-                        document.getElementById('clientInfoSupport').textContent = 'N/A';
-                        document.getElementById('clientInfoNotesCard').style.display = 'none';
-                        document.getElementById('clientInfoHistory').innerHTML = '<div class="text-center text-muted py-3">Sin información de historial</div>';
-                    }
-                })
-                .catch(err => {
-                    console.error('Error al cargar información del cliente:', err);
-                    alert('Error al cargar la información del cliente');
-                    modal.hide();
-                });
         }
 
         function handleEventClick(info) {
@@ -1619,8 +1142,326 @@
             document.getElementById('evtTech').innerText = info.event.extendedProps.tech_name;
             document.getElementById('evtService').innerText = info.event.extendedProps.service_type;
             document.getElementById('evtStatus').innerText = info.event.extendedProps.status;
+            document.getElementById('evtDesc').innerText = info.event.extendedProps.desc || '(Sin descripción)';
+            modalActionAdmin.show();
+        }
+
+        // CALENDARIO GLOBAL
+        document.getElementById('tabGlobalBtn').addEventListener('click', function () {
+            if (calendarGlobalInstance) {
+                calendarGlobalInstance.render();
+                updateGlobalFilters();
+                return;
+            }
+
+            var calendarEl = document.getElementById('calendarGlobal');
+            var isMobile = window.innerWidth < 768;
+
+            calendarGlobalInstance = new FullCalendar.Calendar(calendarEl, {
+                initialView: isMobile ? 'listWeek' : 'dayGridMonth',
+                locale: 'es',
+                headerToolbar: {
+                    left: 'prev,next',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek,listWeek'
+                },
+                height: 'auto',
+                events: '/api/admin/all_tasks',
+                dateClick: handleAdminDateClickGlobal,
+                selectable: true,
+
+                // FILTRADO DINÁMICO
+                eventDidMount: function (info) {
+                    const type = info.event.extendedProps.service_type;
+                    const activeTypes = getActiveFilters();
+
+                    if (!activeTypes.includes(type)) {
+                        info.el.style.display = 'none';
+                    } else {
+                        info.el.style.display = '';
+                        // Usar el color del evento que viene desde backend
+                        if (info.backgroundColor) {
+                            info.el.style.backgroundColor = info.backgroundColor;
+                        }
+                        if (info.event.extendedProps.status === 'Completado') {
+                            info.el.style.opacity = '0.6';
+                            info.el.style.border = '2px solid white';
+                        }
+                    }
+                },
+
+                eventContent: function (arg) {
+                    let techName = arg.event.extendedProps.tech_name || '';
+                    let title = arg.event.title;
+                    let attachmentIcon = arg.event.extendedProps.has_attachments ? '<i class="bi bi-paperclip text-warning ms-1"></i>' : '';
+                    return { html: `<div class="fc-content overflow-hidden text-truncate"><span class="fw-bold badge bg-dark text-white me-1 border border-secondary">${techName}</span> ${title}${attachmentIcon}</div>` };
+                },
+
+                eventClick: handleEventClick
+            });
+            calendarGlobalInstance.render();
+        });
+
+        // --- LÓGICA DE FILTRADO DINÁMICO ---
+        function getActiveFilters() {
+            const activeTypes = [];
+            document.querySelectorAll('.filter-cb:checked').forEach(cb => {
+                activeTypes.push(cb.value);
+            });
+            return activeTypes;
+        }
+
+        function checkAllFilters() {
+            document.querySelectorAll('.filter-cb').forEach(cb => {
+                cb.checked = true;
+            });
+            updateGlobalFilters();
+        }
+
+        function updateGlobalFilters() {
+            if (!calendarGlobalInstance) return;
+            
+            // Refrescamos los eventos para que se vuelva a ejecutar eventDidMount
+            calendarGlobalInstance.refetchEvents();
+        }
+
+        // --- GESTIÓN DE ACCIONES ---
+        function performAdminTaskAction(action) {
+            const id = document.getElementById('evtId').value;
+            if (!confirm('¿Confirmar acción administrativa?')) return;
+
+            fetch(`/api/task_action/${id}/${action}`, { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        if (calendar) calendar.refetchEvents();
+                        if (calendarGlobalInstance) calendarGlobalInstance.refetchEvents();
+                        modalActionAdmin.hide();
+                    } else {
+                        alert('Error: ' + data.msg);
+                    }
+                });
+        }
+
+        // --- HELPERS Y MODALES ---
+        function ajustarStock(id, name) {
+            document.getElementById('adjId').value = id;
+            document.getElementById('adjName').innerText = name;
+            new bootstrap.Modal(document.getElementById('modalAdjustStock')).show();
+        }
+
+        function openEditStockModal(id, name, category, qty) {
+            document.getElementById('editFullId').value = id;
+            document.getElementById('editFullName').value = name;
+            document.getElementById('editFullCat').value = category;
+            document.getElementById('editFullQty').value = qty;
+            new bootstrap.Modal(document.getElementById('modalEditStock')).show();
+        }
+
+        function openEditClientModal(id, name) {
+            document.getElementById('editClientId').value = id;
+            document.getElementById('editClientName').value = name;
+            new bootstrap.Modal(document.getElementById('modalEditClient')).show();
+        }
+
+        function openEditServiceModal(id, name, color) {
+            document.getElementById('editServiceId').value = id;
+            document.getElementById('editServiceName').value = name;
+            document.getElementById('editServiceColor').value = color;
+            new bootstrap.Modal(document.getElementById('modalEditService')).show();
+        }
+
+        function setupAutocomplete(inputId, listId) {
+            const input = document.getElementById(inputId);
+            const list = document.getElementById(listId);
+            if (!input) return;
+
+            input.addEventListener('input', function () {
+                const val = this.value;
+                if (!val || val.length < 2) {
+                    list.innerHTML = '';
+                    list.style.display = 'none';
+                    return;
+                }
+                fetch(`/api/clients_search?q=${encodeURIComponent(val)}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        list.innerHTML = '';
+                        if (data.length > 0) {
+                            list.style.display = 'block';
+                            data.forEach(item => {
+                                const div = document.createElement('div');
+                                div.className = 'suggestion-item';
+                                div.innerText = item.name;
+                                div.onclick = function () {
+                                    input.value = item.name;
+                                    list.innerHTML = '';
+                                    list.style.display = 'none';
+                                };
+                                list.appendChild(div);
+                            });
+                        } else {
+                            list.style.display = 'none';
+                        }
+                    });
+            });
+
+            document.addEventListener('click', function (e) {
+                if (e.target !== input && e.target !== list) {
+                    list.style.display = 'none';
+                }
+            });
+        }
+
+        function filterClientsTable() {
+            var input, filter, table, tr, td, i, txtValue;
+            input = document.getElementById("clientSearchInput");
+            filter = input.value.toUpperCase();
+            table = document.getElementById("clientsTable");
+            tr = table.getElementsByTagName("tr");
+            for (i = 0; i < tr.length; i++) {
+                td = tr[i].getElementsByClassName("client-name-cell")[0];
+                if (td) {
+                    txtValue = td.textContent || td.innerText;
+                    if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                        tr[i].style.display = "";
+                    } else {
+                        tr[i].style.display = "none";
+                    }
+                }
+            }
+        }
+
+        function openEditAdminModal() {
+            const taskId = document.getElementById('evtId').value;
+            fetch(`/api/get_task/${taskId}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('editAdminClientInput').value = data.data.client_name;
+                        document.getElementById('editAdminDate').value = data.data.date;
+                        document.getElementById('editAdminTime').value = data.data.time;
+                        document.getElementById('editAdminService').value = data.data.service_type;
+                        document.getElementById('editAdminNotes').value = data.data.notes;
+                        document.getElementById('formEditApptAdmin').action = `/edit_appointment/${taskId}`;
+                        modalActionAdmin.hide();
+                        new bootstrap.Modal(document.getElementById('modalEditAppointmentAdmin')).show();
+                        setupAutocomplete('editAdminClientInput', 'editAdminClientList');
+                    }
+                });
+        }
+
+        // Función para manejar clic en día del calendario individual del empleado
+        function handleAdminDateClick(info) {
+            if (!currentEmployeeId) return;
+            
+            // Prellenar el modal con la fecha seleccionada y el empleado actual
+            document.getElementById('scheduleClientInput').value = '';
+            document.querySelector('#modalScheduleAppointment select[name="tech_id"]').value = currentEmployeeId;
+            document.querySelector('#modalScheduleAppointment input[name="date"]').value = info.dateStr;
+            
+            // Abrir el modal de nueva cita
+            new bootstrap.Modal(document.getElementById('modalScheduleAppointment')).show();
+        }
+
+        // Función para manejar clic en día del calendario global
+        function handleAdminDateClickGlobal(info) {
+            // Prellenar el modal con la fecha seleccionada
+            document.getElementById('scheduleClientInput').value = '';
+            document.querySelector('#modalScheduleAppointment input[name="date"]').value = info.dateStr;
+            
+            // Abrir el modal de nueva cita
+            new bootstrap.Modal(document.getElementById('modalScheduleAppointment')).show();
+        }
+
+        // Función para ver los detalles completos de una tarea
+        function viewTaskDetails() {
+            const taskId = document.getElementById('evtId').value;
+            
+            fetch(`/api/task_details/${taskId}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        const task = data.data;
+                        
+                        // Rellenar información básica
+                        document.getElementById('detailClient').textContent = task.client_name;
+                        document.getElementById('detailTech').textContent = task.tech_name;
+                        document.getElementById('detailDate').textContent = new Date(task.date).toLocaleDateString('es-ES');
+                        document.getElementById('detailStartTime').textContent = task.start_time || 'N/A';
+                        document.getElementById('detailEndTime').textContent = task.end_time || 'N/A';
+                        document.getElementById('detailService').textContent = task.service_type;
+                        document.getElementById('detailStatus').textContent = task.status;
+                        document.getElementById('detailDescription').textContent = task.description || 'Sin descripción';
+                        
+                        // Material/Stock
+                        if (task.stock_info) {
+                            document.getElementById('detailStockSection').style.display = 'block';
+                            const action = task.stock_info.action === 'used' ? 'USADO' : 'RETIRADO';
+                            document.getElementById('detailStock').textContent = 
+                                `${action}: ${task.stock_info.quantity}x ${task.stock_info.item_name}`;
+                        } else {
+                            document.getElementById('detailStockSection').style.display = 'none';
+                        }
+                        
+                        // Notas adicionales
+                        if (task.parts_text) {
+                            document.getElementById('detailPartsSection').style.display = 'block';
+                            document.getElementById('detailParts').textContent = task.parts_text;
+                        } else {
+                            document.getElementById('detailPartsSection').style.display = 'none';
+                        }
+                        
+                        // Archivos adjuntos
+                        if (task.attachments && task.attachments.length > 0) {
+                            document.getElementById('detailAttachmentsSection').style.display = 'block';
+                            const attachmentsList = document.getElementById('detailAttachmentsList');
+                            attachmentsList.innerHTML = '';
+                            
+                            task.attachments.forEach(filename => {
+                                const item = document.createElement('a');
+                                item.href = `/uploads/${filename}`;
+                                item.target = '_blank';
+                                item.className = 'list-group-item list-group-item-action bg-black text-white border-secondary d-flex justify-content-between align-items-center';
+                                item.innerHTML = `
+                                    <span>
+                                        <i class="bi bi-file-earmark-arrow-down me-2"></i>
+                                        ${filename}
+                                    </span>
+                                    <i class="bi bi-download text-warning"></i>
+                                `;
+                                attachmentsList.appendChild(item);
+                            });
+                        } else {
+                            document.getElementById('detailAttachmentsSection').style.display = 'none';
+                        }
+                        
+                        // Configurar enlace de impresión
+                        document.getElementById('printReportLink').href = `/print_report/${taskId}`;
+                        
+                        // Cerrar el modal actual y abrir el de detalles
+                        modalActionAdmin.hide();
+                        new bootstrap.Modal(document.getElementById('modalTaskDetails')).show();
+                    } else {
+                        alert('Error al cargar los detalles: ' + data.msg);
+                    }
+                })
+                .catch(err => {
+                    console.error('Error:', err);
+                    alert('Error al cargar los detalles de la tarea');
+                });
+        }
+
+        // Modificar handleEventClick para mostrar indicador de archivos adjuntos
+        function handleEventClick(info) {
+            document.getElementById('evtId').value = info.event.id;
+            document.getElementById('evtClient').innerText = info.event.extendedProps.client;
+            document.getElementById('evtTech').innerText = info.event.extendedProps.tech_name;
+            document.getElementById('evtService').innerText = info.event.extendedProps.service_type;
+            document.getElementById('evtStatus').innerText = info.event.extendedProps.status;
             document.getElementById('evtDesc').innerText = info.event.extendedProps.desc || 'Sin descripción';
             
+            // Mostrar indicador si hay archivos adjuntos
             if (info.event.extendedProps.has_attachments) {
                 const attachmentsSection = document.getElementById('attachmentsSection');
                 attachmentsSection.style.display = 'block';
@@ -1630,256 +1471,37 @@
                 document.getElementById('attachmentsSection').style.display = 'none';
             }
             
-            const modalBody = document.querySelector('#modalActionAdmin .modal-body');
-            const existingClientBtn = modalBody.querySelector('.btn-client-info');
-            
-            if (!existingClientBtn) {
-                const clientInfoBtn = document.createElement('button');
-                clientInfoBtn.className = 'btn btn-info w-100 mb-3 btn-client-info';
-                clientInfoBtn.innerHTML = '<i class="bi bi-person-circle me-1"></i> Ver Información del Cliente';
-                clientInfoBtn.onclick = function() {
-                    showClientInfoFromTask(info.event.extendedProps.client);
-                };
-                
-                const buttonContainer = modalBody.querySelector('.d-grid');
-                modalBody.insertBefore(clientInfoBtn, buttonContainer);
-            } else {
-                existingClientBtn.onclick = function() {
-                    showClientInfoFromTask(info.event.extendedProps.client);
-                };
-            }
-            
             modalActionAdmin.show();
         }
 
-        function verDetallesCompletos() {
-            const taskId = document.getElementById('evtId').value;
-            if (!taskId) {
-                alert('Error: No se ha encontrado el ID de la tarea');
-                return;
-            }
-            
-            modalActionAdmin.hide();
-            loadTaskDetails(taskId);
-        }
-
-        function eliminarTarea() {
-            const taskId = document.getElementById('evtId').value;
-            if (!taskId || !confirm('¿Estás seguro de eliminar esta tarea?')) return;
-
-            fetch(`/delete_task/${taskId}`, { method: 'POST' })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success) {
-                        alert('Tarea eliminada correctamente');
-                        modalActionAdmin.hide();
-                        location.reload();
-                    } else {
-                        alert('Error al eliminar tarea');
-                    }
-                })
-                .catch(err => {
-                    console.error('Error al eliminar:', err);
-                    alert('Error al eliminar la tarea');
-                });
-        }
-
-        function loadTaskDetails(taskId) {
-            const modal = new bootstrap.Modal(document.getElementById('modalTaskDetails'));
-            modal.show();
-            
-            document.getElementById('taskDetailsLoading').style.display = 'block';
-            document.getElementById('taskDetailsContent').style.display = 'none';
-            
-            fetch(`/api/task_details/${taskId}`)
-                .then(res => res.json())
-                .then(data => {
-                    document.getElementById('taskDetailsLoading').style.display = 'none';
-                    document.getElementById('taskDetailsContent').style.display = 'block';
-                    
-                    document.getElementById('detailDate').textContent = data.date;
-                    document.getElementById('detailTime').textContent = data.time || 'No especificada';
-                    document.getElementById('detailClient').textContent = data.client_name;
-                    document.getElementById('detailTech').textContent = data.tech_name;
-                    document.getElementById('detailService').textContent = data.service_type;
-                    
-                    const statusBadge = document.getElementById('detailStatus');
-                    statusBadge.textContent = data.status;
-                    statusBadge.className = 'badge ' + 
-                        (data.status === 'Pendiente' ? 'bg-warning text-dark' :
-                         data.status === 'En Progreso' ? 'bg-info' : 'bg-success');
-                    
-                    document.getElementById('detailDescription').textContent = data.description || 'Sin descripción';
-                    
-                    if (data.notes && data.notes.trim() !== '') {
-                        document.getElementById('detailNotesCard').style.display = 'block';
-                        document.getElementById('detailNotes').textContent = data.notes;
-                    } else {
-                        document.getElementById('detailNotesCard').style.display = 'none';
-                    }
-                    
-                    if (data.attachments && data.attachments.length > 0) {
-                        document.getElementById('detailAttachmentsCard').style.display = 'block';
-                        const attachmentsList = document.getElementById('detailAttachmentsList');
-                        attachmentsList.innerHTML = '';
-                        
-                        data.attachments.forEach(att => {
-                            const item = document.createElement('a');
-                            item.href = `/uploads/${att}`;
-                            item.target = '_blank';
-                            item.className = 'list-group-item list-group-item-action bg-dark border-secondary text-white mb-2';
-                            item.innerHTML = `
-                                <i class="bi bi-file-earmark me-2"></i>
-                                ${att}
-                                <i class="bi bi-download ms-2 float-end"></i>
-                            `;
-                            attachmentsList.appendChild(item);
-                        });
-                    } else {
-                        document.getElementById('detailAttachmentsCard').style.display = 'none';
-                    }
-                })
-                .catch(err => {
-                    console.error('Error al cargar detalles:', err);
-                    alert('Error al cargar los detalles de la tarea');
-                    modal.hide();
-                });
-        }
-
-        function openEditStockModal(id, name, category, subcategory, supplier, quantity, minStock) {
-            document.getElementById('editFullId').value = id;
-            document.getElementById('editFullName').value = name;
-            document.getElementById('editFullCat').value = category || '';
-            document.getElementById('editFullSubcat').value = subcategory || '';
-            document.getElementById('editFullSupplier').value = supplier || '';
-            document.getElementById('editFullQty').value = quantity;
-            document.getElementById('editFullMinStock').value = minStock || 5;
-            
-            new bootstrap.Modal(document.getElementById('modalEditStock')).show();
-        }
-
-        function ajustarStock(itemId, itemName) {
-            document.getElementById('adjustItemId').value = itemId;
-            document.getElementById('adjustItemName').innerText = itemName;
-            new bootstrap.Modal(document.getElementById('modalAdjustStock')).show();
-        }
-
-        function openEditClientModal(id, name, phone, email, address, hasSupport, notes) {
-            document.getElementById('editClientId').value = id;
-            document.getElementById('editClientName').value = name;
-            document.getElementById('editClientPhone').value = phone;
-            document.getElementById('editClientEmail').value = email;
-            document.getElementById('editClientAddress').value = address;
-            document.getElementById('editClientSupport').value = hasSupport === 'True' || hasSupport === '1' ? '1' : '0';
-            document.getElementById('editClientNotes').value = notes || '';
-        }
-
-        function showReportsList() {
-            const modal = new bootstrap.Modal(document.getElementById('modalReportsList'));
-            modal.show();
-            
-            const startDate = document.getElementById('adminAnalyticsStart').value;
-            const endDate = document.getElementById('adminAnalyticsEnd').value;
-            const techId = document.getElementById('adminAnalyticsTech').value;
-            const status = document.getElementById('adminAnalyticsStatus').value;
-            
-            let url = '/api/reports_list?';
-            if (startDate) url += `start_date=${startDate}&`;
-            if (endDate) url += `end_date=${endDate}&`;
-            if (techId) url += `tech_id=${techId}&`;
-            if (status) url += `status=${status}&`;
-            
-            fetch(url)
-                .then(res => res.json())
-                .then(data => {
-                    document.getElementById('reportsListTotal').textContent = data.length;
-                    const tbody = document.getElementById('reportsListBody');
-                    
-                    if (data.length === 0) {
-                        tbody.innerHTML = `
-                            <tr>
-                                <td colspan="8" class="text-center text-muted py-5">
-                                    <i class="bi bi-inbox fs-1 d-block mb-2"></i>
-                                    No hay partes de trabajo en este rango
-                                </td>
-                            </tr>
-                        `;
-                        return;
-                    }
-                    
-                    tbody.innerHTML = data.map(task => `
-                        <tr>
-                            <td>${task.date}</td>
-                            <td>${task.client_name}</td>
-                            <td>${task.service_type}</td>
-                            <td>${task.tech_name}</td>
-                            <td>${task.time || '-'}</td>
-                            <td class="text-truncate" style="max-width: 200px;">${task.description}</td>
-                            <td>
-                                <span class="badge ${
-                                    task.status === 'Pendiente' ? 'bg-warning text-dark' :
-                                    task.status === 'En Progreso' ? 'bg-info' : 'bg-success'
-                                }">${task.status}</span>
-                            </td>
-                            <td>
-                                <button class="btn btn-sm btn-outline-info" onclick="loadTaskDetails(${task.id})">
-                                    <i class="bi bi-eye"></i>
-                                </button>
-                            </td>
-                        </tr>
-                    `).join('');
-                })
-                .catch(err => {
-                    console.error('Error al cargar lista:', err);
-                    alert('Error al cargar la lista de partes');
-                });
-        }
-
-        function exportReportsList() {
-            const startDate = document.getElementById('adminAnalyticsStart').value;
-            const endDate = document.getElementById('adminAnalyticsEnd').value;
-            const techId = document.getElementById('adminAnalyticsTech').value;
-            const status = document.getElementById('adminAnalyticsStatus').value;
-            
-            let url = '/api/export_reports_csv?';
-            if (startDate) url += `start_date=${startDate}&`;
-            if (endDate) url += `end_date=${endDate}&`;
-            if (techId) url += `tech_id=${techId}&`;
-            if (status) url += `status=${status}&`;
-            
-            fetch(url)
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success && data.csv_url) {
-                        const link = document.createElement('a');
-                        link.href = data.csv_url;
-                        link.download = data.filename || 'partes_trabajo.csv';
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                    } else {
-                        alert('Error al exportar: ' + (data.msg || 'Sin datos'));
-                    }
-                })
-                .catch(err => {
-                    console.error('Error:', err);
-                    alert('Error al exportar la lista');
-                });
-        }
+        // ============================================================
+        // FUNCIONES DE ANALÍTICAS ADMIN
+        // ============================================================
+        
+        let adminPieChart, adminLineChart, adminBarChart;
+        let adminAnalyticsData = null;
 
         function loadAdminAnalytics() {
-            const startDate = document.getElementById('adminAnalyticsStart').value;
-            const endDate = document.getElementById('adminAnalyticsEnd').value;
-            const techId = document.getElementById('adminAnalyticsTech').value;
-            const status = document.getElementById('adminAnalyticsStatus').value;
+            const techId = document.getElementById('analyticsTechSelector').value;
+            const period = document.getElementById('analyticsPeriodSelector').value;
+            
+            if (!techId) {
+                document.getElementById('analyticsPlaceholder').style.display = 'block';
+                document.getElementById('analyticsContent').style.display = 'none';
+                return;
+            }
 
-            let url = '/api/admin_analytics?';
-            if (startDate) url += `start_date=${startDate}&`;
-            if (endDate) url += `end_date=${endDate}&`;
-            if (techId) url += `tech_id=${techId}&`;
-            if (status) url += `status=${status}&`;
-
-            fetch(url)
+            // Ocultar placeholder y mostrar contenido
+            document.getElementById('analyticsPlaceholder').style.display = 'none';
+            document.getElementById('analyticsContent').style.display = 'block';
+            
+            // Mostrar indicadores de carga
+            document.getElementById('adminTotalServices').textContent = '...';
+            document.getElementById('adminTotalMaintenances').textContent = '...';
+            document.getElementById('adminTotalRevenue').textContent = '...';
+            document.getElementById('adminAvgTime').textContent = '...';
+            
+            fetch(`/api/admin_analytics?tech_id=${techId}&period=${period}`)
                 .then(res => res.json())
                 .then(data => {
                     adminAnalyticsData = data;
@@ -2095,77 +1717,6 @@
                 }
             });
         }
-
-        document.addEventListener('DOMContentLoaded', function() {
-            const categorySelect = document.getElementById('addStockCategory');
-            const subcategorySelect = document.getElementById('addStockSubcategory');
-            const customCategoryDiv = document.getElementById('customCategoryDiv');
-            const customSubcategoryDiv = document.getElementById('customSubcategoryDiv');
-            
-            const subcategories = {
-                'Cajones': ['Cashlogy', 'Cashkeeper', 'ATCA', 'Otros'],
-                'TPV': ['Táctiles', 'Impresoras', 'Lectores', 'Otros'],
-                'Copiadoras': ['Monocromáticas', 'Color', 'Multifunción', 'Otros'],
-                'Consumibles': ['Toners', 'Tintas', 'Papel', 'Otros'],
-                'Recicladores': ['Estándar', 'Avanzados', 'Otros']
-            };
-            
-            if (categorySelect) {
-                categorySelect.addEventListener('change', function() {
-                    const selected = this.value;
-                    
-                    if (selected === 'custom') {
-                        customCategoryDiv.style.display = 'block';
-                        subcategorySelect.innerHTML = '<option value="">Sin subcategoría</option>';
-                    } else {
-                        customCategoryDiv.style.display = 'none';
-                        
-                        subcategorySelect.innerHTML = '<option value="">Sin subcategoría</option>';
-                        if (subcategories[selected]) {
-                            subcategories[selected].forEach(sub => {
-                                const option = document.createElement('option');
-                                option.value = sub;
-                                option.textContent = sub;
-                                subcategorySelect.appendChild(option);
-                            });
-                            
-                            const customOption = document.createElement('option');
-                            customOption.value = 'custom';
-                            customOption.textContent = '+ Nueva subcategoría...';
-                            subcategorySelect.appendChild(customOption);
-                        }
-                    }
-                });
-                
-                if (subcategorySelect) {
-                    subcategorySelect.addEventListener('change', function() {
-                        if (this.value === 'custom') {
-                            customSubcategoryDiv.style.display = 'block';
-                        } else {
-                            customSubcategoryDiv.style.display = 'none';
-                        }
-                    });
-                }
-            }
-            
-            const addStockForm = document.querySelector('#modalAddStock form');
-            if (addStockForm) {
-                addStockForm.addEventListener('submit', function(e) {
-                    const categorySelect = document.getElementById('addStockCategory');
-                    const customCategory = document.getElementById('customCategory');
-                    const subcategorySelect = document.getElementById('addStockSubcategory');
-                    const customSubcategory = document.getElementById('customSubcategory');
-                    
-                    if (categorySelect.value === 'custom' && customCategory.value.trim() !== '') {
-                        categorySelect.innerHTML = `<option value="${customCategory.value}" selected>${customCategory.value}</option>`;
-                    }
-                    
-                    if (subcategorySelect.value === 'custom' && customSubcategory.value.trim() !== '') {
-                        subcategorySelect.innerHTML = `<option value="${customSubcategory.value}" selected>${customSubcategory.value}</option>`;
-                    }
-                });
-            }
-        });
     </script>
 </body>
 
