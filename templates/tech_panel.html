@@ -2012,6 +2012,151 @@
             div.style.display = this.value ? 'block' : 'none';
         });
 
+
+        // ==================== INFORMACIÓN DEL CLIENTE ====================
+        
+        function fillFromTask(selectElement) {
+            const selected = selectElement.options[selectElement.selectedIndex];
+            
+            if (selected.value === 'none') {
+                document.getElementById('fieldClient').value = '';
+                document.getElementById('fieldDate').value = document.querySelector('[name="date"]').value;
+                document.getElementById('fieldEntryTime').value = '';
+                document.getElementById('fieldService').selectedIndex = 0;
+                document.getElementById('fieldDescription').value = '';
+                hideClientInfo();
+                return;
+            }
+            
+            const taskId = selected.value;
+            
+            fetch(`/api/get_task_full/${taskId}`)
+                .then(res => res.json())
+                .then(response => {
+                    if (response.success) {
+                        const task = response.data;
+                        
+                        document.getElementById('fieldClient').value = task.client_name;
+                        document.getElementById('fieldDate').value = task.date;
+                        document.getElementById('fieldEntryTime').value = task.start_time;
+                        
+                        // Seleccionar tipo de servicio
+                        const serviceSelect = document.getElementById('fieldService');
+                        for (let opt of serviceSelect.options) {
+                            if (opt.value === task.service_type) {
+                                serviceSelect.value = task.service_type;
+                                break;
+                            }
+                        }
+                        
+                        document.getElementById('fieldDescription').value = task.description;
+                        
+                        // Mostrar información del cliente
+                        if (task.client_info) {
+                            showClientInfo(task.client_info);
+                        }
+                    }
+                })
+                .catch(err => console.error('Error:', err));
+        }
+        
+        function showClientInfo(clientInfo) {
+            let infoDiv = document.getElementById('clientInfoDisplay');
+            
+            if (!infoDiv) {
+                infoDiv = document.createElement('div');
+                infoDiv.id = 'clientInfoDisplay';
+                infoDiv.className = 'alert alert-info mb-3 mt-2';
+                document.querySelector('#fieldClient').parentElement.appendChild(infoDiv);
+            }
+            
+            let html = `
+                <div class="d-flex justify-content-between align-items-start">
+                    <div class="flex-grow-1">
+                        <h6 class="fw-bold mb-2">
+                            <i class="bi bi-person-circle me-2"></i>
+                            Información del Cliente
+                        </h6>
+                        <div class="small">
+                            <div class="mb-1">
+                                <i class="bi bi-telephone me-2"></i>
+                                <a href="tel:${clientInfo.phone}" class="text-dark fw-bold">${clientInfo.phone}</a>
+                            </div>
+                            <div class="mb-1">
+                                <i class="bi bi-envelope me-2"></i>
+                                ${clientInfo.email}
+                            </div>
+                            <div class="mb-1">
+                                <i class="bi bi-geo-alt me-2"></i>
+                                ${clientInfo.address}
+                            </div>
+                            ${clientInfo.link ? `
+                                <div class="mt-2">
+                                    <a href="${clientInfo.link}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-map me-1"></i>Abrir en Maps
+                                    </a>
+                                </div>
+                            ` : ''}
+                            ${clientInfo.has_support ? `
+                                <div class="alert alert-success py-1 px-2 mt-2 mb-0">
+                                    <small>
+                                        <i class="bi bi-shield-check me-1"></i>
+                                        <strong>Soporte Activo:</strong>
+                                        ${clientInfo.support_monday_friday ? 'L-V ' : ''}
+                                        ${clientInfo.support_saturday ? 'Sáb ' : ''}
+                                        ${clientInfo.support_sunday ? 'Dom' : ''}
+                                    </small>
+                                </div>
+                            ` : ''}
+                            ${clientInfo.notes ? `
+                                <div class="mt-2 pt-2 border-top small text-muted">
+                                    <i class="bi bi-sticky me-1"></i>
+                                    ${clientInfo.notes}
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close" onclick="hideClientInfo()"></button>
+                </div>
+            `;
+            
+            infoDiv.innerHTML = html;
+            infoDiv.style.display = 'block';
+        }
+        
+        function hideClientInfo() {
+            const infoDiv = document.getElementById('clientInfoDisplay');
+            if (infoDiv) {
+                infoDiv.style.display = 'none';
+            }
+        }
+        
+        // Actualizar calendario después de crear cita
+        const formNewAppt = document.querySelector('#modalNewAppointmentTech form');
+        if (formNewAppt && !formNewAppt.hasAttribute('data-enhanced')) {
+            formNewAppt.setAttribute('data-enhanced', 'true');
+            formNewAppt.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(this);
+                fetch('/create_appointment', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        bootstrap.Modal.getInstance(document.getElementById('modalNewAppointmentTech')).hide();
+                        if (window.techCalendar) window.techCalendar.refetchEvents();
+                        alert('✓ Cita creada');
+                        this.reset();
+                        location.reload();
+                    } else {
+                        alert('Error: ' + data.msg);
+                    }
+                });
+            });
+        }
+
     </script>
 </body>
 

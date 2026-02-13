@@ -73,6 +73,7 @@ class Stock(db.Model):
     category = db.relationship('StockCategory', backref='items')
     min_stock = db.Column(db.Integer, default=5)
     description = db.Column(db.Text)
+    supplier = db.Column(db.String(100), nullable=True)  # ✅ NUEVO CAMPO PROVEEDOR
 
 class Task(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -178,14 +179,16 @@ def inject_globals():
         return {
             'all_service_types': ServiceType.query.order_by(ServiceType.name).all(),
             'unread_alarms_count': unread_alarms,
-            'employees': employees
+            'employees': employees,
+            'now': datetime.now  # ✅ Añadir función now para templates
         }
     except Exception as e:
         print("ERROR context_processor:", e)
         return {
             'all_service_types': [],
             'unread_alarms_count': 0,
-            'employees': []
+            'employees': [],
+            'now': datetime.now
         }
 
 # --- RUTAS PRINCIPALES ---
@@ -321,6 +324,8 @@ def dashboard():
         services = ServiceType.query.all()
         informes = Task.query.filter_by(status='Completado').order_by(Task.date.desc()).limit(50).all()
         stock_items = Stock.query.order_by(Stock.name).all()
+        # ✅ Obtener categorías para el panel de stock
+        stock_categories = StockCategory.query.filter_by(parent_id=None).all()
         
         return render_template('admin_panel.html', 
                              empleados=empleados,
@@ -328,6 +333,7 @@ def dashboard():
                              services=services,
                              informes=informes,
                              stock_items=stock_items,
+                             stock_categories=stock_categories,
                              today_date=date.today().strftime('%Y-%m-%d'))
     else:
         pending_tasks = Task.query.filter_by(
@@ -386,7 +392,11 @@ def manage_users():
         role = request.form.get('role', 'tech')
         
         if User.query.filter_by(username=username).first():
-            flash('El nombre de usuario ya existe', 'danger')
+            flash('Ya existe un usuario con ese nombre', 'danger')
+            return redirect(url_for('dashboard'))
+        
+        if User.query.filter_by(email=email).first():
+            flash('Ya existe un usuario con ese email', 'danger')
             return redirect(url_for('dashboard'))
         
         is_valid, message = validate_password(password)
@@ -402,6 +412,7 @@ def manage_users():
         )
         db.session.add(new_user)
         db.session.commit()
+        
         flash(f'Usuario {username} creado correctamente', 'success')
     
     elif action == 'delete':
@@ -411,7 +422,7 @@ def manage_users():
         if user and user.id != current_user.id:
             db.session.delete(user)
             db.session.commit()
-            flash(f'Usuario {user.username} eliminado', 'success')
+            flash('Usuario eliminado correctamente', 'success')
         else:
             flash('No puedes eliminar tu propio usuario', 'danger')
     
@@ -434,7 +445,10 @@ def manage_clients():
         address = request.form.get('address')
         link = request.form.get('link', '')
         notes = request.form.get('notes', '')
-        has_support = request.form.get('has_support') == 'true'
+        has_support = request.form.get('has_support') == 'on'
+        support_monday_friday = request.form.get('support_monday_friday') == 'on'
+        support_saturday = request.form.get('support_saturday') == 'on'
+        support_sunday = request.form.get('support_sunday') == 'on'
         
         if Client.query.filter_by(name=name).first():
             flash('Ya existe un cliente con ese nombre', 'danger')
@@ -445,107 +459,49 @@ def manage_clients():
             phone=phone,
             email=email,
             address=address,
-            link=link if link else None,
+            link=link,
             notes=notes,
-            has_support=has_support
+            has_support=has_support,
+            support_monday_friday=support_monday_friday,
+            support_saturday=support_saturday,
+            support_sunday=support_sunday
         )
         db.session.add(new_client)
         db.session.commit()
+        
         flash(f'Cliente {name} añadido correctamente', 'success')
     
     elif action == 'edit':
         client_id = request.form.get('client_id')
         client = Client.query.get(client_id)
+        
         if client:
             client.name = request.form.get('name')
             client.phone = request.form.get('phone')
             client.email = request.form.get('email')
             client.address = request.form.get('address')
-            client.link = request.form.get('link', '') or None
+            client.link = request.form.get('link', '')
             client.notes = request.form.get('notes', '')
-            client.has_support = request.form.get('has_support') == 'true'
+            client.has_support = request.form.get('has_support') == 'on'
+            client.support_monday_friday = request.form.get('support_monday_friday') == 'on'
+            client.support_saturday = request.form.get('support_saturday') == 'on'
+            client.support_sunday = request.form.get('support_sunday') == 'on'
+            
             db.session.commit()
             flash('Cliente actualizado correctamente', 'success')
     
     elif action == 'delete':
         client_id = request.form.get('client_id')
         client = Client.query.get(client_id)
+        
         if client:
             db.session.delete(client)
             db.session.commit()
-            flash('Cliente eliminado', 'success')
+            flash('Cliente eliminado correctamente', 'success')
     
     return redirect(url_for('dashboard'))
 
-@app.route('/export_clients')
-@login_required
-def export_clients():
-    if current_user.role != 'admin':
-        flash('No autorizado', 'danger')
-        return redirect(url_for('dashboard'))
-    
-    clients = Client.query.all()
-    data = [{
-        'name': c.name,
-        'phone': c.phone,
-        'email': c.email,
-        'address': c.address,
-        'link': c.link,
-        'notes': c.notes,
-        'has_support': c.has_support
-    } for c in clients]
-    
-    json_data = json.dumps(data, indent=2, ensure_ascii=False)
-    return send_file(
-        io.BytesIO(json_data.encode('utf-8')),
-        mimetype='application/json',
-        as_attachment=True,
-        download_name='clientes_oslaprint.json'
-    )
-
-@app.route('/import_clients', methods=['POST'])
-@login_required
-def import_clients():
-    if current_user.role != 'admin':
-        flash('No autorizado', 'danger')
-        return redirect(url_for('dashboard'))
-    
-    if 'file' not in request.files:
-        flash('No se seleccionó archivo', 'danger')
-        return redirect(url_for('dashboard'))
-    
-    file = request.files['file']
-    if file.filename == '':
-        flash('Archivo vacío', 'danger')
-        return redirect(url_for('dashboard'))
-    
-    try:
-        data = json.load(file)
-        imported = 0
-        
-        for item in data:
-            if not Client.query.filter_by(name=item.get('name')).first():
-                new_client = Client(
-                    name=item.get('name'),
-                    phone=item.get('phone', ''),
-                    email=item.get('email', ''),
-                    address=item.get('address', ''),
-                    link=item.get('link'),
-                    notes=item.get('notes', ''),
-                    has_support=item.get('has_support', False)
-                )
-                db.session.add(new_client)
-                imported += 1
-        
-        db.session.commit()
-        flash(f'✅ Importados {imported} clientes correctamente', 'success')
-    except Exception as e:
-        print(f"Error importing clients: {e}")
-        flash('Error al importar clientes. Verifica el formato JSON.', 'danger')
-    
-    return redirect(url_for('dashboard'))
-
-# --- GESTIÓN DE SERVICIOS ---
+# --- GESTIÓN DE TIPOS DE SERVICIO ---
 @app.route('/manage_services', methods=['POST'])
 @login_required
 def manage_services():
@@ -560,30 +516,23 @@ def manage_services():
         color = request.form.get('color', '#6c757d')
         
         if ServiceType.query.filter_by(name=name).first():
-            flash('Ya existe un servicio con ese nombre', 'danger')
+            flash('Ya existe un tipo de servicio con ese nombre', 'danger')
             return redirect(url_for('dashboard'))
         
         new_service = ServiceType(name=name, color=color)
         db.session.add(new_service)
         db.session.commit()
-        flash(f'Tipo de servicio "{name}" añadido', 'success')
-    
-    elif action == 'edit':
-        service_id = request.form.get('service_id')
-        service = ServiceType.query.get(service_id)
-        if service:
-            service.name = request.form.get('name')
-            service.color = request.form.get('color')
-            db.session.commit()
-            flash('Servicio actualizado', 'success')
+        
+        flash(f'Tipo de servicio {name} añadido correctamente', 'success')
     
     elif action == 'delete':
         service_id = request.form.get('service_id')
         service = ServiceType.query.get(service_id)
+        
         if service:
             db.session.delete(service)
             db.session.commit()
-            flash('Servicio eliminado', 'success')
+            flash('Tipo de servicio eliminado correctamente', 'success')
     
     return redirect(url_for('dashboard'))
 
@@ -601,18 +550,36 @@ def manage_stock():
         category_id = request.form.get('category_id')
         quantity = int(request.form.get('quantity', 0))
         min_stock = int(request.form.get('min_stock', 5))
+        supplier = request.form.get('supplier', '')  # ✅ NUEVO CAMPO
         
         new_item = Stock(
             name=name,
             category_id=int(category_id) if category_id else None,
             quantity=quantity,
-            min_stock=min_stock
+            min_stock=min_stock,
+            supplier=supplier  # ✅ GUARDAR PROVEEDOR
         )
         db.session.add(new_item)
         db.session.commit()
         check_low_stock()
         
         return jsonify({'success': True, 'msg': 'Artículo añadido correctamente'})
+    
+    elif action == 'edit':  # ✅ NUEVA ACCIÓN PARA EDITAR
+        item_id = request.form.get('item_id')
+        item = Stock.query.get(item_id)
+        
+        if item:
+            item.name = request.form.get('name')
+            item.min_stock = int(request.form.get('min_stock', 5))
+            item.supplier = request.form.get('supplier', '')
+            item.category_id = int(request.form.get('category_id')) if request.form.get('category_id') else None
+            
+            db.session.commit()
+            check_low_stock()
+            return jsonify({'success': True, 'msg': 'Artículo actualizado correctamente'})
+        
+        return jsonify({'success': False, 'msg': 'Artículo no encontrado'})
     
     elif action == 'adjust':
         item_id = request.form.get('item_id')
@@ -936,11 +903,28 @@ def get_task_full(task_id):
     
     service_type = ServiceType.query.get(task.service_type_id) if task.service_type_id else None
     
+    # ✅ INCLUIR INFORMACIÓN COMPLETA DEL CLIENTE
+    client_info = None
+    if task.client:
+        client_info = {
+            'name': task.client.name,
+            'phone': task.client.phone,
+            'email': task.client.email,
+            'address': task.client.address,
+            'link': task.client.link,
+            'notes': task.client.notes,
+            'has_support': task.client.has_support,
+            'support_monday_friday': task.client.support_monday_friday,
+            'support_saturday': task.client.support_saturday,
+            'support_sunday': task.client.support_sunday
+        }
+    
     return jsonify({
         'success': True,
         'data': {
             'id': task.id,
             'client_name': task.client_name,
+            'client_info': client_info,  # ✅ AÑADIDO
             'date': task.date.strftime('%Y-%m-%d'),
             'start_time': task.start_time or '',
             'end_time': task.end_time or '',
@@ -966,11 +950,28 @@ def get_task_details(task_id):
     
     service_type = ServiceType.query.get(task.service_type_id) if task.service_type_id else None
     
+    # ✅ INCLUIR INFORMACIÓN COMPLETA DEL CLIENTE
+    client_info = None
+    if task.client:
+        client_info = {
+            'name': task.client.name,
+            'phone': task.client.phone,
+            'email': task.client.email,
+            'address': task.client.address,
+            'link': task.client.link,
+            'notes': task.client.notes,
+            'has_support': task.client.has_support,
+            'support_monday_friday': task.client.support_monday_friday,
+            'support_saturday': task.client.support_saturday,
+            'support_sunday': task.client.support_sunday
+        }
+    
     return jsonify({
         'success': True,
         'data': {
             'id': task.id,
             'client_name': task.client_name,
+            'client_info': client_info,  # ✅ AÑADIDO
             'date': task.date.strftime('%Y-%m-%d'),
             'start_time': task.start_time,
             'end_time': task.end_time,
@@ -1072,7 +1073,7 @@ def get_tech_analytics():
 @app.route('/api/tech_stats/<int:tech_id>')
 @login_required
 def get_tech_stats(tech_id):
-    """Análisis individual de trabajador"""
+    """Análisis individual de trabajador con lista detallada de servicios"""
     if current_user.role != 'admin':
         return jsonify({'success': False, 'msg': 'No autorizado'}), 403
     
@@ -1098,6 +1099,7 @@ def get_tech_stats(tech_id):
             'client': task.client_name,
             'date': task.date.strftime('%d/%m/%Y'),
             'time': f"{task.start_time} - {task.end_time}" if task.start_time and task.end_time else 'No especificado',
+            'description': task.description or 'Sin descripción',  # ✅ AÑADIDO
             'has_attachments': bool(task.attachments),
             'has_signature': bool(task.signature_data)
         })
@@ -1212,12 +1214,35 @@ def get_stock_categories():
                 'id': cat.id,
                 'name': cat.name,
                 'children': build_tree(cat.id),
-                'items': [{'id': item.id, 'name': item.name, 'quantity': item.quantity} 
+                'items': [{'id': item.id, 'name': item.name, 'quantity': item.quantity, 'min_stock': item.min_stock, 'supplier': item.supplier or 'N/A'} 
                          for item in cat.items]
             })
         return result
     
     return jsonify(build_tree())
+
+# ✅ NUEVA RUTA: Obtener info de un item de stock para editar
+@app.route('/api/stock_item/<int:item_id>')
+@login_required
+def get_stock_item(item_id):
+    """Obtener datos de un artículo de stock"""
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'msg': 'No autorizado'}), 403
+    
+    item = Stock.query.get_or_404(item_id)
+    
+    return jsonify({
+        'success': True,
+        'data': {
+            'id': item.id,
+            'name': item.name,
+            'quantity': item.quantity,
+            'min_stock': item.min_stock,
+            'supplier': item.supplier or '',
+            'category_id': item.category_id,
+            'description': item.description or ''
+        }
+    })
 
 # --- RUTAS DE ALARMAS ---
 @app.route('/api/alarms')
@@ -1288,16 +1313,26 @@ def print_report(report_id):
             return redirect(url_for('dashboard'))
         
         # Parsear archivos adjuntos si existen
-        attachments = []
+        attachments_data = []
         if task.attachments:
             try:
-                attachments = json.loads(task.attachments)
-            except:
-                attachments = []
+                filenames = json.loads(task.attachments)
+                for filename in filenames:
+                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                    if os.path.exists(filepath):
+                        file_size = os.path.getsize(filepath)
+                        attachments_data.append({
+                            'filename': filename,
+                            'original_name': filename.split('_', 3)[-1] if '_' in filename else filename,
+                            'size': file_size
+                        })
+            except Exception as e:
+                print(f"Error parsing attachments: {e}")
+                attachments_data = []
         
         return render_template('print_report.html', 
                              task=task,
-                             attachments=attachments)
+                             attachments=attachments_data)
     except Exception as e:
         print(f"Error printing report {report_id}: {str(e)}")
         flash('Error al cargar el reporte', 'danger')
@@ -1625,6 +1660,20 @@ def uploaded_file(filename):
 with app.app_context():
     db.create_all()
     
+    # ✅ MIGRACIÓN: Añadir columna 'supplier' a Stock
+    try:
+        from sqlalchemy import inspect
+        inspector = inspect(db.engine)
+        stock_columns = [col['name'] for col in inspector.get_columns('stock')]
+        
+        if 'supplier' not in stock_columns:
+            with db.engine.connect() as conn:
+                conn.execute(db.text('ALTER TABLE stock ADD COLUMN supplier VARCHAR(100)'))
+                conn.commit()
+                print("✓ Columna 'supplier' añadida a Stock")
+    except Exception as e:
+        print(f"Nota: Migración 'supplier': {e}")
+    
     # Migración: columna 'link'
     try:
         from sqlalchemy import inspect
@@ -1703,19 +1752,19 @@ with app.app_context():
         atca_cat = StockCategory.query.filter_by(name='ATCA').first()
         
         stock_items = [
-            {'name': 'Copiadora HP LaserJet Pro', 'category_id': copiadoras_cat.id if copiadoras_cat else None, 'quantity': 3, 'min_stock': 1},
-            {'name': 'Copiadora Canon imageRUNNER', 'category_id': copiadoras_cat.id if copiadoras_cat else None, 'quantity': 2, 'min_stock': 1},
-            {'name': 'Cajón Cashlogy 1500', 'category_id': cashlogy_cat.id if cashlogy_cat else None, 'quantity': 5, 'min_stock': 2},
-            {'name': 'Cajón Cashlogy 2500', 'category_id': cashlogy_cat.id if cashlogy_cat else None, 'quantity': 3, 'min_stock': 1},
-            {'name': 'Cajón Cashkeeper Pro', 'category_id': cashkeeper_cat.id if cashkeeper_cat else None, 'quantity': 4, 'min_stock': 2},
-            {'name': 'Cajón Cashkeeper Lite', 'category_id': cashkeeper_cat.id if cashkeeper_cat else None, 'quantity': 2, 'min_stock': 1},
-            {'name': 'Cajón ATCA Standard', 'category_id': atca_cat.id if atca_cat else None, 'quantity': 3, 'min_stock': 1},
-            {'name': 'Cajón ATCA Pro', 'category_id': atca_cat.id if atca_cat else None, 'quantity': 2, 'min_stock': 1},
-            {'name': 'TPV Táctil 15"', 'category_id': tpv_cat.id if tpv_cat else None, 'quantity': 6, 'min_stock': 2},
-            {'name': 'TPV Táctil 17"', 'category_id': tpv_cat.id if tpv_cat else None, 'quantity': 4, 'min_stock': 2},
-            {'name': 'Reciclador 1', 'category_id': recicladores_cat.id if recicladores_cat else None, 'quantity': 2, 'min_stock': 1},
-            {'name': 'Toner Genérico Negro', 'category_id': consumibles_cat.id if consumibles_cat else None, 'quantity': 15, 'min_stock': 5},
-            {'name': 'Toner Genérico Color', 'category_id': consumibles_cat.id if consumibles_cat else None, 'quantity': 10, 'min_stock': 5},
+            {'name': 'Copiadora HP LaserJet Pro', 'category_id': copiadoras_cat.id if copiadoras_cat else None, 'quantity': 3, 'min_stock': 1, 'supplier': 'HP España'},
+            {'name': 'Copiadora Canon imageRUNNER', 'category_id': copiadoras_cat.id if copiadoras_cat else None, 'quantity': 2, 'min_stock': 1, 'supplier': 'Canon Iberia'},
+            {'name': 'Cajón Cashlogy 1500', 'category_id': cashlogy_cat.id if cashlogy_cat else None, 'quantity': 5, 'min_stock': 2, 'supplier': 'Glory Global'},
+            {'name': 'Cajón Cashlogy 2500', 'category_id': cashlogy_cat.id if cashlogy_cat else None, 'quantity': 3, 'min_stock': 1, 'supplier': 'Glory Global'},
+            {'name': 'Cajón Cashkeeper Pro', 'category_id': cashkeeper_cat.id if cashkeeper_cat else None, 'quantity': 4, 'min_stock': 2, 'supplier': 'Cashkeeper Systems'},
+            {'name': 'Cajón Cashkeeper Lite', 'category_id': cashkeeper_cat.id if cashkeeper_cat else None, 'quantity': 2, 'min_stock': 1, 'supplier': 'Cashkeeper Systems'},
+            {'name': 'Cajón ATCA Standard', 'category_id': atca_cat.id if atca_cat else None, 'quantity': 3, 'min_stock': 1, 'supplier': 'ATCA Solutions'},
+            {'name': 'Cajón ATCA Pro', 'category_id': atca_cat.id if atca_cat else None, 'quantity': 2, 'min_stock': 1, 'supplier': 'ATCA Solutions'},
+            {'name': 'TPV Táctil 15"', 'category_id': tpv_cat.id if tpv_cat else None, 'quantity': 6, 'min_stock': 2, 'supplier': 'Epson POS'},
+            {'name': 'TPV Táctil 17"', 'category_id': tpv_cat.id if tpv_cat else None, 'quantity': 4, 'min_stock': 2, 'supplier': 'Epson POS'},
+            {'name': 'Reciclador 1', 'category_id': recicladores_cat.id if recicladores_cat else None, 'quantity': 2, 'min_stock': 1, 'supplier': 'Gunnebo'},
+            {'name': 'Toner Genérico Negro', 'category_id': consumibles_cat.id if consumibles_cat else None, 'quantity': 15, 'min_stock': 5, 'supplier': 'Suministros Office'},
+            {'name': 'Toner Genérico Color', 'category_id': consumibles_cat.id if consumibles_cat else None, 'quantity': 10, 'min_stock': 5, 'supplier': 'Suministros Office'},
         ]
         for item in stock_items:
             db.session.add(Stock(**item))

@@ -2675,6 +2675,183 @@
                 });
             }
         });
+
+        // ==================== GESTIÓN DE STOCK MEJORADA ====================
+        
+        document.getElementById('modalAddStock').addEventListener('show.bs.modal', function() {
+            loadCategoriesForStockForm('addStock');
+        });
+        
+        function loadCategoriesForStockForm(prefix) {
+            const select = document.getElementById(prefix + 'Category');
+            if (!select) return;
+            
+            select.innerHTML = '<option value="">Cargando...</option>';
+            
+            fetch('/api/stock_categories')
+                .then(res => res.json())
+                .then(categories => {
+                    let options = '<option value="">-- Seleccionar --</option>';
+                    
+                    function addCategories(cats, pref = '') {
+                        cats.forEach(cat => {
+                            options += `<option value="${cat.id}">${pref}${cat.name}</option>`;
+                            if (cat.children && cat.children.length > 0) {
+                                addCategories(cat.children, pref + '→ ');
+                            }
+                        });
+                    }
+                    
+                    addCategories(categories);
+                    select.innerHTML = options;
+                });
+        }
+        
+        function editStockItem(itemId) {
+            fetch(`/api/stock_item/${itemId}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        const item = data.data;
+                        
+                        // Crear modal si no existe
+                        let modal = document.getElementById('modalEditStockComplete');
+                        if (!modal) {
+                            const modalHTML = `
+                                <div class="modal fade" id="modalEditStockComplete" tabindex="-1">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content bg-dark text-white">
+                                            <div class="modal-header border-secondary">
+                                                <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>Editar Artículo</h5>
+                                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <form id="formEditStockComplete">
+                                                <div class="modal-body">
+                                                    <input type="hidden" id="editStockIdComplete">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Nombre *</label>
+                                                        <input type="text" id="editStockNameComplete" class="form-control" required>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Categoría *</label>
+                                                        <select id="editStockCategoryComplete" class="form-select" required></select>
+                                                    </div>
+                                                    <div class="row">
+                                                        <div class="col-md-6 mb-3">
+                                                            <label class="form-label">Stock Actual</label>
+                                                            <input type="number" id="editStockQtyComplete" class="form-control" readonly>
+                                                            <small class="text-muted">Use Ajustar para modificar</small>
+                                                        </div>
+                                                        <div class="col-md-6 mb-3">
+                                                            <label class="form-label">Stock Mínimo *</label>
+                                                            <input type="number" id="editStockMinComplete" class="form-control" required min="1">
+                                                        </div>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Proveedor *</label>
+                                                        <input type="text" id="editStockSupplierComplete" class="form-control" required>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Descripción</label>
+                                                        <textarea id="editStockDescComplete" class="form-control" rows="2"></textarea>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer border-secondary">
+                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                                    <button type="submit" class="btn btn-warning"><i class="bi bi-check-circle me-1"></i>Guardar</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                            document.body.insertAdjacentHTML('beforeend', modalHTML);
+                            
+                            // Añadir event listener al formulario
+                            document.getElementById('formEditStockComplete').addEventListener('submit', function(e) {
+                                e.preventDefault();
+                                
+                                const formData = new FormData();
+                                formData.append('action', 'edit');
+                                formData.append('item_id', document.getElementById('editStockIdComplete').value);
+                                formData.append('name', document.getElementById('editStockNameComplete').value);
+                                formData.append('min_stock', document.getElementById('editStockMinComplete').value);
+                                formData.append('supplier', document.getElementById('editStockSupplierComplete').value);
+                                formData.append('category_id', document.getElementById('editStockCategoryComplete').value);
+                                
+                                fetch('/manage_stock', {
+                                    method: 'POST',
+                                    body: formData
+                                })
+                                .then(res => res.json())
+                                .then(data => {
+                                    if (data.success) {
+                                        bootstrap.Modal.getInstance(document.getElementById('modalEditStockComplete')).hide();
+                                        loadStockTree();
+                                        alert('✓ Artículo actualizado');
+                                    } else {
+                                        alert('Error: ' + data.msg);
+                                    }
+                                });
+                            });
+                        }
+                        
+                        // Rellenar datos
+                        document.getElementById('editStockIdComplete').value = item.id;
+                        document.getElementById('editStockNameComplete').value = item.name;
+                        document.getElementById('editStockQtyComplete').value = item.quantity;
+                        document.getElementById('editStockMinComplete').value = item.min_stock;
+                        document.getElementById('editStockSupplierComplete').value = item.supplier || '';
+                        document.getElementById('editStockDescComplete').value = item.description || '';
+                        
+                        // Cargar categorías
+                        const select = document.getElementById('editStockCategoryComplete');
+                        fetch('/api/stock_categories')
+                            .then(res => res.json())
+                            .then(categories => {
+                                let options = '<option value="">-- Seleccionar --</option>';
+                                function addCats(cats, pref = '') {
+                                    cats.forEach(cat => {
+                                        const sel = cat.id == item.category_id ? 'selected' : '';
+                                        options += `<option value="${cat.id}" ${sel}>${pref}${cat.name}</option>`;
+                                        if (cat.children && cat.children.length > 0) {
+                                            addCats(cat.children, pref + '→ ');
+                                        }
+                                    });
+                                }
+                                addCats(categories);
+                                select.innerHTML = options;
+                            });
+                        
+                        new bootstrap.Modal(document.getElementById('modalEditStockComplete')).show();
+                    }
+                });
+        }
+        
+        // Actualizar calendario después de agendar
+        const formSchedule = document.querySelector('#modalScheduleAppointment form');
+        if (formSchedule && !formSchedule.hasAttribute('data-enhanced')) {
+            formSchedule.setAttribute('data-enhanced', 'true');
+            formSchedule.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(this);
+                fetch('/schedule_appointment', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (response.ok) {
+                        bootstrap.Modal.getInstance(document.getElementById('modalScheduleAppointment')).hide();
+                        if (window.calendarGlobalInstance) window.calendarGlobalInstance.refetchEvents();
+                        if (window.calendar) window.calendar.refetchEvents();
+                        alert('✓ Cita agendada');
+                        this.reset();
+                        location.reload();
+                    }
+                });
+            });
+        }
+
     </script>
 </body>
 
