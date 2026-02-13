@@ -190,7 +190,7 @@
             <li class="nav-item"><button class="nav-link w-100" data-bs-toggle="tab"
                     data-bs-target="#data">INFORMES</button></li>
             <li class="nav-item"><button class="nav-link w-100" data-bs-toggle="tab"
-                    data-bs-target="#analytics">ANALÍTICAS</button></li>
+                    data-bs-target="#statistics">ESTADÍSTICAS</button></li>
             <li class="nav-item"><button class="nav-link w-100" data-bs-toggle="tab"
                     data-bs-target="#stock">STOCK</button></li>
             <li class="nav-item"><button class="nav-link w-100" data-bs-toggle="tab"
@@ -214,17 +214,21 @@
                         <div class="card-emp">
                             <button class="btn-delete-user" 
                                 data-bs-toggle="modal"
-                                data-user-id="{{ u.id }}"
-                                onclick="document.getElementById('deleteUserId').value=this.dataset.userId;"
-                                data-bs-target="#modalDeleteUser"><i class="bi bi-x-circle-fill fs-4"></i></button>
+                                data-bs-target="#modalDeleteUser"
+                                onclick="document.getElementById('deleteUserId').value='{{ u.id }}';">
+                                <i class="bi bi-x-circle-fill fs-4"></i>
+                            </button>
                             <i class="bi bi-person-circle fs-1 mb-2 text-warning"></i>
                             <h5 class="mb-1 text-white fw-bold">{{ u.username }}</h5>
                             <small class="text-muted">ID: #{{ u.id }}</small>
                             <hr class="my-3" style="border-color:#333;">
-                            <button class="btn btn-sm btn-primary w-100" 
-                                data-user-id="{{ u.id }}"
-                                onclick="loadEmployeeCalendar(this.dataset.userId)">
+                            <button class="btn btn-sm btn-primary w-100 mb-2" 
+                                onclick="loadEmployeeCalendar({{ u.id }})">
                                 <i class="bi bi-calendar-check-fill me-1"></i> Ver Calendario
+                            </button>
+                            <button class="btn btn-sm btn-outline-info w-100" 
+                                onclick="viewTechStats({{ u.id }})">
+                                <i class="bi bi-graph-up me-1"></i> Ver Estadísticas
                             </button>
                         </div>
                     </div>
@@ -291,13 +295,13 @@
                             <tr>
                                 <td>{{ r.id }}</td>
                                 <td>{{ r.client_name }}</td>
-                                <td>{{ r.service_type }}</td>
+                                <td>{{ r.service_type.name if r.service_type is not string else r.service_type }}</td>
                                 <td>{{ r.date.strftime('%d/%m/%Y') }}</td>
                                 <td>{{ r.tech.username if r.tech else 'Sin técnico' }}</td>
                                 <td>
                                     <a href="/print_report/{{ r.id }}" target="_blank"
                                         class="btn btn-sm btn-outline-warning">
-                                        <i class="bi bi-printer-fill"></i>
+                                        <i class="bi bi-printer-fill"></i> Imprimir
                                     </a>
                                 </td>
                             </tr>
@@ -307,193 +311,142 @@
                 </div>
             </div>
 
-            <!-- SECCIÓN ANALÍTICAS -->
-            <div class="tab-pane fade" id="analytics">
-                <h4 class="fw-bold text-info fs-5 mb-4"><i class="bi bi-graph-up me-2"></i>Panel de Analíticas</h4>
+            <!-- TAB ESTADÍSTICAS -->
+            <div class="tab-pane fade" id="statistics">
+                <h4 class="fw-bold text-white fs-5 mb-4">
+                    <i class="bi bi-graph-up-arrow me-2 text-info"></i>Estadísticas Globales
+                </h4>
                 
-                <!-- Selector de Técnico -->
-                <div class="card bg-dark border-secondary p-3 mb-4">
-                    <div class="row g-3 align-items-end">
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold text-info">TÉCNICO</label>
-                            <select id="analyticsTechSelector" class="form-select" onchange="loadAdminAnalytics()">
-                                <option value="">-- Seleccionar Técnico --</option>
-                                {% for emp in employees %}
-                                <option value="{{ emp.id }}">{{ emp.username }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold text-info">PERÍODO</label>
-                            <select id="analyticsPeriodSelector" class="form-select" onchange="loadAdminAnalytics()">
-                                <option value="7">Últimos 7 días</option>
-                                <option value="30" selected>Últimos 30 días</option>
-                                <option value="90">Últimos 3 meses</option>
-                                <option value="180">Últimos 6 meses</option>
-                                <option value="365">Último año</option>
-                                <option value="all">Todo el historial</option>
-                            </select>
-                        </div>
-                        <div class="col-md-2">
-                            <button class="btn btn-warning w-100" onclick="loadAdminAnalytics()">
-                                <i class="bi bi-arrow-clockwise me-1"></i>Actualizar
-                            </button>
+                <!-- Filtros -->
+                <div class="card bg-dark border-secondary mb-4">
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label text-white fw-bold">Técnico</label>
+                                <select id="statsFilterTech" class="form-select bg-black text-white border-secondary">
+                                    <option value="">Todos los técnicos</option>
+                                    {% for emp in empleados %}
+                                    <option value="{{ emp.id }}">{{ emp.username }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label text-white fw-bold">Período</label>
+                                <select id="statsFilterPeriod" class="form-select bg-black text-white border-secondary">
+                                    <option value="all">Todo el historial</option>
+                                    <option value="month">Último mes</option>
+                                    <option value="week">Última semana</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 d-flex align-items-end">
+                                <button class="btn btn-info w-100" onclick="loadAdminStatistics()">
+                                    <i class="bi bi-arrow-clockwise me-1"></i>Actualizar Estadísticas
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
-
-                <!-- Mensaje inicial -->
-                <div id="analyticsPlaceholder" class="text-center text-muted py-5">
-                    <i class="bi bi-bar-chart fs-1 d-block mb-3"></i>
-                    <h5>Selecciona un técnico para ver sus analíticas</h5>
-                    <p class="small">Elige un técnico del menú desplegable para visualizar sus estadísticas de rendimiento</p>
+                
+                <!-- KPIs -->
+                <div class="row g-3 mb-4" id="statsKPIs">
+                    <div class="col-md-3">
+                        <div class="card bg-dark border-info">
+                            <div class="card-body text-center">
+                                <i class="bi bi-clipboard-check fs-1 text-info"></i>
+                                <h3 class="text-white mt-2 mb-0" id="kpiTotalTasks">-</h3>
+                                <small class="text-muted">Total Tareas</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-dark border-success">
+                            <div class="card-body text-center">
+                                <i class="bi bi-check-circle fs-1 text-success"></i>
+                                <h3 class="text-white mt-2 mb-0" id="kpiCompletedTasks">-</h3>
+                                <small class="text-muted">Completadas</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-dark border-warning">
+                            <div class="card-body text-center">
+                                <i class="bi bi-hourglass-split fs-1 text-warning"></i>
+                                <h3 class="text-white mt-2 mb-0" id="kpiPendingTasks">-</h3>
+                                <small class="text-muted">Pendientes</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-dark border-secondary">
+                            <div class="card-body text-center">
+                                <i class="bi bi-people fs-1 text-secondary"></i>
+                                <h3 class="text-white mt-2 mb-0" id="kpiActiveTechs">-</h3>
+                                <small class="text-muted">Técnicos Activos</small>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-
-                <!-- Contenedor de Analíticas (oculto inicialmente) -->
-                <div id="analyticsContent" style="display: none;">
-                    <!-- Tarjetas de Resumen -->
-                    <div class="row g-3 mb-4">
-                        <div class="col-md-3 col-6">
-                            <div class="card bg-dark border-secondary p-3 text-center">
-                                <i class="bi bi-clipboard-check fs-1 text-success mb-2"></i>
-                                <h2 class="text-white fw-bold mb-0" id="adminTotalServices">0</h2>
-                                <small class="text-muted">Servicios Totales</small>
+                
+                <!-- Gráficos -->
+                <div class="row g-3">
+                    <!-- Gráfico Circular de Tipos de Tareas -->
+                    <div class="col-md-6">
+                        <div class="card bg-dark border-secondary">
+                            <div class="card-header bg-black border-secondary">
+                                <h6 class="text-white fw-bold mb-0">
+                                    <i class="bi bi-pie-chart-fill me-2 text-warning"></i>
+                                    Distribución por Tipo de Servicio
+                                </h6>
                             </div>
-                        </div>
-                        <div class="col-md-3 col-6">
-                            <div class="card bg-dark border-secondary p-3 text-center">
-                                <i class="bi bi-tools fs-1 text-warning mb-2"></i>
-                                <h2 class="text-white fw-bold mb-0" id="adminTotalMaintenances">0</h2>
-                                <small class="text-muted">Mantenimientos</small>
-                            </div>
-                        </div>
-                        <div class="col-md-3 col-6">
-                            <div class="card bg-dark border-secondary p-3 text-center">
-                                <i class="bi bi-cash-stack fs-1 text-info mb-2"></i>
-                                <h2 class="text-white fw-bold mb-0" id="adminTotalRevenue">0€</h2>
-                                <small class="text-muted">Ingresos Estimados</small>
-                            </div>
-                        </div>
-                        <div class="col-md-3 col-6">
-                            <div class="card bg-dark border-secondary p-3 text-center">
-                                <i class="bi bi-clock-history fs-1 text-danger mb-2"></i>
-                                <h2 class="text-white fw-bold mb-0" id="adminAvgTime">0h</h2>
-                                <small class="text-muted">Tiempo Promedio</small>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Gráficos -->
-                    <div class="row g-3 mb-4">
-                        <!-- Distribución de Servicios -->
-                        <div class="col-lg-6">
-                            <div class="card bg-dark border-secondary p-4">
-                                <h5 class="text-white fw-bold mb-3"><i class="bi bi-pie-chart me-2"></i>Distribución de Servicios</h5>
-                                <canvas id="adminServiceDistributionChart" style="max-height: 300px;"></canvas>
-                            </div>
-                        </div>
-
-                        <!-- Evolución Temporal -->
-                        <div class="col-lg-6">
-                            <div class="card bg-dark border-secondary p-4">
-                                <h5 class="text-white fw-bold mb-3"><i class="bi bi-graph-up me-2"></i>Evolución Temporal</h5>
-                                <div class="mb-3">
-                                    <select id="adminMetricSelector" class="form-select form-select-sm" onchange="updateAdminTimelineChart()">
-                                        <option value="services">Servicios Realizados</option>
-                                        <option value="revenue">Ingresos Totales</option>
-                                        <option value="maintenances">Mantenimientos</option>
-                                    </select>
-                                </div>
-                                <canvas id="adminTimelineChart" style="max-height: 250px;"></canvas>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Top Clientes y Servicios -->
-                    <div class="row g-3">
-                        <div class="col-lg-6">
-                            <div class="card bg-dark border-secondary p-4">
-                                <h5 class="text-white fw-bold mb-3"><i class="bi bi-people-fill me-2"></i>Top 5 Clientes</h5>
-                                <div id="adminTopClients" class="list-group">
-                                    <div class="text-center text-muted py-5">
-                                        <i class="bi bi-hourglass-split fs-1 d-block mb-2"></i>
-                                        Cargando datos...
-                                    </div>
+                            <div class="card-body">
+                                <canvas id="taskTypesPieChart" style="max-height: 300px;"></canvas>
+                                <div id="noPieData" class="text-center text-muted py-5" style="display: none;">
+                                    <i class="bi bi-info-circle fs-1"></i>
+                                    <p class="mt-2">No hay datos disponibles</p>
                                 </div>
                             </div>
                         </div>
-
-                        <div class="col-lg-6">
-                            <div class="card bg-dark border-secondary p-4">
-                                <h5 class="text-white fw-bold mb-3"><i class="bi bi-bar-chart me-2"></i>Servicios Más Frecuentes</h5>
-                                <canvas id="adminTopServicesChart" style="max-height: 300px;"></canvas>
+                    </div>
+                    
+                    <!-- Gráfico de Línea de Tareas Mensuales -->
+                    <div class="col-md-6">
+                        <div class="card bg-dark border-secondary">
+                            <div class="card-header bg-black border-secondary">
+                                <h6 class="text-white fw-bold mb-0">
+                                    <i class="bi bi-graph-up me-2 text-info"></i>
+                                    Evolución Mensual de Tareas
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="monthlyTasksChart" style="max-height: 300px;"></canvas>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
 
+            <!-- SECCIÓN ANALÍTICAS - REMOVIDA -->
+            <!-- Las analíticas ahora se muestran individualmente por técnico desde la tarjeta de cada uno en EQUIPO -->
+
             <div class="tab-pane fade" id="stock">
                 <div class="d-flex justify-content-between mb-3 align-items-center">
                     <h4 class="fw-bold text-white fs-5 m-0">Gestión de Inventario</h4>
-                    <button class="btn btn-warning btn-sm fw-bold" data-bs-toggle="modal"
-                        data-bs-target="#modalAddStock">
-                        <i class="bi bi-plus-circle-fill me-1"></i> Nuevo Artículo
-                    </button>
+                    <div>
+                        <button class="btn btn-outline-info btn-sm fw-bold me-2" onclick="loadStockTree()">
+                            <i class="bi bi-arrow-clockwise me-1"></i> Recargar
+                        </button>
+                        <button class="btn btn-warning btn-sm fw-bold" data-bs-toggle="modal"
+                            data-bs-target="#modalAddStock">
+                            <i class="bi bi-plus-circle-fill me-1"></i> Nuevo Artículo
+                        </button>
+                    </div>
                 </div>
 
-                <div class="table-responsive">
-                    <table class="table table-dark table-sm">
-                        <thead>
-                            <tr>
-                                <th>Artículo</th>
-                                <th>Categoría</th>
-                                <th>Subcategoría</th>
-                                <th>Proveedor</th>
-                                <th>Cantidad</th>
-                                <th>Stock Mín.</th>
-                                <th>Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for i in inventory %}
-                            <tr>
-                                <td>{{ i.name }}</td>
-                                <td>{{ i.category }}</td>
-                                <td>{{ i.subcategory or '-' }}</td>
-                                <td>{{ i.supplier or '-' }}</td>
-                                <td>
-                                    <span class="badge {% if i.quantity <= i.min_stock %}bg-danger{% else %}bg-success{% endif %}">
-                                        {{ i.quantity }}
-                                    </span>
-                                </td>
-                                <td>
-                                    <span class="badge bg-secondary">{{ i.min_stock }}</span>
-                                </td>
-                                <td>
-                                    <button class="btn btn-sm btn-outline-info"
-                                        data-item-id="{{ i.id }}"
-                                        data-item-name="{{ i.name }}"
-                                        onclick="ajustarStock(this.dataset.itemId, this.dataset.itemName)">
-                                        <i class="bi bi-arrow-repeat"></i>
-                                    </button>
-                                    <button class="btn btn-sm btn-outline-warning"
-                                        onclick="openEditStockModalComplete({{ i.id }}, '{{ i.name }}', '{{ i.category }}', '{{ i.subcategory or '' }}', '{{ i.supplier or '' }}', {{ i.quantity }}, {{ i.min_stock }})">
-                                        <i class="bi bi-pencil-fill"></i>
-                                    </button>
-                                    <form method="POST" action="/manage_stock" class="d-inline">
-                                        <input type="hidden" name="action" value="delete">
-                                        <input type="hidden" name="item_id" value="{{ i.id }}">
-                                        <button class="btn btn-sm btn-outline-danger"
-                                            onclick="return confirm('¿Eliminar este artículo?')">
-                                            <i class="bi bi-trash-fill"></i>
-                                        </button>
-                                    </form>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                <!-- Vista jerárquica de categorías y productos -->
+                <div id="stockCategoriesTree" class="border border-secondary rounded p-3 bg-black" style="min-height: 300px;">
+                    <div class="text-center text-muted py-3">
+                        <i class="bi bi-hourglass-split"></i> Cargando inventario...
+                    </div>
                 </div>
             </div>
 
@@ -516,48 +469,117 @@
                 </div>
 
                 <input type="text" id="clientSearchInput" class="form-control mb-3"
-                    placeholder="🔍 Buscar cliente..." onkeyup="filterClientsTable()">
+                    placeholder="🔍 Buscar cliente..." onkeyup="filterClientsView()">
 
-                <div class="table-responsive">
-                    <table class="table table-dark table-sm" id="clientsTable">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Nombre</th>
-                                <th>Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for c in clients %}
-                            <tr>
-                                <td>{{ c.id }}</td>
-                                <td class="client-name-cell">{{ c.name }}</td>
-                                <td>
-                                    <button class="btn btn-sm btn-outline-warning"
-                                        data-client-id="{{ c.id }}"
-                                        data-client-name="{{ c.name }}"
-                                        onclick="openEditClientModal(this.dataset.clientId, this.dataset.clientName)">
-                                        <i class="bi bi-pencil-fill"></i>
+                <div class="row g-3" id="clientsCardContainer">
+                    {% for c in clients %}
+                    <div class="col-12 col-md-6 col-lg-4 client-card-wrapper" data-client-name="{{ c.name|lower }}" data-client-phone="{{ c.phone }}" data-client-email="{{ c.email }}">
+                        <div class="card bg-dark border-secondary text-white h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h6 class="card-title text-warning fw-bold mb-0">{{ c.name }}</h6>
+                                    {% if c.has_support %}
+                                    <span class="badge bg-success">
+                                        <i class="bi bi-shield-check"></i> Soporte
+                                    </span>
+                                    {% else %}
+                                    <span class="badge bg-danger">
+                                        <i class="bi bi-shield-x"></i> Sin Soporte
+                                    </span>
+                                    {% endif %}
+                                </div>
+                                
+                                <hr class="border-secondary my-2">
+                                
+                                <div class="small mb-1">
+                                    <i class="bi bi-telephone-fill text-info me-2"></i>
+                                    <a href="tel:{{ c.phone }}" class="text-decoration-none text-white">{{ c.phone }}</a>
+                                </div>
+                                
+                                <div class="small mb-1">
+                                    <i class="bi bi-envelope-fill text-info me-2"></i>
+                                    <a href="/cdn-cgi/l/email-protection#fc8787dc9fd299919d9590dc8181" class="text-decoration-none text-white">{{ c.email }}</a>
+                                </div>
+                                
+                                <div class="small mb-2">
+                                    <i class="bi bi-geo-alt-fill text-info me-2"></i>
+                                    <span class="text-muted">{{ c.address }}</span>
+                                </div>
+                                
+                                {% if c.link %}
+                                <div class="mb-2">
+                                    <a href="{{ c.link }}" target="_blank" class="btn btn-sm btn-outline-info w-100">
+                                        <i class="bi bi-link-45deg me-1"></i>Abrir Enlace
+                                    </a>
+                                </div>
+                                {% endif %}
+                                
+                                {% if c.notes %}
+                                <div class="small text-muted fst-italic border-top border-secondary pt-2 mt-2">
+                                    <i class="bi bi-sticky-fill me-1"></i>{{ c.notes|truncate(60) }}
+                                </div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="card-footer bg-black border-secondary">
+                                <div class="d-flex gap-2">
+                                    <button class="btn btn-sm btn-outline-warning flex-fill"
+                                        onclick="openEditClientModalFull({{ c.id }}, '{{ c.name }}', '{{ c.phone }}', '{{ c.email }}', '{{ c.address }}', '{{ c.link or '' }}', '{{ c.notes or '' }}', {{ c.has_support|lower }}, {{ c.support_monday_friday|lower }}, {{ c.support_saturday|lower }}, {{ c.support_sunday|lower }})">
+                                        <i class="bi bi-pencil-fill"></i> Editar
                                     </button>
-                                    <form method="POST" action="/manage_clients" class="d-inline">
+                                    <form method="POST" action="/manage_clients" class="flex-fill">
                                         <input type="hidden" name="action" value="delete">
                                         <input type="hidden" name="client_id" value="{{ c.id }}">
-                                        <button class="btn btn-sm btn-outline-danger"
-                                            onclick="return confirm('¿Eliminar este cliente?')">
-                                            <i class="bi bi-trash-fill"></i>
+                                        <button class="btn btn-sm btn-outline-danger w-100"
+                                            onclick="return confirm('¿Eliminar cliente {{ c.name }}?')">
+                                            <i class="bi bi-trash-fill"></i> Eliminar
                                         </button>
                                     </form>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    
+                    {% if clients|length == 0 %}
+                    <div class="col-12">
+                        <div class="alert alert-info text-center">
+                            <i class="bi bi-info-circle me-2"></i>No hay clientes registrados aún. 
+                            Haz clic en "Nuevo Cliente" para añadir uno.
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
 
             <div class="tab-pane fade" id="config">
                 <h4 class="fw-bold text-white fs-5 mb-3">Configuración del Sistema</h4>
 
+                <!-- GESTIÓN DE CATEGORÍAS DE STOCK -->
+                <div class="card bg-dark text-white p-3 mb-3 border border-secondary">
+                    <h6 class="fw-bold mb-3">
+                        <i class="bi bi-diagram-3-fill me-2 text-info"></i>
+                        Categorías y Subcategorías de Stock
+                    </h6>
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            <button class="btn btn-sm btn-info me-2" data-bs-toggle="modal" data-bs-target="#modalAddCategory">
+                                <i class="bi bi-plus-circle-fill me-1"></i> Nueva Categoría Principal
+                            </button>
+                            <button class="btn btn-sm btn-outline-info" onclick="loadCategoriesTree()">
+                                <i class="bi bi-arrow-clockwise me-1"></i> Recargar
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="categoriesTree" class="border border-secondary rounded p-3 bg-black" style="min-height: 200px;">
+                        <div class="text-center text-muted py-3">
+                            <i class="bi bi-hourglass-split"></i> Cargando categorías...
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TIPOS DE SERVICIO -->
                 <div class="card bg-dark text-white p-3 mb-3 border border-secondary">
                     <h6 class="fw-bold mb-3"><i class="bi bi-wrench-adjustable-circle-fill me-2 text-warning"></i>
                         Tipos de Servicio</h6>
@@ -687,45 +709,56 @@
         <div class="modal-dialog">
             <div class="modal-content bg-dark text-white">
                 <div class="modal-header border-secondary">
-                    <h5 class="modal-title">Nuevo Artículo de Stock</h5>
+                    <h5 class="modal-title"><i class="bi bi-box-seam-fill me-2"></i>Nuevo Artículo de Stock</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <form method="POST" action="/manage_stock">
                     <div class="modal-body">
                         <input type="hidden" name="action" value="add">
-                        <label class="form-label">Nombre del Artículo</label>
-                        <input type="text" name="name" class="form-control mb-2" required>
                         
-                        <label class="form-label">Categoría</label>
-                        <select name="category" class="form-select mb-2" required>
-                            <option value="">Seleccionar categoría</option>
-                            <option value="Consumibles">Consumibles</option>
-                            <option value="Copiadoras">Copiadoras</option>
-                            <option value="Cajones">Cajones</option>
-                            <option value="TPV">TPV</option>
-                            <option value="Recicladores">Recicladores</option>
-                            <option value="Accesorios">Accesorios</option>
-                        </select>
+                        <div class="mb-3">
+                            <label class="form-label">Nombre del Producto *</label>
+                            <input type="text" name="name" class="form-control" required 
+                                   placeholder="Ej: Cajón Cashlogy 1500">
+                        </div>
                         
-                        <label class="form-label">Subcategoría (opcional)</label>
-                        <select name="subcategory" class="form-select mb-2">
-                            <option value="">Sin subcategoría</option>
-                            <option value="Cashlogy">Cashlogy</option>
-                            <option value="Cashkeeper">Cashkeeper</option>
-                            <option value="ATCA">ATCA</option>
-                        </select>
+                        <div class="mb-3">
+                            <label class="form-label">Categoría * <small class="text-muted">(Obligatorio)</small></label>
+                            <select name="category_id" id="addStockCategory" class="form-select" required onchange="loadSubcategories(this.value, 'addStockSubcategory')">
+                                <option value="">-- Seleccionar Categoría --</option>
+                            </select>
+                        </div>
                         
-                        <label class="form-label">Proveedor</label>
-                        <input type="text" name="supplier" class="form-control mb-2" placeholder="Nombre del proveedor">
+                        <div class="mb-3" id="subcategorySection" style="display: none;">
+                            <label class="form-label">Subcategoría <small class="text-muted">(Opcional)</small></label>
+                            <select name="subcategory_id" id="addStockSubcategory" class="form-select">
+                                <option value="">-- Sin subcategoría --</option>
+                            </select>
+                        </div>
                         
-                        <label class="form-label">Cantidad Inicial</label>
-                        <input type="number" name="quantity" class="form-control mb-2" value="0" required>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Stock Actual *</label>
+                                <input type="number" name="quantity" class="form-control" value="0" required min="0">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Stock Mínimo *</label>
+                                <input type="number" name="min_stock" class="form-control" value="5" required min="1">
+                                <small class="text-muted">Se activará alerta cuando esté por debajo</small>
+                            </div>
+                        </div>
                         
-                        <label class="form-label">Stock Mínimo (para alarmas)</label>
-                        <input type="number" name="min_stock" class="form-control" value="5" required>
+                        <div class="mb-3">
+                            <label class="form-label">Descripción</label>
+                            <textarea name="description" class="form-control" rows="2" 
+                                      placeholder="Detalles adicionales del producto"></textarea>
+                        </div>
                     </div>
                     <div class="modal-footer border-secondary">
-                        <button type="submit" class="btn btn-warning">Añadir</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-warning">
+                            <i class="bi bi-plus-circle-fill me-1"></i>Añadir Producto
+                        </button>
                     </div>
                 </form>
             </div>
@@ -768,36 +801,12 @@
                     <div class="modal-body">
                         <input type="hidden" name="action" value="edit">
                         <input type="hidden" name="item_id" id="editFullId">
-                        
                         <label class="form-label">Nombre</label>
                         <input type="text" name="name" id="editFullName" class="form-control mb-2" required>
-                        
                         <label class="form-label">Categoría</label>
-                        <select name="category" id="editFullCat" class="form-select mb-2" required>
-                            <option value="Consumibles">Consumibles</option>
-                            <option value="Copiadoras">Copiadoras</option>
-                            <option value="Cajones">Cajones</option>
-                            <option value="TPV">TPV</option>
-                            <option value="Recicladores">Recicladores</option>
-                            <option value="Accesorios">Accesorios</option>
-                        </select>
-                        
-                        <label class="form-label">Subcategoría</label>
-                        <select name="subcategory" id="editFullSubcat" class="form-select mb-2">
-                            <option value="">Sin subcategoría</option>
-                            <option value="Cashlogy">Cashlogy</option>
-                            <option value="Cashkeeper">Cashkeeper</option>
-                            <option value="ATCA">ATCA</option>
-                        </select>
-                        
-                        <label class="form-label">Proveedor</label>
-                        <input type="text" name="supplier" id="editFullSupplier" class="form-control mb-2" placeholder="Nombre del proveedor">
-                        
-                        <label class="form-label">Cantidad Actual</label>
-                        <input type="number" name="quantity" id="editFullQty" class="form-control mb-2" required>
-                        
-                        <label class="form-label">Stock Mínimo</label>
-                        <input type="number" name="min_stock" id="editFullMinStock" class="form-control" value="5" required>
+                        <input type="text" name="category" id="editFullCat" class="form-control mb-2" required>
+                        <label class="form-label">Cantidad</label>
+                        <input type="number" name="quantity" id="editFullQty" class="form-control" required>
                     </div>
                     <div class="modal-footer border-secondary">
                         <button type="submit" class="btn btn-warning">Guardar Cambios</button>
@@ -809,20 +818,81 @@
 
     <!-- Modal: Añadir Cliente -->
     <div class="modal fade" id="modalAddClient" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-lg">
             <div class="modal-content bg-dark text-white">
                 <div class="modal-header border-secondary">
-                    <h5 class="modal-title">Nuevo Cliente</h5>
+                    <h5 class="modal-title"><i class="bi bi-person-plus-fill me-2"></i>Nuevo Cliente</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <form method="POST" action="/manage_clients">
                     <div class="modal-body">
                         <input type="hidden" name="action" value="add">
-                        <label class="form-label">Nombre del Cliente</label>
-                        <input type="text" name="name" class="form-control" required>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Nombre del Cliente *</label>
+                                <input type="text" name="name" class="form-control" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Teléfono *</label>
+                                <input type="tel" name="phone" class="form-control" required 
+                                       placeholder="Ej: 912345678">
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Correo Electrónico *</label>
+                                <input type="email" name="email" class="form-control" required 
+                                       placeholder="ejemplo@email.com">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Enlace/URL (Opcional)</label>
+                                <input type="url" name="link" class="form-control" 
+                                       placeholder="https://ejemplo.com">
+                                <small class="text-muted">
+                                    <i class="bi bi-info-circle me-1"></i>Portal web, sistema interno, etc.
+                                </small>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Dirección Completa *</label>
+                            <input type="text" name="address" id="clientAddress" class="form-control" required 
+                                   placeholder="Calle, número, ciudad">
+                            <a href="#" id="openGoogleMaps" class="small text-info mt-1 d-block" target="_blank" style="display:none;">
+                                <i class="bi bi-geo-alt-fill me-1"></i>Abrir en Google Maps
+                            </a>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Notas Internas</label>
+                            <textarea name="notes" class="form-control" rows="2" 
+                                      placeholder="Comentarios internos sobre el cliente"></textarea>
+                        </div>
+                        
+                        <hr class="border-secondary">
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">¿Tiene Soporte Técnico Contratado?</label>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="hasSupportSwitch" 
+                                       name="has_support" value="true">
+                                <label class="form-check-label" for="hasSupportSwitch">
+                                    Sí, tiene soporte técnico
+                                </label>
+                            </div>
+                            <small class="text-muted">
+                                <i class="bi bi-info-circle me-1"></i>
+                                Marca esta opción si el cliente tiene contratado soporte técnico con OSLAPRINT
+                            </small>
+                        </div>
                     </div>
                     <div class="modal-footer border-secondary">
-                        <button type="submit" class="btn btn-warning">Añadir</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-warning">
+                            <i class="bi bi-save-fill me-1"></i>Guardar Cliente
+                        </button>
                     </div>
                 </form>
             </div>
@@ -831,21 +901,72 @@
 
     <!-- Modal: Editar Cliente -->
     <div class="modal fade" id="modalEditClient" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-lg">
             <div class="modal-content bg-dark text-white">
                 <div class="modal-header border-secondary">
-                    <h5 class="modal-title">Editar Cliente</h5>
+                    <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>Editar Cliente</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <form method="POST" action="/manage_clients">
                     <div class="modal-body">
                         <input type="hidden" name="action" value="edit">
                         <input type="hidden" name="client_id" id="editClientId">
-                        <label class="form-label">Nombre del Cliente</label>
-                        <input type="text" name="name" id="editClientName" class="form-control" required>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Nombre del Cliente *</label>
+                                <input type="text" name="name" id="editClientName" class="form-control" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Teléfono *</label>
+                                <input type="tel" name="phone" id="editClientPhone" class="form-control" required>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Correo Electrónico *</label>
+                                <input type="email" name="email" id="editClientEmail" class="form-control" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Enlace/URL (Opcional)</label>
+                                <input type="url" name="link" id="editClientLink" class="form-control" 
+                                       placeholder="https://ejemplo.com">
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Dirección Completa *</label>
+                            <input type="text" name="address" id="editClientAddress" class="form-control" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Notas Internas</label>
+                            <textarea name="notes" id="editClientNotes" class="form-control" rows="2"></textarea>
+                        </div>
+                        
+                        <hr class="border-secondary">
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">¿Tiene Soporte Técnico Contratado?</label>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="editHasSupport" 
+                                       name="has_support" value="true">
+                                <label class="form-check-label" for="editHasSupport">
+                                    Sí, tiene soporte técnico
+                                </label>
+                            </div>
+                            <small class="text-muted">
+                                <i class="bi bi-info-circle me-1"></i>
+                                Marca esta opción si el cliente tiene contratado soporte técnico con OSLAPRINT
+                            </small>
+                        </div>
                     </div>
                     <div class="modal-footer border-secondary">
-                        <button type="submit" class="btn btn-warning">Guardar Cambios</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-warning">
+                            <i class="bi bi-save-fill me-1"></i>Guardar Cambios
+                        </button>
                     </div>
                 </form>
             </div>
@@ -1059,37 +1180,6 @@
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <!-- INFORMACIÓN DEL CLIENTE -->
-                    <div class="card bg-black border-secondary p-3 mb-3" id="clientInfoCard" style="display: none;">
-                        <h6 class="text-warning fw-bold mb-3">
-                            <i class="bi bi-person-circle me-2"></i>Información del Cliente
-                        </h6>
-                        <div class="row">
-                            <div class="col-md-6">
-                                <p class="mb-2 small">
-                                    <strong>Teléfono:</strong> <span id="detailClientPhone">-</span>
-                                </p>
-                                <p class="mb-2 small">
-                                    <strong>Email:</strong> <span id="detailClientEmail">-</span>
-                                </p>
-                            </div>
-                            <div class="col-md-6">
-                                <p class="mb-2 small">
-                                    <strong>Dirección:</strong> <span id="detailClientAddress">-</span>
-                                </p>
-                                <p class="mb-2 small">
-                                    <strong>Soporte:</strong> 
-                                    <span id="detailClientSupport" class="badge">N/A</span>
-                                </p>
-                            </div>
-                        </div>
-                        <div class="mt-2" id="detailClientNotes" style="display: none;">
-                            <p class="mb-1 small"><strong>Notas del cliente:</strong></p>
-                            <div class="p-2 bg-dark rounded small" id="detailClientNotesText"></div>
-                        </div>
-                    </div>
-                    
-                    <!-- INFORMACIÓN DEL SERVICIO -->
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <p class="mb-2"><strong class="text-warning">Cliente:</strong><br>
@@ -1102,21 +1192,17 @@
                     </div>
                     
                     <div class="row mb-3">
-                        <div class="col-md-3">
+                        <div class="col-md-4">
                             <p class="mb-2"><strong class="text-warning">Fecha:</strong><br>
                             <span id="detailDate"></span></p>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-4">
                             <p class="mb-2"><strong class="text-warning">Hora Entrada:</strong><br>
                             <span id="detailStartTime"></span></p>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-4">
                             <p class="mb-2"><strong class="text-warning">Hora Salida:</strong><br>
                             <span id="detailEndTime"></span></p>
-                        </div>
-                        <div class="col-md-3" id="detailDurationSection" style="display: none;">
-                            <p class="mb-2"><strong class="text-warning">Duración:</strong><br>
-                            <span id="detailDuration"></span></p>
                         </div>
                     </div>
                     
@@ -1164,7 +1250,84 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Modal: Añadir Categoría de Stock -->
+    <div class="modal fade" id="modalAddCategory" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">Nueva Categoría/Subcategoría</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="/manage_stock_categories" onsubmit="return validateCategoryForm()">
+                    <div class="modal-body">
+                        <input type="hidden" name="action" value="add">
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Nombre *</label>
+                            <input type="text" name="name" id="categoryName" class="form-control" required 
+                                   placeholder="Ej: TPV, Consumibles, etc.">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Tipo de Categoría</label>
+                            <select id="categoryType" class="form-select" onchange="toggleParentSelect()">
+                                <option value="main">Categoría Principal</option>
+                                <option value="sub">Subcategoría</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3" id="parentCategoryDiv" style="display: none;">
+                            <label class="form-label">Categoría Padre *</label>
+                            <select name="parent_id" id="parentCategorySelect" class="form-select">
+                                <option value="">-- Seleccionar --</option>
+                            </select>
+                        </div>
+                        
+                        <div class="alert alert-info small">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Las subcategorías se crean dentro de categorías principales existentes.
+                        </div>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-info">
+                            <i class="bi bi-plus-circle-fill me-1"></i>Crear
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Modal: Estadísticas del Técnico -->
+<div class="modal fade" id="modalTechStats" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content bg-dark text-white">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title">
+                    <i class="bi bi-graph-up me-2 text-info"></i>
+                    Estadísticas del Técnico
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="techStatsContent">
+                    <div class="text-center text-muted py-3">
+                        <i class="bi bi-hourglass-split"></i> Selecciona un técnico...
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
     <script>
         var calendar = null;
         var calendarGlobalInstance = null;
@@ -1315,18 +1478,49 @@
         // --- GESTIÓN DE ACCIONES ---
         function performAdminTaskAction(action) {
             const id = document.getElementById('evtId').value;
-            if (!confirm('¿Confirmar acción administrativa?')) return;
+            
+            const actionNames = {
+                'complete': 'completar',
+                'delete': 'eliminar',
+                'cancel': 'cancelar'
+            };
+            
+            const actionName = actionNames[action] || action;
+            
+            if (!confirm(`¿Confirmar ${actionName} esta tarea?`)) return;
 
             fetch(`/api/task_action/${id}/${action}`, { method: 'POST' })
-                .then(res => res.json())
+                .then(res => {
+                    if (!res.ok) {
+                        throw new Error(`HTTP error! status: ${res.status}`);
+                    }
+                    return res.json();
+                })
                 .then(data => {
                     if (data.success) {
+                        // Mostrar mensaje de éxito
+                        const successMsg = action === 'delete' ? 'Tarea eliminada correctamente' : 
+                                         action === 'complete' ? 'Tarea marcada como completada' : 
+                                         'Acción completada correctamente';
+                        
+                        // Refrescar calendarios PRIMERO
                         if (calendar) calendar.refetchEvents();
                         if (calendarGlobalInstance) calendarGlobalInstance.refetchEvents();
+                        
+                        // Cerrar modal
                         modalActionAdmin.hide();
+                        
+                        // Mostrar confirmación después de cerrar modal
+                        setTimeout(() => {
+                            alert('✓ ' + successMsg);
+                        }, 100);
                     } else {
-                        alert('Error: ' + data.msg);
+                        alert('❌ Error: ' + (data.msg || 'No se pudo completar la acción'));
                     }
+                })
+                .catch(err => {
+                    console.error('Error en performAdminTaskAction:', err);
+                    alert('❌ Error de conexión. Por favor, intenta de nuevo.');
                 });
         }
 
@@ -1344,21 +1538,28 @@
             document.getElementById('editFullQty').value = qty;
             new bootstrap.Modal(document.getElementById('modalEditStock')).show();
         }
-        
-        function openEditStockModalComplete(id, name, category, subcategory, supplier, qty, minStock) {
-            document.getElementById('editFullId').value = id;
-            document.getElementById('editFullName').value = name;
-            document.getElementById('editFullCat').value = category;
-            document.getElementById('editFullSubcat').value = subcategory;
-            document.getElementById('editFullSupplier').value = supplier;
-            document.getElementById('editFullQty').value = qty;
-            document.getElementById('editFullMinStock').value = minStock;
-            new bootstrap.Modal(document.getElementById('modalEditStock')).show();
-        }
 
         function openEditClientModal(id, name) {
             document.getElementById('editClientId').value = id;
             document.getElementById('editClientName').value = name;
+            new bootstrap.Modal(document.getElementById('modalEditClient')).show();
+        }
+        
+        // Nueva función completa para editar clientes con todos los campos
+        function openEditClientModalFull(id, name, phone, email, address, link, notes, hasSupport, supportMF, supportSat, supportSun) {
+            document.getElementById('editClientId').value = id;
+            document.getElementById('editClientName').value = name;
+            document.getElementById('editClientPhone').value = phone;
+            document.getElementById('editClientEmail').value = email;
+            document.getElementById('editClientAddress').value = address;
+            document.getElementById('editClientLink').value = link || '';
+            document.getElementById('editClientNotes').value = notes || '';
+            document.getElementById('editHasSupport').checked = hasSupport;
+            document.getElementById('editSupportMF').checked = supportMF;
+            document.getElementById('editSupportSat').checked = supportSat;
+            document.getElementById('editSupportSun').checked = supportSun;
+            
+            toggleEditSupportOptions();
             new bootstrap.Modal(document.getElementById('modalEditClient')).show();
         }
 
@@ -1411,23 +1612,24 @@
             });
         }
 
-        function filterClientsTable() {
-            var input, filter, table, tr, td, i, txtValue;
-            input = document.getElementById("clientSearchInput");
-            filter = input.value.toUpperCase();
-            table = document.getElementById("clientsTable");
-            tr = table.getElementsByTagName("tr");
-            for (i = 0; i < tr.length; i++) {
-                td = tr[i].getElementsByClassName("client-name-cell")[0];
-                if (td) {
-                    txtValue = td.textContent || td.innerText;
-                    if (txtValue.toUpperCase().indexOf(filter) > -1) {
-                        tr[i].style.display = "";
-                    } else {
-                        tr[i].style.display = "none";
-                    }
+        function filterClientsView() {
+            const input = document.getElementById("clientSearchInput");
+            const filter = input.value.toLowerCase();
+            const cards = document.querySelectorAll('.client-card-wrapper');
+            
+            cards.forEach(card => {
+                const name = card.dataset.clientName || '';
+                const phone = card.dataset.clientPhone || '';
+                const email = card.dataset.clientEmail || '';
+                
+                const textContent = (name + ' ' + phone + ' ' + email).toLowerCase();
+                
+                if (textContent.indexOf(filter) > -1) {
+                    card.style.display = '';
+                } else {
+                    card.style.display = 'none';
                 }
-            }
+            });
         }
 
         function openEditAdminModal() {
@@ -1491,54 +1693,6 @@
                         document.getElementById('detailService').textContent = task.service_type;
                         document.getElementById('detailStatus').textContent = task.status;
                         document.getElementById('detailDescription').textContent = task.description || 'Sin descripción';
-                        
-                        // Información del cliente
-                        if (task.client_info) {
-                            const clientCard = document.getElementById('clientInfoCard');
-                            clientCard.style.display = 'block';
-                            
-                            document.getElementById('detailClientPhone').textContent = task.client_info.phone || 'No disponible';
-                            document.getElementById('detailClientEmail').textContent = task.client_info.email || 'No disponible';
-                            document.getElementById('detailClientAddress').textContent = task.client_info.address || 'No disponible';
-                            
-                            const supportBadge = document.getElementById('detailClientSupport');
-                            if (task.client_info.has_support) {
-                                supportBadge.className = 'badge bg-success';
-                                supportBadge.textContent = '✓ Activo';
-                                
-                                // Mostrar días de soporte
-                                let supportDays = [];
-                                if (task.client_info.support_monday_friday) supportDays.push('L-V');
-                                if (task.client_info.support_saturday) supportDays.push('Sáb');
-                                if (task.client_info.support_sunday) supportDays.push('Dom');
-                                if (supportDays.length > 0) {
-                                    supportBadge.textContent += ` (${supportDays.join(', ')})`;
-                                }
-                            } else {
-                                supportBadge.className = 'badge bg-danger';
-                                supportBadge.textContent = '✗ Sin soporte';
-                            }
-                            
-                            // Notas del cliente
-                            if (task.client_info.notes && task.client_info.notes.trim()) {
-                                document.getElementById('detailClientNotes').style.display = 'block';
-                                document.getElementById('detailClientNotesText').textContent = task.client_info.notes;
-                            } else {
-                                document.getElementById('detailClientNotes').style.display = 'none';
-                            }
-                        } else {
-                            document.getElementById('clientInfoCard').style.display = 'none';
-                        }
-                        
-                        // Duración del trabajo
-                        if (task.work_duration_seconds && task.work_duration_seconds > 0) {
-                            const hours = Math.floor(task.work_duration_seconds / 3600);
-                            const minutes = Math.floor((task.work_duration_seconds % 3600) / 60);
-                            document.getElementById('detailDurationSection').style.display = 'block';
-                            document.getElementById('detailDuration').textContent = `${hours}h ${minutes}m`;
-                        } else {
-                            document.getElementById('detailDurationSection').style.display = 'none';
-                        }
                         
                         // Material/Stock
                         if (task.stock_info) {
@@ -1863,6 +2017,664 @@
                 }
             });
         }
+    
+        // ==================== GESTIÓN DE CATEGORÍAS DE STOCK ====================
+        
+        function toggleParentSelect() {
+            const type = document.getElementById('categoryType').value;
+            const parentDiv = document.getElementById('parentCategoryDiv');
+            const parentSelect = document.getElementById('parentCategorySelect');
+            
+            if (type === 'sub') {
+                parentDiv.style.display = 'block';
+                parentSelect.required = true;
+                loadMainCategoriesForParent();
+            } else {
+                parentDiv.style.display = 'none';
+                parentSelect.required = false;
+                parentSelect.value = '';
+            }
+        }
+        
+        function validateCategoryForm() {
+            const type = document.getElementById('categoryType').value;
+            const parentId = document.getElementById('parentCategorySelect').value;
+            
+            if (type === 'sub' && !parentId) {
+                alert('Por favor, selecciona una categoría padre para la subcategoría');
+                return false;
+            }
+            return true;
+        }
+        
+        function loadMainCategoriesForParent() {
+            fetch('/api/stock_categories')
+                .then(res => res.json())
+                .then(data => {
+                    const select = document.getElementById('parentCategorySelect');
+                    select.innerHTML = '<option value="">-- Seleccionar --</option>';
+                    
+                    data.forEach(cat => {
+                        const option = document.createElement('option');
+                        option.value = cat.id;
+                        option.textContent = cat.name;
+                        select.appendChild(option);
+                    });
+                })
+                .catch(err => console.error('Error cargando categorías:', err));
+        }
+        
+        function loadCategoriesTree() {
+            fetch('/api/stock_categories')
+                .then(res => res.json())
+                .then(data => {
+                    updateCategoriesTreeView(data);
+                    updateCategorySelectors(data);
+                })
+                .catch(err => {
+                    console.error('Error:', err);
+                    document.getElementById('categoriesTree').innerHTML = 
+                        '<div class="text-center text-danger py-3"><i class="bi bi-exclamation-triangle me-2"></i>Error cargando categorías</div>';
+                });
+        }
+        
+        function updateCategoriesTreeView(categories) {
+            const container = document.getElementById('categoriesTree');
+            if (!container) return;
+            
+            if (categories.length === 0) {
+                container.innerHTML = '<div class="text-center text-muted py-3"><i class="bi bi-inbox me-2"></i>No hay categorías creadas</div>';
+                return;
+            }
+            
+            let html = '<div class="list-group">';
+            categories.forEach(cat => {
+                html += buildCategoryTreeHTML(cat, 0);
+            });
+            html += '</div>';
+            
+            container.innerHTML = html;
+        }
+        
+        function buildCategoryTreeHTML(cat, level) {
+            const indent = level * 20;
+            const hasChildren = cat.children && cat.children.length > 0;
+            const icon = hasChildren ? 'folder-fill' : 'folder2';
+            const itemCount = cat.items ? cat.items.length : 0;
+            
+            let html = `
+                <div class="list-group-item bg-dark border-secondary mb-2" style="margin-left: ${indent}px;">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <i class="bi bi-${icon} text-warning me-2"></i>
+                            <strong class="text-white">${cat.name}</strong>
+                            <span class="badge bg-info ms-2">${itemCount} productos</span>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-outline-success me-1" onclick="addSubcategoryTo(${cat.id}, '${cat.name}')" title="Añadir subcategoría">
+                                <i class="bi bi-plus-circle"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteCategory(${cat.id}, '${cat.name}', ${itemCount})" title="Eliminar">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            if (hasChildren) {
+                cat.children.forEach(child => {
+                    html += buildCategoryTreeHTML(child, level + 1);
+                });
+            }
+            
+            return html;
+        }
+        
+        function addSubcategoryTo(parentId, parentName) {
+            document.getElementById('categoryType').value = 'sub';
+            document.getElementById('parentCategorySelect').value = parentId;
+            toggleParentSelect();
+            
+            const modal = new bootstrap.Modal(document.getElementById('modalAddCategory'));
+            modal.show();
+            
+            document.getElementById('categoryName').placeholder = `Nueva subcategoría de ${parentName}`;
+        }
+        
+        function deleteCategory(id, name, itemCount) {
+            if (itemCount > 0) {
+                if (!confirm(`La categoría "${name}" tiene ${itemCount} productos. ¿Estás seguro de eliminarla? Los productos NO se eliminarán.`)) {
+                    return;
+                }
+            } else {
+                if (!confirm(`¿Eliminar la categoría "${name}"?`)) {
+                    return;
+                }
+            }
+            
+            const formData = new FormData();
+            formData.append('action', 'delete');
+            formData.append('category_id', id);
+            
+            fetch('/manage_stock_categories', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    loadCategoriesTree();
+                    alert('Categoría eliminada correctamente');
+                } else {
+                    alert('Error al eliminar: ' + (data.msg || 'Error desconocido'));
+                }
+            })
+            .catch(err => {
+                console.error('Error:', err);
+                alert('Error al eliminar categoría');
+            });
+        }
+        
+        function updateCategorySelectors(categories) {
+            // Actualizar selector en modal de añadir stock
+            const addStockSelect = document.getElementById('addStockCategory');
+            if (addStockSelect) {
+                addStockSelect.innerHTML = '<option value="">-- Seleccionar Categoría --</option>';
+                addCategoryOptionsToSelect(addStockSelect, categories);
+            }
+        }
+        
+        function addCategoryOptionsToSelect(select, categories, prefix = '') {
+            categories.forEach(cat => {
+                const option = document.createElement('option');
+                option.value = cat.id;
+                option.textContent = prefix + cat.name;
+                option.dataset.hasChildren = cat.children && cat.children.length > 0;
+                select.appendChild(option);
+                
+                // No añadir subcategorías aquí, se cargarán dinámicamente
+            });
+        }
+        
+        function loadSubcategories(categoryId, targetSelectId) {
+            const subcategorySection = document.getElementById('subcategorySection');
+            const subcategorySelect = document.getElementById(targetSelectId);
+            
+            if (!categoryId) {
+                subcategorySection.style.display = 'none';
+                return;
+            }
+            
+            fetch('/api/stock_categories')
+                .then(res => res.json())
+                .then(data => {
+                    const category = findCategoryById(data, parseInt(categoryId));
+                    
+                    if (category && category.children && category.children.length > 0) {
+                        subcategorySection.style.display = 'block';
+                        subcategorySelect.innerHTML = '<option value="">-- Sin subcategoría --</option>';
+                        
+                        category.children.forEach(sub => {
+                            const option = document.createElement('option');
+                            option.value = sub.id;
+                            option.textContent = sub.name;
+                            subcategorySelect.appendChild(option);
+                        });
+                    } else {
+                        subcategorySection.style.display = 'none';
+                        subcategorySelect.innerHTML = '<option value="">-- Sin subcategoría --</option>';
+                    }
+                })
+                .catch(err => console.error('Error cargando subcategorías:', err));
+        }
+        
+        function findCategoryById(categories, id) {
+            for (let cat of categories) {
+                if (cat.id === id) return cat;
+                if (cat.children) {
+                    const found = findCategoryById(cat.children, id);
+                    if (found) return found;
+                }
+            }
+            return null;
+        }
+        
+        // ==================== FUNCIONES DE SOPORTE TÉCNICO ====================
+        
+        // ==================== GOOGLE MAPS ====================
+        
+        document.getElementById('clientAddress')?.addEventListener('input', function() {
+            const address = this.value.trim();
+            const link = document.getElementById('openGoogleMaps');
+            
+            if (address) {
+                const encoded = encodeURIComponent(address);
+                link.href = `https://www.google.com/maps/search/?api=1&query=${encoded}`;
+                link.style.display = 'block';
+            } else {
+                link.style.display = 'none';
+            }
+        });
+        
+        // ==================== ESTADÍSTICAS GLOBALES ====================
+        
+        let taskTypesPieChart = null;
+        let monthlyTasksChart = null;
+        
+        function loadAdminStatistics() {
+            const techId = document.getElementById('statsFilterTech').value;
+            const period = document.getElementById('statsFilterPeriod').value;
+            
+            let url = '/api/admin_analytics?';
+            if (techId) url += `tech_id=${techId}&`;
+            if (period) url += `period=${period}`;
+            
+            fetch(url)
+                .then(res => res.json())
+                .then(response => {
+                    if (response.success) {
+                        const data = response.data;
+                        
+                        // Actualizar KPIs
+                        document.getElementById('kpiTotalTasks').textContent = data.total_tasks;
+                        document.getElementById('kpiCompletedTasks').textContent = data.completed_tasks;
+                        document.getElementById('kpiPendingTasks').textContent = data.pending_tasks;
+                        document.getElementById('kpiActiveTechs').textContent = data.active_technicians;
+                        
+                        // Crear gráfico circular de tipos de tareas
+                        createTaskTypesPieChart(data.task_types);
+                        
+                        // Crear gráfico de línea de tareas mensuales
+                        createMonthlyTasksChart(data.monthly_tasks);
+                    } else {
+                        alert('Error al cargar estadísticas: ' + response.msg);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error al conectar con el servidor');
+                });
+        }
+        
+        function createTaskTypesPieChart(taskTypes) {
+            const canvas = document.getElementById('taskTypesPieChart');
+            const noDataDiv = document.getElementById('noPieData');
+            
+            // Si no hay datos
+            if (!taskTypes || Object.keys(taskTypes).length === 0) {
+                canvas.style.display = 'none';
+                noDataDiv.style.display = 'block';
+                return;
+            }
+            
+            canvas.style.display = 'block';
+            noDataDiv.style.display = 'none';
+            
+            // Preparar datos
+            const labels = [];
+            const counts = [];
+            const colors = [];
+            
+            for (const [name, info] of Object.entries(taskTypes)) {
+                labels.push(name);
+                counts.push(info.count);
+                colors.push(info.color);
+            }
+            
+            // Destruir gráfico anterior si existe
+            if (taskTypesPieChart) {
+                taskTypesPieChart.destroy();
+            }
+            
+            // Crear nuevo gráfico
+            const ctx = canvas.getContext('2d');
+            taskTypesPieChart = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: counts,
+                        backgroundColor: colors,
+                        borderColor: '#1e1e1e',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                color: '#fff',
+                                padding: 15,
+                                font: {
+                                    size: 12
+                                }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.parsed || 0;
+                                    const percentage = taskTypes[label].percentage || 0;
+                                    return `${label}: ${value} (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function createMonthlyTasksChart(monthlyData) {
+            const canvas = document.getElementById('monthlyTasksChart');
+            
+            if (!monthlyData || monthlyData.length === 0) {
+                return;
+            }
+            
+            const labels = monthlyData.map(m => m.month);
+            const counts = monthlyData.map(m => m.count);
+            
+            // Destruir gráfico anterior si existe
+            if (monthlyTasksChart) {
+                monthlyTasksChart.destroy();
+            }
+            
+            // Crear nuevo gráfico
+            const ctx = canvas.getContext('2d');
+            monthlyTasksChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Tareas Completadas',
+                        data: counts,
+                        borderColor: '#0d6efd',
+                        backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                color: '#fff',
+                                stepSize: 1
+                            },
+                            grid: {
+                                color: '#333'
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                color: '#fff'
+                            },
+                            grid: {
+                                color: '#333'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // ==================== INICIALIZACIÓN ====================
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            // Cargar categorías al inicio
+            loadCategoriesTree();
+            
+            // Recargar cuando se abre el modal de añadir stock
+            const modalAddStock = document.getElementById('modalAddStock');
+            if (modalAddStock) {
+                modalAddStock.addEventListener('show.bs.modal', function() {
+                    loadCategoriesTree();
+                });
+            }
+        });
+
+
+        // ==================== ANALÍTICAS POR TÉCNICO ====================
+        
+        function viewTechStats(techId) {
+            const modal = new bootstrap.Modal(document.getElementById('modalTechStats'));
+            modal.show();
+            
+            document.getElementById('techStatsContent').innerHTML = `
+                <div class="text-center text-muted py-5">
+                    <div class="spinner-border text-warning" role="status">
+                        <span class="visually-hidden">Cargando...</span>
+                    </div>
+                    <p class="mt-3">Cargando estadísticas...</p>
+                </div>
+            `;
+            
+            fetch(`/api/tech_stats/${techId}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        displayTechStats(data.data);
+                    } else {
+                        document.getElementById('techStatsContent').innerHTML = `
+                            <div class="alert alert-danger">
+                                <i class="bi bi-exclamation-triangle me-2"></i>
+                                Error al cargar las estadísticas
+                            </div>
+                        `;
+                    }
+                })
+                .catch(err => {
+                    console.error('Error:', err);
+                    document.getElementById('techStatsContent').innerHTML = `
+                        <div class="alert alert-danger">
+                            <i class="bi bi-exclamation-triangle me-2"></i>
+                            Error de conexión
+                        </div>
+                    `;
+                });
+        }
+        
+        function displayTechStats(data) {
+            const container = document.getElementById('techStatsContent');
+            
+            let html = `
+                <div class="mb-4">
+                    <h5 class="text-white fw-bold">
+                        <i class="bi bi-person-circle me-2 text-warning"></i>
+                        ${data.tech_name}
+                    </h5>
+                </div>
+                
+                <div class="row g-3 mb-4">
+                    <div class="col-6">
+                        <div class="card bg-dark border-secondary p-3 text-center">
+                            <h3 class="text-success fw-bold mb-0">${data.total_completed}</h3>
+                            <small class="text-muted">Servicios Completados</small>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="card bg-dark border-secondary p-3 text-center">
+                            <h3 class="text-info fw-bold mb-0">${data.total_hours}h</h3>
+                            <small class="text-muted">Horas Trabajadas</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card bg-dark border-secondary p-3">
+                    <h6 class="text-white fw-bold mb-3">
+                        <i class="bi bi-bar-chart me-2"></i>Desglose por Tipo de Servicio
+                    </h6>
+            `;
+            
+            for (const [serviceName, serviceData] of Object.entries(data.service_breakdown)) {
+                html += `
+                    <div class="mb-3 pb-3 border-bottom border-secondary">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <strong class="text-warning">${serviceName}</strong>
+                            <span class="badge bg-info">${serviceData.count} servicios</span>
+                        </div>
+                        <div class="small text-muted">
+                            ${serviceData.tasks.slice(0, 3).map(task => `
+                                <div class="d-flex justify-content-between py-1">
+                                    <span>${task.client}</span>
+                                    <span>${task.date}</span>
+                                </div>
+                            `).join('')}
+                            ${serviceData.tasks.length > 3 ? `<div class="text-center pt-2"><small>... y ${serviceData.tasks.length - 3} más</small></div>` : ''}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            html += `</div>`;
+            container.innerHTML = html;
+        }
+        
+        // ==================== VISTA JERÁRQUICA DE STOCK ====================
+        
+        function loadStockTree() {
+            const container = document.getElementById('stockCategoriesTree');
+            container.innerHTML = '<div class="text-center text-muted py-3"><i class="bi bi-hourglass-split"></i> Cargando...</div>';
+            
+            fetch('/api/stock_categories')
+                .then(res => res.json())
+                .then(data => {
+                    updateStockTreeView(data);
+                })
+                .catch(err => {
+                    console.error('Error:', err);
+                    container.innerHTML = `
+                        <div class="text-center text-danger py-3">
+                            <i class="bi bi-exclamation-triangle me-2"></i>
+                            Error cargando inventario
+                        </div>
+                    `;
+                });
+        }
+        
+        function updateStockTreeView(categories) {
+            const container = document.getElementById('stockCategoriesTree');
+            
+            if (categories.length === 0) {
+                container.innerHTML = '<div class="text-center text-muted py-3"><i class="bi bi-inbox me-2"></i>No hay categorías creadas</div>';
+                return;
+            }
+            
+            let html = '<div class="list-group">';
+            categories.forEach(cat => {
+                html += buildStockCategoryTreeHTML(cat, 0);
+            });
+            html += '</div>';
+            
+            container.innerHTML = html;
+        }
+        
+        function buildStockCategoryTreeHTML(cat, level) {
+            const indent = level * 20;
+            const hasChildren = cat.children && cat.children.length > 0;
+            const icon = hasChildren ? 'folder-fill' : 'folder2';
+            const itemCount = cat.items ? cat.items.length : 0;
+            
+            let html = `
+                <div class="list-group-item bg-dark border-secondary mb-2" style="margin-left: ${indent}px;">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div>
+                            <i class="bi bi-${icon} text-warning me-2"></i>
+                            <strong class="text-white">${cat.name}</strong>
+                            <span class="badge bg-info ms-2">${itemCount} productos</span>
+                        </div>
+                    </div>
+            `;
+            
+            if (cat.items && cat.items.length > 0) {
+                html += '<div class="mt-2" style="margin-left: 30px;">';
+                cat.items.forEach(item => {
+                    const stockBadgeClass = item.quantity < 5 ? 'bg-danger' : 'bg-success';
+                    html += `
+                        <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-secondary">
+                            <div>
+                                <i class="bi bi-box text-info me-2"></i>
+                                <span class="text-white">${item.name}</span>
+                                <span class="badge ${stockBadgeClass} ms-2">${item.quantity}</span>
+                            </div>
+                            <div>
+                                <button class="btn btn-sm btn-outline-info me-1" 
+                                        onclick="ajustarStock(${item.id}, '${item.name.replace(/'/g, "\\'")}')">
+                                    <i class="bi bi-arrow-repeat"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-warning" 
+                                        onclick="deleteStockItem(${item.id}, '${item.name.replace(/'/g, "\\'")}')">
+                                    <i class="bi bi-trash-fill"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            }
+            
+            html += '</div>';
+            
+            if (hasChildren) {
+                cat.children.forEach(child => {
+                    html += buildStockCategoryTreeHTML(child, level + 1);
+                });
+            }
+            
+            return html;
+        }
+        
+        function deleteStockItem(itemId, itemName) {
+            if (!confirm(`¿Eliminar el producto "${itemName}"?`)) return;
+            
+            const formData = new FormData();
+            formData.append('action', 'delete');
+            formData.append('item_id', itemId);
+            
+            fetch('/manage_stock', {
+                method: 'POST',
+                body: formData
+            })
+            .then(() => {
+                loadStockTree();
+                alert('Producto eliminado correctamente');
+            })
+            .catch(err => {
+                console.error('Error:', err);
+                alert('Error al eliminar el producto');
+            });
+        }
+        
+        // Event listeners para cargar stock tree y categories tree al abrir las pestañas
+        document.addEventListener('DOMContentLoaded', function() {
+            const stockTabButton = document.querySelector('button[data-bs-target="#stock"]');
+            if (stockTabButton) {
+                stockTabButton.addEventListener('click', function() {
+                    setTimeout(() => loadStockTree(), 100);
+                });
+            }
+            
+            const configTabButton = document.querySelector('button[data-bs-target="#config"]');
+            if (configTabButton) {
+                configTabButton.addEventListener('click', function() {
+                    setTimeout(() => loadCategoriesTree(), 100);
+                });
+            }
+        });
     </script>
 </body>
 
