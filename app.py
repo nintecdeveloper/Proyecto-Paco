@@ -1645,6 +1645,137 @@ def schedule_appointment():
         flash('Error al agendar la cita', 'danger')
         return redirect(url_for('dashboard'))
 
+@app.route('/edit_stock_item/<int:item_id>', methods=['POST'])
+@login_required
+def edit_stock_item(item_id):
+    """Endpoint para editar un elemento de stock"""
+    try:
+        if current_user.role != 'admin':
+            return jsonify({'success': False, 'msg': 'No autorizado'}), 403
+        
+        item = Stock.query.get_or_404(item_id)
+        
+        name = request.form.get('name')
+        quantity = request.form.get('quantity')
+        min_stock = request.form.get('min_stock')
+        supplier = request.form.get('supplier', '')
+        description = request.form.get('description', '')
+        category_id = request.form.get('category_id')
+        
+        if name:
+            item.name = name
+        if quantity is not None:
+            item.quantity = int(quantity)
+        if min_stock is not None:
+            item.min_stock = int(min_stock)
+        if supplier is not None:
+            item.supplier = supplier
+        if description is not None:
+            item.description = description
+        if category_id:
+            item.category_id = int(category_id) if category_id != '' else None
+        
+        db.session.commit()
+        check_low_stock()
+        
+        flash('Elemento actualizado correctamente', 'success')
+        return redirect(url_for('dashboard'))
+        
+    except Exception as e:
+        print(f"Error editing stock item: {str(e)}")
+        db.session.rollback()
+        flash('Error al actualizar el elemento', 'danger')
+        return redirect(url_for('dashboard'))
+
+@app.route('/edit_stock_category/<int:category_id>', methods=['POST'])
+@login_required
+def edit_stock_category(category_id):
+    """Endpoint para editar una categoría de stock"""
+    try:
+        if current_user.role != 'admin':
+            return jsonify({'success': False, 'msg': 'No autorizado'}), 403
+        
+        category = StockCategory.query.get_or_404(category_id)
+        
+        name = request.form.get('name')
+        parent_id = request.form.get('parent_id')
+        
+        if name:
+            # Verificar que no exista otra categoría con el mismo nombre
+            existing = StockCategory.query.filter(
+                StockCategory.name == name,
+                StockCategory.id != category_id
+            ).first()
+            
+            if existing:
+                flash('Ya existe una categoría con ese nombre', 'danger')
+                return redirect(url_for('dashboard'))
+            
+            category.name = name
+        
+        if parent_id is not None:
+            if parent_id == '':
+                category.parent_id = None
+            else:
+                new_parent_id = int(parent_id)
+                # Evitar ciclos: no puede ser padre de sí misma
+                if new_parent_id == category_id:
+                    flash('Una categoría no puede ser padre de sí misma', 'danger')
+                    return redirect(url_for('dashboard'))
+                # Evitar que una subcategoría se convierta en padre de su padre
+                if category.parent_id == new_parent_id:
+                    pass  # Sin cambios
+                else:
+                    category.parent_id = new_parent_id
+        
+        db.session.commit()
+        flash('Categoría actualizada correctamente', 'success')
+        return redirect(url_for('dashboard'))
+        
+    except Exception as e:
+        print(f"Error editing category: {str(e)}")
+        db.session.rollback()
+        flash('Error al actualizar la categoría', 'danger')
+        return redirect(url_for('dashboard'))
+
+@app.route('/api/stock_item/<int:item_id>')
+@login_required
+def api_get_stock_item(item_id):
+    """API para obtener detalles de un elemento de stock"""
+    try:
+        item = Stock.query.get_or_404(item_id)
+        return jsonify({
+            'success': True,
+            'data': {
+                'id': item.id,
+                'name': item.name,
+                'quantity': item.quantity,
+                'min_stock': item.min_stock,
+                'supplier': item.supplier or '',
+                'description': item.description or '',
+                'category_id': item.category_id or ''
+            }
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'msg': str(e)}), 500
+
+@app.route('/api/stock_category/<int:category_id>')
+@login_required
+def api_get_stock_category(category_id):
+    """API para obtener detalles de una categoría de stock"""
+    try:
+        category = StockCategory.query.get_or_404(category_id)
+        return jsonify({
+            'success': True,
+            'data': {
+                'id': category.id,
+                'name': category.name,
+                'parent_id': category.parent_id or ''
+            }
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'msg': str(e)}), 500
+
 @app.route('/logout')
 def logout():
     logout_user()

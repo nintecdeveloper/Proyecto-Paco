@@ -949,6 +949,13 @@
                 }
             });
             calendar.render();
+            
+            // Agregar listener al checkbox de completadas
+            const toggleCheckbox = document.getElementById('toggleCompleted');
+            if (toggleCheckbox && !toggleCheckbox.hasAttribute('data-listener-added')) {
+                toggleCheckbox.addEventListener('change', renderTaskList);
+                toggleCheckbox.setAttribute('data-listener-added', 'true');
+            }
         }
 
         function handleEventClick(info) {
@@ -1000,7 +1007,7 @@
                 description: formData.get('description') || ''
             };
 
-            fetch('/create_task', {
+            fetch('/create_appointment', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

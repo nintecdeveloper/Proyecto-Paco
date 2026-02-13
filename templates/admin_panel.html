@@ -247,12 +247,17 @@
             </div>
 
             <div class="tab-pane fade" id="global-agenda">
-                <div class="d-flex justify-content-between mb-3 align-items-center flex-wrap">
+                <div class="d-flex justify-content-between mb-3 align-items-center flex-wrap gap-2">
                     <h4 class="fw-bold text-white fs-5 m-0">Agenda Global de Tareas</h4>
-                    <button class="btn btn-warning btn-sm fw-bold" data-bs-toggle="modal"
-                        data-bs-target="#modalScheduleAppointment">
-                        <i class="bi bi-calendar-plus-fill me-1"></i> Nueva Cita
-                    </button>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-outline-info btn-sm fw-bold" onclick="refreshGlobalCalendar()" title="Actualizar calendario">
+                            <i class="bi bi-arrow-clockwise me-1"></i> Actualizar
+                        </button>
+                        <button class="btn btn-warning btn-sm fw-bold" data-bs-toggle="modal"
+                            data-bs-target="#modalScheduleAppointment">
+                            <i class="bi bi-calendar-plus-fill me-1"></i> Nueva Cita
+                        </button>
+                    </div>
                 </div>
 
                 <!-- FILTROS DINÁMICOS POR TIPO -->
@@ -810,6 +815,107 @@
                     </div>
                     <div class="modal-footer border-secondary">
                         <button type="submit" class="btn btn-warning">Guardar Cambios</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal: Editar Artículo de Stock (COMPLETO) -->
+    <div class="modal fade" id="modalEditStockItem" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title"><i class="bi bi-box-seam me-2"></i>Editar Artículo de Stock</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="/edit_stock_item">
+                    <div class="modal-body">
+                        <input type="hidden" name="item_id" id="editStockItemId">
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Nombre del Artículo *</label>
+                                <input type="text" name="name" id="editStockItemName" class="form-control" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Categoría</label>
+                                <select name="category_id" id="editStockItemCategory" class="form-select">
+                                    <option value="">Sin categoría</option>
+                                    {% for cat in all_categories %}
+                                    <option value="{{ cat.id }}">{{ cat.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Cantidad Actual *</label>
+                                <input type="number" name="quantity" id="editStockItemQuantity" class="form-control" min="0" required>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Stock Mínimo *</label>
+                                <input type="number" name="min_stock" id="editStockItemMinStock" class="form-control" min="0" required>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Proveedor</label>
+                                <input type="text" name="supplier" id="editStockItemSupplier" class="form-control" placeholder="Opcional">
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Descripción / Notas</label>
+                            <textarea name="description" id="editStockItemDescription" class="form-control" rows="3" placeholder="Información adicional sobre el artículo..."></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-warning">
+                            <i class="bi bi-save me-1"></i>Guardar Cambios
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal: Editar Categoría de Stock -->
+    <div class="modal fade" id="modalEditCategory" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title"><i class="bi bi-folder-fill me-2"></i>Editar Categoría</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="/edit_stock_category">
+                    <div class="modal-body">
+                        <input type="hidden" name="category_id" id="editCategoryId">
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Nombre de la Categoría *</label>
+                            <input type="text" name="name" id="editCategoryName" class="form-control" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Categoría Padre (Opcional)</label>
+                            <select name="parent_id" id="editCategoryParent" class="form-select">
+                                <option value="">-- Sin padre (categoría principal) --</option>
+                                {% for cat in all_categories %}
+                                <option value="{{ cat.id }}">{{ cat.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <small class="text-muted">
+                                <i class="bi bi-info-circle me-1"></i>
+                                Si seleccionas una categoría padre, esta se convertirá en subcategoría
+                            </small>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-warning">
+                            <i class="bi bi-save me-1"></i>Guardar Cambios
+                        </button>
                     </div>
                 </form>
             </div>
@@ -1474,6 +1580,26 @@
             // Refrescamos los eventos para que se vuelva a ejecutar eventDidMount
             calendarGlobalInstance.refetchEvents();
         }
+        
+        function refreshGlobalCalendar() {
+            if (!calendarGlobalInstance) {
+                alert('El calendario global no está inicializado');
+                return;
+            }
+            
+            calendarGlobalInstance.refetchEvents();
+            
+            // Mostrar feedback visual
+            const btn = event.target.closest('button');
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i> Actualizando...';
+            btn.disabled = true;
+            
+            setTimeout(() => {
+                btn.innerHTML = originalHTML;
+                btn.disabled = false;
+            }, 1000);
+        }
 
         // --- GESTIÓN DE ACCIONES ---
         function performAdminTaskAction(action) {
@@ -1568,6 +1694,39 @@
             document.getElementById('editServiceName').value = name;
             document.getElementById('editServiceColor').value = color;
             new bootstrap.Modal(document.getElementById('modalEditService')).show();
+        }
+        
+        // Nueva función para editar elementos de stock completos
+        function openEditStockItemModal(itemId) {
+            fetch(`/api/stock_item/${itemId}`)
+                .then(res => res.json())
+                .then(response => {
+                    if (response.success) {
+                        const item = response.data;
+                        document.getElementById('editStockItemId').value = item.id;
+                        document.getElementById('editStockItemName').value = item.name;
+                        document.getElementById('editStockItemQuantity').value = item.quantity;
+                        document.getElementById('editStockItemMinStock').value = item.min_stock;
+                        document.getElementById('editStockItemSupplier').value = item.supplier || '';
+                        document.getElementById('editStockItemDescription').value = item.description || '';
+                        document.getElementById('editStockItemCategory').value = item.category_id || '';
+                        new bootstrap.Modal(document.getElementById('modalEditStockItem')).show();
+                    } else {
+                        alert('Error al cargar los datos del artículo');
+                    }
+                })
+                .catch(err => {
+                    console.error('Error:', err);
+                    alert('Error al cargar el artículo');
+                });
+        }
+        
+        // Nueva función para editar categorías de stock
+        function openEditCategoryModal(categoryId, categoryName, parentId) {
+            document.getElementById('editCategoryId').value = categoryId;
+            document.getElementById('editCategoryName').value = categoryName;
+            document.getElementById('editCategoryParent').value = parentId || '';
+            new bootstrap.Modal(document.getElementById('modalEditCategory')).show();
         }
 
         function setupAutocomplete(inputId, listId) {
@@ -2597,26 +2756,41 @@
                             <strong class="text-white">${cat.name}</strong>
                             <span class="badge bg-info ms-2">${itemCount} productos</span>
                         </div>
+                        <div>
+                            <button class="btn btn-sm btn-outline-warning me-1" 
+                                    onclick="openEditCategoryModal(${cat.id}, '${cat.name.replace(/'/g, "\\'")}', ${cat.parent_id || 'null'})"
+                                    title="Editar categoría">
+                                <i class="bi bi-pencil-fill"></i>
+                            </button>
+                        </div>
                     </div>
             `;
             
             if (cat.items && cat.items.length > 0) {
                 html += '<div class="mt-2" style="margin-left: 30px;">';
                 cat.items.forEach(item => {
-                    const stockBadgeClass = item.quantity < 5 ? 'bg-danger' : 'bg-success';
+                    const stockBadgeClass = item.quantity <= item.min_stock ? 'bg-danger' : 'bg-success';
+                    const supplierText = item.supplier ? `<small class="text-muted">(${item.supplier})</small>` : '';
                     html += `
                         <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-secondary">
                             <div>
                                 <i class="bi bi-box text-info me-2"></i>
-                                <span class="text-white">${item.name}</span>
+                                <span class="text-white">${item.name}</span> ${supplierText}
                                 <span class="badge ${stockBadgeClass} ms-2">${item.quantity}</span>
+                                ${item.min_stock ? `<small class="text-muted">(Min: ${item.min_stock})</small>` : ''}
                             </div>
                             <div>
-                                <button class="btn btn-sm btn-outline-info me-1" 
-                                        onclick="ajustarStock(${item.id}, '${item.name.replace(/'/g, "\\'")}')">
+                                <button class="btn btn-sm btn-outline-success me-1" 
+                                        onclick="ajustarStock(${item.id}, '${item.name.replace(/'/g, "\\'")}', ${item.quantity})"
+                                        title="Ajustar cantidad">
                                     <i class="bi bi-arrow-repeat"></i>
                                 </button>
-                                <button class="btn btn-sm btn-outline-warning" 
+                                <button class="btn btn-sm btn-outline-warning me-1" 
+                                        onclick="openEditStockItemModal(${item.id})"
+                                        title="Editar artículo">
+                                    <i class="bi bi-pencil-fill"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" 
                                         onclick="deleteStockItem(${item.id}, '${item.name.replace(/'/g, "\\'")}')">
                                     <i class="bi bi-trash-fill"></i>
                                 </button>
