@@ -188,6 +188,8 @@ def inject_globals():
             'all_service_types': [],
             'unread_alarms_count': 0,
             'employees': [],
+            'now': datetime.now
+        }
 
 # Filtro Jinja2 para parsear JSON
 @app.template_filter('from_json')
@@ -199,8 +201,6 @@ def from_json_filter(value):
         return json.loads(value)
     except:
         return []
-            'now': datetime.now
-        }
 
 # --- RUTAS PRINCIPALES ---
 @app.route('/')
