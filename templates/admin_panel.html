@@ -168,6 +168,7 @@
         <span class="fw-bold fs-5 text-white">OSLA<span style="color:var(--osla-orange)">PRINT</span> <small
                 class="badge bg-secondary ms-1" style="font-size: 0.6em;">PACO</small></span>
         <div class="d-flex align-items-center gap-2">
+            <span id="sessionTimer" class="badge text-white border border-success me-2" style="background-color: #000; color: #00ff00 !important; font-family: 'Courier New', monospace; font-size: 0.85rem; padding: 5px 10px;">00:00:00</span>
             <span class="text-white fw-bold me-2">Hola {{ current_user.username }}</span>
             <button class="btn btn-outline-light btn-sm" data-bs-toggle="modal" data-bs-target="#modalChangePassword" title="Cambiar Contraseña">
                 <i class="bi bi-key-fill"></i>
@@ -292,6 +293,7 @@
                                 <th>Servicio</th>
                                 <th>Fecha</th>
                                 <th>Técnico</th>
+                                <th>Archivos</th>
                                 <th>Acción</th>
                             </tr>
                         </thead>
@@ -303,6 +305,20 @@
                                 <td>{{ r.service_type.name if r.service_type is not string else r.service_type }}</td>
                                 <td>{{ r.date.strftime('%d/%m/%Y') }}</td>
                                 <td>{{ r.tech.username if r.tech else 'Sin técnico' }}</td>
+                                <td>
+                                    {% if r.attachments %}
+                                    {% set att_list = r.attachments|from_json %}
+                                    {% if att_list and att_list|length > 0 %}
+                                    <button class="btn btn-sm btn-outline-info" onclick="showAttachmentsModal({{ r.id }}, '{{ r.client_name }}')">
+                                        <i class="bi bi-paperclip"></i> {{ att_list|length }}
+                                    </button>
+                                    {% else %}
+                                    <span class="text-muted small">Sin archivos</span>
+                                    {% endif %}
+                                    {% else %}
+                                    <span class="text-muted small">Sin archivos</span>
+                                    {% endif %}
+                                </td>
                                 <td>
                                     <a href="/print_report/{{ r.id }}" target="_blank"
                                         class="btn btn-sm btn-outline-warning">
@@ -1133,6 +1149,32 @@
                 <div class="modal-header border-secondary">
                     <h5 class="modal-title">Editar Tipo de Servicio</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+
+    <!-- Modal: Archivos Adjuntos del Informe -->
+    <div class="modal fade" id="modalAttachments" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">
+                        <i class="bi bi-paperclip me-2"></i>
+                        Archivos Adjuntos - <span id="attachModalClient"></span>
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="attachmentsListContainer">
+                        <div class="text-center text-muted py-3">
+                            <i class="bi bi-hourglass-split"></i> Cargando archivos...
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
                 </div>
                 <form method="POST" action="/manage_services">
                     <div class="modal-body">
@@ -2745,13 +2787,23 @@
         function buildStockCategoryTreeHTML(cat, level) {
             const indent = level * 20;
             const hasChildren = cat.children && cat.children.length > 0;
+            const hasItems = cat.items && cat.items.length > 0;
             const icon = hasChildren ? 'folder-fill' : 'folder2';
             const itemCount = cat.items ? cat.items.length : 0;
+            const categoryId = `cat_${cat.id}_${level}`;
+            const itemsId = `items_${cat.id}_${level}`;
             
             let html = `
                 <div class="list-group-item bg-dark border-secondary mb-2" style="margin-left: ${indent}px;">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div>
+                        <div class="flex-grow-1">
+                            ${(hasChildren || hasItems) ? `
+                                <button class="btn btn-sm btn-link text-white p-0 me-2" 
+                                        onclick="toggleStockSection('${categoryId}', '${itemsId}', this)"
+                                        title="Expandir/Colapsar">
+                                    <i class="bi bi-chevron-right" id="icon_${categoryId}" style="transition: transform 0.3s;"></i>
+                                </button>
+                            ` : ''}
                             <i class="bi bi-${icon} text-warning me-2"></i>
                             <strong class="text-white">${cat.name}</strong>
                             <span class="badge bg-info ms-2">${itemCount} productos</span>
@@ -2766,8 +2818,9 @@
                     </div>
             `;
             
-            if (cat.items && cat.items.length > 0) {
-                html += '<div class="mt-2" style="margin-left: 30px;">';
+            // Productos de esta categoría
+            if (hasItems) {
+                html += `<div id="${itemsId}" class="mt-2" style="margin-left: 30px; display: none;">`;
                 cat.items.forEach(item => {
                     const stockBadgeClass = item.quantity <= item.min_stock ? 'bg-danger' : 'bg-success';
                     const supplierText = item.supplier ? `<small class="text-muted">(${item.supplier})</small>` : '';
@@ -2803,13 +2856,43 @@
             
             html += '</div>';
             
+            // Subcategorías
             if (hasChildren) {
+                html += `<div id="${categoryId}" style="display: none;">`;
                 cat.children.forEach(child => {
                     html += buildStockCategoryTreeHTML(child, level + 1);
                 });
+                html += '</div>';
             }
             
             return html;
+        }
+        
+        // Función para expandir/colapsar secciones de stock
+        function toggleStockSection(categoryId, itemsId, button) {
+            const categoryDiv = document.getElementById(categoryId);
+            const itemsDiv = document.getElementById(itemsId);
+            const icon = document.getElementById('icon_' + categoryId);
+            
+            // Alternar visibilidad
+            if (categoryDiv) {
+                const isHidden = categoryDiv.style.display === 'none';
+                categoryDiv.style.display = isHidden ? 'block' : 'none';
+            }
+            
+            if (itemsDiv) {
+                const isHidden = itemsDiv.style.display === 'none';
+                itemsDiv.style.display = isHidden ? 'block' : 'none';
+            }
+            
+            // Rotar icono
+            if (icon) {
+                if (icon.style.transform === 'rotate(90deg)') {
+                    icon.style.transform = 'rotate(0deg)';
+                } else {
+                    icon.style.transform = 'rotate(90deg)';
+                }
+            }
         }
         
         function deleteStockItem(itemId, itemName) {
@@ -3025,6 +3108,69 @@
                 });
             });
         }
+
+        // FUNCIÓN PARA MOSTRAR ARCHIVOS ADJUNTOS EN INFORMES
+        function showAttachmentsModal(taskId, clientName) {
+            document.getElementById('attachModalClient').innerText = clientName;
+            
+            fetch(`/api/task/${taskId}/attachments`)
+                .then(res => res.json())
+                .then(data => {
+                    const container = document.getElementById('attachmentsListContainer');
+                    
+                    if (data.success && data.attachments && data.attachments.length > 0) {
+                        let html = '<div class="list-group">';
+                        data.attachments.forEach(att => {
+                            const sizeKB = (att.size / 1024).toFixed(1);
+                            html += `
+                                <div class="list-group-item bg-dark text-white border-secondary mb-2">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <i class="bi bi-file-earmark text-info me-2"></i>
+                                            <strong>${att.original_name}</strong>
+                                            <br>
+                                            <small class="text-muted">${sizeKB} KB</small>
+                                        </div>
+                                        <a href="/uploads/${att.filename}" target="_blank" class="btn btn-sm btn-success" download>
+                                            <i class="bi bi-download"></i> Descargar
+                                        </a>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                        html += '</div>';
+                        container.innerHTML = html;
+                    } else {
+                        container.innerHTML = '<div class="text-center text-muted py-3"><i class="bi bi-inbox"></i> No hay archivos adjuntos</div>';
+                    }
+                    
+                    new bootstrap.Modal(document.getElementById('modalAttachments')).show();
+                })
+                .catch(err => {
+                    console.error('Error cargando archivos:', err);
+                    alert('Error al cargar los archivos adjuntos');
+                });
+        }
+
+        // CONTADOR DE SESIÓN ACTIVA
+        let sessionStartTime = Date.now();
+        let sessionTimerInterval;
+
+        function updateSessionTimer() {
+            const elapsed = Date.now() - sessionStartTime;
+            const hours = Math.floor(elapsed / 3600000);
+            const minutes = Math.floor((elapsed % 3600000) / 60000);
+            const seconds = Math.floor((elapsed % 60000) / 1000);
+            
+            const timerText = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            document.getElementById('sessionTimer').innerText = timerText;
+        }
+
+        // Iniciar contador de sesión
+        document.addEventListener('DOMContentLoaded', function() {
+            sessionTimerInterval = setInterval(updateSessionTimer, 1000);
+            updateSessionTimer();
+        });
 
     </script>
 </body>

@@ -188,6 +188,17 @@ def inject_globals():
             'all_service_types': [],
             'unread_alarms_count': 0,
             'employees': [],
+
+# Filtro Jinja2 para parsear JSON
+@app.template_filter('from_json')
+def from_json_filter(value):
+    """Parsear JSON string a objeto Python"""
+    if not value:
+        return []
+    try:
+        return json.loads(value)
+    except:
+        return []
             'now': datetime.now
         }
 
@@ -848,10 +859,12 @@ def get_all_tasks():
             'borderColor': color,
             'extendedProps': {
                 'client': task.client_name,
+                'client_id': task.client_id,  # Agregar client_id para poder obtener más información
                 'service_type': service_type.name if service_type else 'Sin tipo',
                 'status': task.status,
                 'tech_id': task.tech_id,
                 'tech_name': task.tech.username if task.tech else 'Sin asignar',
+                'desc': task.description or '',
                 'has_signature': bool(task.signature_data)
             }
         })
@@ -1776,6 +1789,54 @@ def api_get_stock_category(category_id):
     except Exception as e:
         return jsonify({'success': False, 'msg': str(e)}), 500
 
+@app.route('/api/task/<int:task_id>/attachments')
+@login_required
+def api_get_task_attachments(task_id):
+    """API para obtener archivos adjuntos de una tarea"""
+    try:
+        task = Task.query.get_or_404(task_id)
+        
+        attachments_list = []
+        if task.attachments:
+            try:
+                attachments_data = json.loads(task.attachments)
+                attachments_list = attachments_data if isinstance(attachments_data, list) else []
+            except:
+                attachments_list = []
+        
+        return jsonify({
+            'success': True,
+            'attachments': attachments_list
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'msg': str(e)}), 500
+
+@app.route('/api/client/<int:client_id>')
+@login_required
+def api_get_client(client_id):
+    """API para obtener información de un cliente"""
+    try:
+        client = Client.query.get_or_404(client_id)
+        
+        return jsonify({
+            'success': True,
+            'client': {
+                'id': client.id,
+                'name': client.name,
+                'phone': client.phone,
+                'email': client.email,
+                'address': client.address,
+                'link': client.link,
+                'notes': client.notes,
+                'has_support': client.has_support,
+                'support_monday_friday': client.support_monday_friday,
+                'support_saturday': client.support_saturday,
+                'support_sunday': client.support_sunday
+            }
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'msg': str(e)}), 500
+
 @app.route('/logout')
 def logout():
     logout_user()
@@ -1834,6 +1895,15 @@ with app.app_context():
             role='admin', 
             password_hash=generate_password_hash('Paco123!')
         ))
+    
+    # Paco como técnico (adicional al admin)
+    if not User.query.filter_by(username='paco_tech').first():
+        db.session.add(User(
+            username='paco_tech',
+            email='paco_tech@oslaprint.com', 
+            role='tech', 
+            password_hash=generate_password_hash('Paco123!')
+        ))
         
     if not User.query.filter_by(username='tech').first():
         db.session.add(User(
@@ -1842,6 +1912,25 @@ with app.app_context():
             role='tech', 
             password_hash=generate_password_hash('Tech123!')
         ))
+    
+    # Nuevos usuarios técnicos
+    new_techs = [
+        {'username': 'Ruben', 'email': 'ruben@oslaprint.com', 'password': 'Ruben123!'},
+        {'username': 'Ramses', 'email': 'ramses@oslaprint.com', 'password': 'Ramses123!'},
+        {'username': 'David', 'email': 'david@oslaprint.com', 'password': 'David123!'},
+        {'username': 'Aldo', 'email': 'aldo@oslaprint.com', 'password': 'Aldo123!'},
+        {'username': 'Practicas', 'email': 'practicas@oslaprint.com', 'password': 'Practicas123!'},
+        {'username': 'Paco_tec', 'email': 'paco_tec@oslaprint.com', 'password': 'Paco123!'}
+    ]
+    
+    for tech_data in new_techs:
+        if not User.query.filter_by(username=tech_data['username']).first():
+            db.session.add(User(
+                username=tech_data['username'],
+                email=tech_data['email'],
+                role='tech',
+                password_hash=generate_password_hash(tech_data['password'])
+            ))
     
     # Tipos de Servicio
     if ServiceType.query.count() == 0:

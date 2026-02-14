@@ -270,6 +270,7 @@
         <div class="d-flex justify-content-between w-100 align-items-center">
             <span class="fw-bold fs-4 text-white">OSLA<span style="color:var(--osla-orange)">PRINT</span></span>
             <div class="d-flex align-items-center gap-2">
+                <span id="sessionTimer" class="badge text-white border border-success me-2" style="background-color: #000; color: #00ff00 !important; font-family: 'Courier New', monospace; font-size: 0.85rem; padding: 5px 10px;">00:00:00</span>
                 <span class="text-white fw-bold me-2">Hola {{ current_user.username }}</span>
                 <button class="btn btn-outline-light btn-sm" data-bs-toggle="modal"
                     data-bs-target="#modalChangePassword" title="Cambiar Contraseña">
@@ -615,19 +616,39 @@
 
     <!-- MODALES -->
     <div class="modal fade" id="modalEventAction" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content bg-dark text-white border-warning">
                 <div class="modal-header border-0 pb-0">
                     <h5 class="modal-title" id="evtTitle">Detalles Cita</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
+                    <!-- INFORMACIÓN DEL CLIENTE (PROMINENTE) -->
+                    <div class="card bg-black border-info mb-3">
+                        <div class="card-header bg-gradient border-0 py-2">
+                            <h6 class="mb-0 text-info">
+                                <i class="bi bi-person-circle me-2"></i>
+                                Información del Cliente
+                            </h6>
+                        </div>
+                        <div class="card-body" id="evtClientInfo">
+                            <div class="text-center text-muted py-2">
+                                <i class="bi bi-hourglass-split"></i> Cargando información...
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Estado del trabajo -->
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <span id="evtStatus" class="badge p-2"></span>
                     </div>
-                    <h5 id="evtClient" class="text-warning fw-bold mb-3"></h5>
+                    
+                    <!-- Descripción del trabajo -->
+                    <h6 class="text-warning fw-bold mb-2">Descripción del Trabajo:</h6>
                     <p class="small text-muted bg-black p-3 rounded border border-secondary" id="evtDesc"></p>
+                    
                     <input type="hidden" id="evtId">
+                    <input type="hidden" id="evtClientId">
                 </div>
                 <div class="modal-footer border-0 pt-0">
                     <button type="button" class="btn btn-outline-danger flex-grow-1"
@@ -962,7 +983,7 @@
             const evt = info.event;
             document.getElementById('evtId').value = evt.id;
             document.getElementById('evtTitle').innerText = evt.title;
-            document.getElementById('evtClient').innerText = evt.extendedProps.client;
+            document.getElementById('evtClientId').value = evt.extendedProps.client_id || '';
             document.getElementById('evtDesc').innerText = evt.extendedProps.desc || 'Sin descripción';
 
             const badge = document.getElementById('evtStatus');
@@ -975,6 +996,117 @@
                 btnComplete.style.display = 'none';
             } else {
                 btnComplete.style.display = '';
+            }
+
+            // CARGAR INFORMACIÓN DEL CLIENTE
+            const clientInfoContainer = document.getElementById('evtClientInfo');
+            const clientId = evt.extendedProps.client_id;
+            
+            if (clientId) {
+                // Hacer petición al servidor para obtener información del cliente
+                fetch(`/api/client/${clientId}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success && data.client) {
+                            const client = data.client;
+                            let html = `
+                                <div class="row g-2">
+                                    <div class="col-md-12 mb-2">
+                                        <h5 class="text-warning mb-0">${client.name}</h5>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <small class="text-muted d-block">
+                                            <i class="bi bi-telephone-fill text-info me-1"></i>
+                                            <strong>Teléfono:</strong>
+                                        </small>
+                                        <a href="tel:${client.phone}" class="text-white text-decoration-none">
+                                            ${client.phone}
+                                        </a>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <small class="text-muted d-block">
+                                            <i class="bi bi-envelope-fill text-info me-1"></i>
+                                            <strong>Email:</strong>
+                                        </small>
+                                        <a href="mailto:${client.email}" class="text-white text-decoration-none">
+                                            ${client.email}
+                                        </a>
+                                    </div>
+                                    <div class="col-md-12">
+                                        <small class="text-muted d-block">
+                                            <i class="bi bi-geo-alt-fill text-info me-1"></i>
+                                            <strong>Dirección:</strong>
+                                        </small>
+                                        <span class="text-white">${client.address}</span>
+                                    </div>
+                            `;
+                            
+                            if (client.link) {
+                                html += `
+                                    <div class="col-md-12 mt-2">
+                                        <a href="${client.link}" target="_blank" class="btn btn-sm btn-outline-primary w-100">
+                                            <i class="bi bi-map me-1"></i>Abrir en Google Maps
+                                        </a>
+                                    </div>
+                                `;
+                            }
+                            
+                            if (client.has_support) {
+                                html += `
+                                    <div class="col-md-12 mt-2">
+                                        <div class="alert alert-success py-2 px-2 mb-0 small">
+                                            <i class="bi bi-shield-check me-1"></i>
+                                            <strong>Soporte Activo:</strong>
+                                            ${client.support_monday_friday ? 'L-V ' : ''}
+                                            ${client.support_saturday ? 'Sáb ' : ''}
+                                            ${client.support_sunday ? 'Dom' : ''}
+                                        </div>
+                                    </div>
+                                `;
+                            }
+                            
+                            if (client.notes) {
+                                html += `
+                                    <div class="col-md-12 mt-2 pt-2 border-top">
+                                        <small class="text-muted d-block">
+                                            <i class="bi bi-sticky me-1"></i>
+                                            <strong>Notas:</strong>
+                                        </small>
+                                        <p class="small text-muted mb-0">${client.notes}</p>
+                                    </div>
+                                `;
+                            }
+                            
+                            html += `</div>`;
+                            clientInfoContainer.innerHTML = html;
+                        } else {
+                            clientInfoContainer.innerHTML = `
+                                <div class="text-center text-muted py-2">
+                                    <i class="bi bi-exclamation-circle"></i> 
+                                    Cliente: ${evt.extendedProps.client}
+                                    <br>
+                                    <small>Información no disponible</small>
+                                </div>
+                            `;
+                        }
+                    })
+                    .catch(err => {
+                        console.error('Error cargando información del cliente:', err);
+                        clientInfoContainer.innerHTML = `
+                            <div class="text-center text-warning py-2">
+                                <i class="bi bi-exclamation-triangle"></i> 
+                                Error al cargar información del cliente
+                            </div>
+                        `;
+                    });
+            } else {
+                // Si no hay client_id, mostrar solo el nombre
+                clientInfoContainer.innerHTML = `
+                    <div class="text-center py-2">
+                        <h5 class="text-warning mb-0">${evt.extendedProps.client}</h5>
+                        <small class="text-muted">Cliente no registrado en la base de datos</small>
+                    </div>
+                `;
             }
 
             modalAction.show();
@@ -2163,6 +2295,29 @@
                 });
             });
         }
+
+        // CONTADOR DE SESIÓN ACTIVA
+        let sessionStartTime = Date.now();
+        let sessionTimerInterval;
+
+        function updateSessionTimer() {
+            const elapsed = Date.now() - sessionStartTime;
+            const hours = Math.floor(elapsed / 3600000);
+            const minutes = Math.floor((elapsed % 3600000) / 60000);
+            const seconds = Math.floor((elapsed % 60000) / 1000);
+            
+            const timerText = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            const timerEl = document.getElementById('sessionTimer');
+            if (timerEl) {
+                timerEl.innerText = timerText;
+            }
+        }
+
+        // Iniciar contador de sesión
+        document.addEventListener('DOMContentLoaded', function() {
+            sessionTimerInterval = setInterval(updateSessionTimer, 1000);
+            updateSessionTimer();
+        });
 
     </script>
 </body>
