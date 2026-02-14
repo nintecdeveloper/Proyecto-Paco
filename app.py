@@ -1890,58 +1890,24 @@ with app.app_context():
     except Exception as e:
         print(f"Nota: Migración de 'link': {e}")
     
-    # Usuarios
-    if not User.query.filter_by(username='admin').first():
+    # Usuarios - SOLO ESTOS DOS
+    # 1. Paco (admin)
+    if not User.query.filter_by(username='Paco').first():
         db.session.add(User(
-            username='admin', 
-            email='admin@oslaprint.com',
-            role='admin', 
-            password_hash=generate_password_hash('Admin123!')
-        ))
-    
-    if not User.query.filter_by(username='paco').first():
-        db.session.add(User(
-            username='paco',
+            username='Paco',
             email='paco@oslaprint.com', 
             role='admin', 
             password_hash=generate_password_hash('Paco123!')
         ))
     
-    # Paco como técnico (adicional al admin)
-    if not User.query.filter_by(username='paco_tech').first():
+    # 2. Paco_tec (técnico)
+    if not User.query.filter_by(username='Paco_tec').first():
         db.session.add(User(
-            username='paco_tech',
-            email='paco_tech@oslaprint.com', 
+            username='Paco_tec',
+            email='paco_tec@oslaprint.com', 
             role='tech', 
             password_hash=generate_password_hash('Paco123!')
         ))
-        
-    if not User.query.filter_by(username='tech').first():
-        db.session.add(User(
-            username='tech',
-            email='tech@oslaprint.com', 
-            role='tech', 
-            password_hash=generate_password_hash('Tech123!')
-        ))
-    
-    # Nuevos usuarios técnicos
-    new_techs = [
-        {'username': 'Ruben', 'email': 'ruben@oslaprint.com', 'password': 'Ruben123!'},
-        {'username': 'Ramses', 'email': 'ramses@oslaprint.com', 'password': 'Ramses123!'},
-        {'username': 'David', 'email': 'david@oslaprint.com', 'password': 'David123!'},
-        {'username': 'Aldo', 'email': 'aldo@oslaprint.com', 'password': 'Aldo123!'},
-        {'username': 'Practicas', 'email': 'practicas@oslaprint.com', 'password': 'Practicas123!'},
-        {'username': 'Paco_tec', 'email': 'paco_tec@oslaprint.com', 'password': 'Paco123!'}
-    ]
-    
-    for tech_data in new_techs:
-        if not User.query.filter_by(username=tech_data['username']).first():
-            db.session.add(User(
-                username=tech_data['username'],
-                email=tech_data['email'],
-                role='tech',
-                password_hash=generate_password_hash(tech_data['password'])
-            ))
     
     # Tipos de Servicio
     if ServiceType.query.count() == 0:

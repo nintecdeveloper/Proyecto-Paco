@@ -601,16 +601,7 @@
                 </div>
             </div>
 
-            <!-- Tipos de Servicio Más Frecuentes - Ancho Completo -->
-            <div class="row g-3">
-                <div class="col-12">
-                    <div class="card bg-dark border-secondary p-4">
-                        <h5 class="text-white fw-bold mb-3"><i class="bi bi-bar-chart me-2"></i>Servicios Más Frecuentes
-                        </h5>
-                        <canvas id="topServicesChart" style="max-height: 300px;"></canvas>
-                    </div>
-                </div>
-            </div>
+
         </div>
     </div>
 
@@ -1533,7 +1524,6 @@
                     updateAnalyticsSummary(data);
                     updateServiceDistributionChart(data);
                     updateTimelineChart();
-                    updateTopServicesChart(data);
                 })
                 .catch(err => {
                     console.error('Error cargando analíticas:', err);
@@ -1661,51 +1651,6 @@
                         x: {
                             ticks: { color: '#aaaaaa' },
                             grid: { color: '#333333' }
-                        }
-                    }
-                }
-            });
-        }
-
-        function updateTopServicesChart(data) {
-            const ctx = document.getElementById('topServicesChart');
-
-            if (barChart) {
-                barChart.destroy();
-            }
-
-            const topServices = data.top_services || {};
-            const labels = Object.keys(topServices);
-            const values = Object.values(topServices);
-
-            barChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Cantidad',
-                        data: values,
-                        backgroundColor: '#f37021',
-                        borderColor: '#f37021',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: true,
-                    indexAxis: 'y',
-                    plugins: {
-                        legend: { display: false }
-                    },
-                    scales: {
-                        x: {
-                            beginAtZero: true,
-                            ticks: { color: '#aaaaaa' },
-                            grid: { color: '#333333' }
-                        },
-                        y: {
-                            ticks: { color: '#aaaaaa' },
-                            grid: { display: false }
                         }
                     }
                 }
