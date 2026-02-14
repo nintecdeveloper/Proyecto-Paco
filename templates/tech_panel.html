@@ -624,14 +624,14 @@
                 </div>
                 <div class="modal-body">
                     <!-- INFORMACIÓN DEL CLIENTE (PROMINENTE) -->
-                    <div class="card bg-black border-info mb-3">
-                        <div class="card-header bg-gradient border-0 py-2">
-                            <h6 class="mb-0 text-info">
+                    <div class="card bg-dark border-warning mb-3">
+                        <div class="card-header bg-warning text-dark border-0 py-2">
+                            <h6 class="mb-0 fw-bold">
                                 <i class="bi bi-person-circle me-2"></i>
                                 Información del Cliente
                             </h6>
                         </div>
-                        <div class="card-body" id="evtClientInfo">
+                        <div class="card-body bg-black" id="evtClientInfo">
                             <div class="text-center text-muted py-2">
                                 <i class="bi bi-hourglass-split"></i> Cargando información...
                             </div>
@@ -1010,41 +1010,41 @@
                         if (data.success && data.client) {
                             const client = data.client;
                             let html = `
-                                <div class="row g-2">
+                                <div class="row g-3">
                                     <div class="col-md-12 mb-2">
-                                        <h5 class="text-warning mb-0">${client.name}</h5>
+                                        <h5 class="text-warning mb-1 fw-bold">${client.name}</h5>
                                     </div>
                                     <div class="col-md-6">
-                                        <small class="text-muted d-block">
-                                            <i class="bi bi-telephone-fill text-info me-1"></i>
-                                            <strong>Teléfono:</strong>
-                                        </small>
-                                        <a href="tel:${client.phone}" class="text-white text-decoration-none">
+                                        <div class="d-flex align-items-center mb-1">
+                                            <i class="bi bi-telephone-fill text-warning me-2" style="font-size: 1.1rem;"></i>
+                                            <strong class="text-white">Teléfono:</strong>
+                                        </div>
+                                        <a href="tel:${client.phone}" class="text-info fw-bold text-decoration-none d-block" style="font-size: 1.1rem;">
                                             ${client.phone}
                                         </a>
                                     </div>
                                     <div class="col-md-6">
-                                        <small class="text-muted d-block">
-                                            <i class="bi bi-envelope-fill text-info me-1"></i>
-                                            <strong>Email:</strong>
-                                        </small>
-                                        <a href="mailto:${client.email}" class="text-white text-decoration-none">
+                                        <div class="d-flex align-items-center mb-1">
+                                            <i class="bi bi-envelope-fill text-warning me-2" style="font-size: 1.1rem;"></i>
+                                            <strong class="text-white">Email:</strong>
+                                        </div>
+                                        <a href="mailto:${client.email}" class="text-info fw-bold text-decoration-none d-block" style="font-size: 1rem; word-break: break-all;">
                                             ${client.email}
                                         </a>
                                     </div>
                                     <div class="col-md-12">
-                                        <small class="text-muted d-block">
-                                            <i class="bi bi-geo-alt-fill text-info me-1"></i>
-                                            <strong>Dirección:</strong>
-                                        </small>
-                                        <span class="text-white">${client.address}</span>
+                                        <div class="d-flex align-items-center mb-1">
+                                            <i class="bi bi-geo-alt-fill text-warning me-2" style="font-size: 1.1rem;"></i>
+                                            <strong class="text-white">Dirección:</strong>
+                                        </div>
+                                        <span class="text-white fw-bold d-block" style="font-size: 1.05rem;">${client.address}</span>
                                     </div>
                             `;
                             
                             if (client.link) {
                                 html += `
                                     <div class="col-md-12 mt-2">
-                                        <a href="${client.link}" target="_blank" class="btn btn-sm btn-outline-primary w-100">
+                                        <a href="${client.link}" target="_blank" class="btn btn-warning fw-bold w-100">
                                             <i class="bi bi-map me-1"></i>Abrir en Google Maps
                                         </a>
                                     </div>
@@ -1054,7 +1054,7 @@
                             if (client.has_support) {
                                 html += `
                                     <div class="col-md-12 mt-2">
-                                        <div class="alert alert-success py-2 px-2 mb-0 small">
+                                        <div class="alert alert-success py-2 px-3 mb-0 fw-bold" style="background-color: #28a745 !important; color: white !important; border: 2px solid #20c997;">
                                             <i class="bi bi-shield-check me-1"></i>
                                             <strong>Soporte Activo:</strong>
                                             ${client.support_monday_friday ? 'L-V ' : ''}
@@ -1067,12 +1067,12 @@
                             
                             if (client.notes) {
                                 html += `
-                                    <div class="col-md-12 mt-2 pt-2 border-top">
-                                        <small class="text-muted d-block">
-                                            <i class="bi bi-sticky me-1"></i>
-                                            <strong>Notas:</strong>
-                                        </small>
-                                        <p class="small text-muted mb-0">${client.notes}</p>
+                                    <div class="col-md-12 mt-3 pt-2 border-top border-secondary">
+                                        <div class="d-flex align-items-center mb-1">
+                                            <i class="bi bi-sticky text-warning me-2"></i>
+                                            <strong class="text-white">Notas:</strong>
+                                        </div>
+                                        <p class="text-white-50 mb-0" style="font-size: 0.95rem;">${client.notes}</p>
                                     </div>
                                 `;
                             }
@@ -2205,39 +2205,42 @@
             if (!infoDiv) {
                 infoDiv = document.createElement('div');
                 infoDiv.id = 'clientInfoDisplay';
-                infoDiv.className = 'alert alert-info mb-3 mt-2';
+                infoDiv.className = 'alert mb-3 mt-2';
+                infoDiv.style.backgroundColor = '#1a1a1a';
+                infoDiv.style.border = '2px solid var(--osla-orange)';
+                infoDiv.style.color = 'white';
                 document.querySelector('#fieldClient').parentElement.appendChild(infoDiv);
             }
             
             let html = `
                 <div class="d-flex justify-content-between align-items-start">
                     <div class="flex-grow-1">
-                        <h6 class="fw-bold mb-2">
+                        <h6 class="fw-bold mb-3 text-warning">
                             <i class="bi bi-person-circle me-2"></i>
                             Información del Cliente
                         </h6>
                         <div class="small">
-                            <div class="mb-1">
-                                <i class="bi bi-telephone me-2"></i>
-                                <a href="tel:${clientInfo.phone}" class="text-dark fw-bold">${clientInfo.phone}</a>
+                            <div class="mb-2">
+                                <i class="bi bi-telephone text-warning me-2"></i>
+                                <a href="tel:${clientInfo.phone}" class="text-info fw-bold text-decoration-none">${clientInfo.phone}</a>
                             </div>
-                            <div class="mb-1">
-                                <i class="bi bi-envelope me-2"></i>
-                                ${clientInfo.email}
+                            <div class="mb-2">
+                                <i class="bi bi-envelope text-warning me-2"></i>
+                                <span class="text-white fw-bold">${clientInfo.email}</span>
                             </div>
-                            <div class="mb-1">
-                                <i class="bi bi-geo-alt me-2"></i>
-                                ${clientInfo.address}
+                            <div class="mb-2">
+                                <i class="bi bi-geo-alt text-warning me-2"></i>
+                                <span class="text-white">${clientInfo.address}</span>
                             </div>
                             ${clientInfo.link ? `
                                 <div class="mt-2">
-                                    <a href="${clientInfo.link}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                    <a href="${clientInfo.link}" target="_blank" class="btn btn-sm btn-warning fw-bold">
                                         <i class="bi bi-map me-1"></i>Abrir en Maps
                                     </a>
                                 </div>
                             ` : ''}
                             ${clientInfo.has_support ? `
-                                <div class="alert alert-success py-1 px-2 mt-2 mb-0">
+                                <div class="alert alert-success py-2 px-2 mt-2 mb-0 fw-bold" style="background-color: #28a745 !important; color: white !important; border: 2px solid #20c997;">
                                     <small>
                                         <i class="bi bi-shield-check me-1"></i>
                                         <strong>Soporte Activo:</strong>
@@ -2248,14 +2251,14 @@
                                 </div>
                             ` : ''}
                             ${clientInfo.notes ? `
-                                <div class="mt-2 pt-2 border-top small text-muted">
-                                    <i class="bi bi-sticky me-1"></i>
-                                    ${clientInfo.notes}
+                                <div class="mt-2 pt-2 border-top border-secondary">
+                                    <i class="bi bi-sticky text-warning me-1"></i>
+                                    <span class="text-white-50">${clientInfo.notes}</span>
                                 </div>
                             ` : ''}
                         </div>
                     </div>
-                    <button type="button" class="btn-close" onclick="hideClientInfo()"></button>
+                    <button type="button" class="btn-close btn-close-white" onclick="hideClientInfo()"></button>
                 </div>
             `;
             
