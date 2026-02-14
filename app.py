@@ -457,9 +457,7 @@ def manage_clients():
         link = request.form.get('link', '')
         notes = request.form.get('notes', '')
         has_support = request.form.get('has_support') == 'on'
-        support_monday_friday = request.form.get('support_monday_friday') == 'on'
-        support_saturday = request.form.get('support_saturday') == 'on'
-        support_sunday = request.form.get('support_sunday') == 'on'
+        # Los días de soporte se establecen por defecto en False
         
         if Client.query.filter_by(name=name).first():
             flash('Ya existe un cliente con ese nombre', 'danger')
@@ -473,9 +471,9 @@ def manage_clients():
             link=link,
             notes=notes,
             has_support=has_support,
-            support_monday_friday=support_monday_friday,
-            support_saturday=support_saturday,
-            support_sunday=support_sunday
+            support_monday_friday=False,
+            support_saturday=False,
+            support_sunday=False
         )
         db.session.add(new_client)
         db.session.commit()
@@ -1521,16 +1519,29 @@ def admin_tech_tasks(tech_id):
 def create_appointment():
     """Endpoint para crear una nueva cita desde el panel técnico"""
     try:
-        client_name = request.form.get('client_name')
-        date_str = request.form.get('date')
-        start_time = request.form.get('start_time')
-        end_time = request.form.get('end_time')
-        service_type_id = request.form.get('service_type_id')
-        description = request.form.get('description', '')
+        # Obtener datos del request (puede ser JSON o form)
+        if request.is_json:
+            data = request.json
+            client_name = data.get('client_name')
+            date_str = data.get('date')
+            start_time = data.get('start_time')
+            end_time = data.get('end_time', '')  # Opcional
+            service_type_id = data.get('service_type_id')
+            description = data.get('description', '')  # Opcional
+        else:
+            client_name = request.form.get('client_name')
+            date_str = request.form.get('date')
+            start_time = request.form.get('start_time')
+            end_time = request.form.get('end_time', '')  # Opcional
+            service_type_id = request.form.get('service_type_id')
+            description = request.form.get('description', '')  # Opcional
         
-        # Validaciones
-        if not all([client_name, date_str, start_time, service_type_id]):
-            return jsonify({'success': False, 'msg': 'Faltan campos obligatorios'}), 400
+        # Validación: SOLO estos 4 campos son obligatorios
+        if not client_name or not date_str or not start_time or not service_type_id:
+            return jsonify({
+                'success': False, 
+                'msg': 'Faltan campos obligatorios: Cliente, Fecha, Hora de inicio y Tipo de servicio son requeridos'
+            }), 400
         
         # Buscar o crear cliente
         client = Client.query.filter_by(name=client_name).first()
@@ -1544,10 +1555,10 @@ def create_appointment():
             tech_id=current_user.id,
             client_id=client_id,
             client_name=client_name,
-            description=description,
+            description=description if description else '',
             date=task_date,
             start_time=start_time,
-            end_time=end_time,
+            end_time=end_time if end_time else None,
             service_type_id=int(service_type_id),
             status='Pendiente'
         )
@@ -1564,7 +1575,7 @@ def create_appointment():
     except Exception as e:
         print(f"Error creating appointment: {str(e)}")
         db.session.rollback()
-        return jsonify({'success': False, 'msg': 'Error al crear la cita'}), 500
+        return jsonify({'success': False, 'msg': f'Error al crear la cita: {str(e)}'}), 500
 
 @app.route('/edit_appointment/<int:task_id>', methods=['POST'])
 @login_required
