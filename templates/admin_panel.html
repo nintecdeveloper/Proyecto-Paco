@@ -114,23 +114,30 @@
             color: white;
         }
 
-        /* Filtros Calendario Dinámicos */
+        /* Filtros Calendario Dinámicos - MEJORADO */
         .btn-check:checked+.btn-outline-custom {
-            color: white;
+            color: white !important;
+            background-color: var(--osla-orange) !important;
+            border-color: var(--osla-orange) !important;
             border-width: 2px;
             opacity: 1;
+            font-weight: 700;
+            box-shadow: 0 0 10px rgba(243, 112, 33, 0.5);
         }
 
         .btn-outline-custom {
             color: #bbb;
             border-color: #555;
+            background-color: transparent;
             opacity: 0.7;
-            transition: all 0.2s;
+            transition: all 0.3s ease;
         }
 
         .btn-outline-custom:hover {
             opacity: 1;
             filter: brightness(1.2);
+            background-color: rgba(243, 112, 33, 0.2);
+            border-color: var(--osla-orange);
         }
 
         .filter-group {
@@ -138,6 +145,27 @@
             padding: 15px;
             border-radius: 10px;
             border: 1px solid #333;
+        }
+
+        /* Badge de soporte mejorado para mejor visibilidad */
+        .support-badge {
+            background-color: #28a745 !important;
+            color: white !important;
+            font-weight: 700 !important;
+            padding: 6px 12px !important;
+            font-size: 0.85rem !important;
+            box-shadow: 0 2px 8px rgba(40, 167, 69, 0.4);
+            border: 2px solid #20c997 !important;
+        }
+        
+        .no-support-badge {
+            background-color: #dc3545 !important;
+            color: white !important;
+            font-weight: 700 !important;
+            padding: 6px 12px !important;
+            font-size: 0.85rem !important;
+            box-shadow: 0 2px 8px rgba(220, 53, 69, 0.4);
+            border: 2px solid #c82333 !important;
         }
 
         /* Mobile overrides */
@@ -500,11 +528,11 @@
                                 <div class="d-flex justify-content-between align-items-start mb-2">
                                     <h6 class="card-title text-warning fw-bold mb-0">{{ c.name }}</h6>
                                     {% if c.has_support %}
-                                    <span class="badge bg-success">
+                                    <span class="badge support-badge">
                                         <i class="bi bi-shield-check"></i> Soporte
                                     </span>
                                     {% else %}
-                                    <span class="badge bg-danger">
+                                    <span class="badge no-support-badge">
                                         <i class="bi bi-shield-x"></i> Sin Soporte
                                     </span>
                                     {% endif %}
@@ -1073,7 +1101,7 @@
                             <label class="form-label fw-bold">¿Tiene Soporte Técnico Contratado?</label>
                             <div class="form-check form-switch">
                                 <input class="form-check-input" type="checkbox" id="editHasSupport" 
-                                       name="has_support" value="true">
+                                       name="has_support" value="true" onchange="toggleEditSupportOptions()">
                                 <label class="form-check-label" for="editHasSupport">
                                     Sí, tiene soporte técnico
                                 </label>
@@ -1081,6 +1109,40 @@
                             <small class="text-muted">
                                 <i class="bi bi-info-circle me-1"></i>
                                 Marca esta opción si el cliente tiene contratado soporte técnico con OSLAPRINT
+                            </small>
+                        </div>
+                        
+                        <!-- Opciones de soporte por día - NUEVO -->
+                        <div id="editSupportDaysOptions" style="display: none;">
+                            <label class="form-label fw-bold text-info">Días de Soporte Disponibles:</label>
+                            
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="editSupportMF" 
+                                       name="support_monday_friday" value="true">
+                                <label class="form-check-label" for="editSupportMF">
+                                    <i class="bi bi-calendar-week me-1"></i>Lunes a Viernes
+                                </label>
+                            </div>
+                            
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="editSupportSat" 
+                                       name="support_saturday" value="true">
+                                <label class="form-check-label" for="editSupportSat">
+                                    <i class="bi bi-calendar-day me-1"></i>Sábado
+                                </label>
+                            </div>
+                            
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="editSupportSun" 
+                                       name="support_sunday" value="true">
+                                <label class="form-check-label" for="editSupportSun">
+                                    <i class="bi bi-calendar-day me-1"></i>Domingo
+                                </label>
+                            </div>
+                            
+                            <small class="text-muted mt-2 d-block">
+                                <i class="bi bi-info-circle me-1"></i>
+                                Selecciona los días en los que este cliente tiene cobertura de soporte
                             </small>
                         </div>
                     </div>
@@ -1509,11 +1571,21 @@
                 initialView: isMobile ? 'listWeek' : 'dayGridMonth',
                 locale: 'es',
                 headerToolbar: {
-                    left: 'prev,next',
+                    left: 'prev,next today',
                     center: 'title',
-                    right: 'dayGridMonth,timeGridWeek,listWeek'
+                    right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek'
+                },
+                buttonText: {
+                    today: 'Hoy',
+                    month: 'Mes',
+                    week: 'Semana',
+                    day: 'Día',
+                    list: 'Lista'
                 },
                 height: 'auto',
+                navLinks: true,
+                editable: false,
+                dayMaxEvents: true,
                 events: `/api/admin/tasks/${userId}`,
                 eventClick: handleEventClick,
                 dateClick: handleAdminDateClick,
@@ -1559,11 +1631,21 @@
                 initialView: isMobile ? 'listWeek' : 'dayGridMonth',
                 locale: 'es',
                 headerToolbar: {
-                    left: 'prev,next',
+                    left: 'prev,next today',
                     center: 'title',
-                    right: 'dayGridMonth,timeGridWeek,listWeek'
+                    right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek'
+                },
+                buttonText: {
+                    today: 'Hoy',
+                    month: 'Mes',
+                    week: 'Semana',
+                    day: 'Día',
+                    list: 'Lista'
                 },
                 height: 'auto',
+                navLinks: true,
+                editable: false,
+                dayMaxEvents: true,
                 events: '/api/admin/all_tasks',
                 dateClick: handleAdminDateClickGlobal,
                 selectable: true,
@@ -1729,6 +1811,24 @@
             
             toggleEditSupportOptions();
             new bootstrap.Modal(document.getElementById('modalEditClient')).show();
+        }
+        
+        // Nueva función para mostrar/ocultar opciones de días de soporte en modal de edición
+        function toggleEditSupportOptions() {
+            const hasSupportCheckbox = document.getElementById('editHasSupport');
+            const supportDaysOptions = document.getElementById('editSupportDaysOptions');
+            
+            if (hasSupportCheckbox && supportDaysOptions) {
+                if (hasSupportCheckbox.checked) {
+                    supportDaysOptions.style.display = 'block';
+                } else {
+                    supportDaysOptions.style.display = 'none';
+                    // Desmarcar todos los días si se desactiva el soporte
+                    document.getElementById('editSupportMF').checked = false;
+                    document.getElementById('editSupportSat').checked = false;
+                    document.getElementById('editSupportSun').checked = false;
+                }
+            }
         }
 
         function openEditServiceModal(id, name, color) {
