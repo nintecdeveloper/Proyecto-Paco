@@ -681,11 +681,11 @@
                         <div class="col-7"><label class="form-label">Fecha</label><input type="date" name="date"
                                 id="editTechDate" class="form-control" required></div>
                         <div class="col-5"><label class="form-label">Hora</label><input type="time" name="time"
-                                id="editTechTime" class="form-control"></div>
+                                id="editTechTime" class="form-control" required></div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Tipo Servicio</label>
-                        <select name="service_type" id="editTechService" class="form-select">
+                        <select name="service_type" id="editTechService" class="form-select" required>
                             {% for s in all_service_types %}
                             <option value="{{ s.name }}">{{ s.name }}</option>
                             {% endfor %}
@@ -727,8 +727,11 @@
                             </div>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Hora Fin (Estimada)</label>
-                            <input type="time" name="end_time" id="modalEndTime" class="form-control" required>
+                            <label class="form-label">Hora Fin (Estimada) - Opcional</label>
+                            <input type="time" name="end_time" id="modalEndTime" class="form-control">
+                            <small class="text-muted">
+                                <i class="bi bi-info-circle me-1"></i>Campo opcional - puede dejarse vacío
+                            </small>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Tipo de Servicio</label>
