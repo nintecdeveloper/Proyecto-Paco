@@ -270,7 +270,6 @@
         <div class="d-flex justify-content-between w-100 align-items-center">
             <span class="fw-bold fs-4 text-white">OSLA<span style="color:var(--osla-orange)">PRINT</span></span>
             <div class="d-flex align-items-center gap-2">
-                <span id="sessionTimer" class="badge text-white border border-success me-2" style="background-color: #000; color: #00ff00 !important; font-family: 'Courier New', monospace; font-size: 0.85rem; padding: 5px 10px;">00:00:00</span>
                 <span class="text-white fw-bold me-2">Hola {{ current_user.username }}</span>
                 <button class="btn btn-outline-light btn-sm" data-bs-toggle="modal"
                     data-bs-target="#modalChangePassword" title="Cambiar Contraseña">
@@ -312,6 +311,13 @@
                     <p class="text-muted small">Estadísticas y rendimiento</p>
                 </div>
             </div>
+            <div class="col-12 col-md-6" onclick="showSection('section-incidents')">
+                <div class="menu-card">
+                    <i class="bi bi-exclamation-triangle-fill fs-1 text-danger mb-2 d-block"></i>
+                    <h4 class="text-white">INCIDENCIAS</h4>
+                    <p class="text-muted small">Reportar problemas</p>
+                </div>
+            </div>
         </div>
 
         <div id="section-parte" class="d-none" style="max-width: 900px; margin: auto;">
@@ -335,6 +341,40 @@
                         </option>
                         {% endfor %}
                     </select>
+                </div>
+
+                <!-- CRONÓMETRO DE TRABAJO -->
+                <div class="mb-4 p-4 rounded" style="background: linear-gradient(135deg, #1f1f1f 0%, #2a2a2a 100%); border: 2px solid var(--osla-orange);">
+                    <div class="text-center">
+                        <label class="form-label text-warning fw-bold mb-3 d-block">
+                            <i class="bi bi-stopwatch me-2"></i>CRONÓMETRO DE TRABAJO
+                        </label>
+                        <div class="mb-3">
+                            <div id="workTimerDisplay" class="badge text-white border border-success" 
+                                 style="background-color: #000; color: #00ff00 !important; font-family: 'Courier New', monospace; font-size: 2rem; padding: 15px 30px; min-width: 200px;">
+                                00:00:00
+                            </div>
+                        </div>
+                        <div class="d-flex gap-2 justify-content-center flex-wrap">
+                            <button type="button" id="startTimerBtn" class="btn btn-success" onclick="startWorkTimer()">
+                                <i class="bi bi-play-fill me-1"></i>Iniciar
+                            </button>
+                            <button type="button" id="pauseTimerBtn" class="btn btn-warning" onclick="pauseWorkTimer()" style="display: none;">
+                                <i class="bi bi-pause-fill me-1"></i>Pausar
+                            </button>
+                            <button type="button" id="resumeTimerBtn" class="btn btn-info" onclick="resumeWorkTimer()" style="display: none;">
+                                <i class="bi bi-play-circle me-1"></i>Reanudar
+                            </button>
+                            <button type="button" class="btn btn-danger" onclick="resetWorkTimer()">
+                                <i class="bi bi-arrow-clockwise me-1"></i>Reiniciar
+                            </button>
+                        </div>
+                        <small class="text-muted d-block mt-2">
+                            <i class="bi bi-info-circle me-1"></i>Inicia el cronómetro cuando comiences el trabajo
+                        </small>
+                        <!-- Campo oculto para guardar la duración total -->
+                        <input type="hidden" name="work_duration" id="workDurationInput" value="0">
+                    </div>
                 </div>
 
                 <div class="row g-3 mb-3">
@@ -393,11 +433,9 @@
                     </div>
                     <div class="row g-2">
                         <div class="col-8">
-                            <select name="stock_item" class="form-select">
+                            <select name="stock_item" id="stockItemSelect" class="form-select">
                                 <option value="">Sin artículo de stock</option>
-                                {% for item in stock_items %}
-                                <option value="{{ item.id }}">{{ item.name }} ({{ item.quantity }} disponibles)</option>
-                                {% endfor %}
+                                <!-- Se llenará dinámicamente con categorías y subcategorías -->
                             </select>
                         </div>
                         <div class="col-4">
@@ -602,6 +640,126 @@
             </div>
 
 
+        </div>
+
+        <!-- SECCIÓN INCIDENCIAS -->
+        <div id="section-incidents" class="d-none" style="max-width: 900px; margin: auto;">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h3 class="text-danger fw-bold m-0 fs-4">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>Reportar Incidencia
+                </h3>
+                <button class="btn btn-outline-secondary btn-sm px-3" onclick="showSection('home-menu')">Atrás</button>
+            </div>
+
+            <div class="card bg-dark border-secondary p-4">
+                <form id="incidentForm">
+                    <!-- Tipo de Incidencia -->
+                    <div class="mb-4">
+                        <label class="form-label text-white fw-bold">
+                            <i class="bi bi-ui-radios me-2"></i>TIPO DE INCIDENCIA *
+                        </label>
+                        <div class="row g-2">
+                            <div class="col-md-6">
+                                <div class="form-check p-3 rounded" style="background: #1f1f1f; border: 2px solid #444; cursor: pointer;"
+                                     onclick="document.getElementById('incidentTypeService').checked = true; toggleServiceField()">
+                                    <input class="form-check-input" type="radio" name="incident_type" id="incidentTypeService" 
+                                           value="servicio" checked onchange="toggleServiceField()">
+                                    <label class="form-check-label fw-bold" for="incidentTypeService">
+                                        <i class="bi bi-tools text-warning me-2"></i>Relacionada con Servicio
+                                    </label>
+                                    <p class="small text-muted mb-0 mt-2">Problemas con un servicio específico realizado</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check p-3 rounded" style="background: #1f1f1f; border: 2px solid #444; cursor: pointer;"
+                                     onclick="document.getElementById('incidentTypeApp').checked = true; toggleServiceField()">
+                                    <input class="form-check-input" type="radio" name="incident_type" id="incidentTypeApp" 
+                                           value="aplicacion" onchange="toggleServiceField()">
+                                    <label class="form-check-label fw-bold" for="incidentTypeApp">
+                                        <i class="bi bi-bug text-danger me-2"></i>Problema con la Aplicación
+                                    </label>
+                                    <p class="small text-muted mb-0 mt-2">Errores o fallos en la aplicación OSLAPRINT</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Servicio Relacionado (solo para incidencias de servicio) -->
+                    <div class="mb-3" id="serviceSelectDiv">
+                        <label class="form-label text-white fw-bold">
+                            <i class="bi bi-link-45deg me-2"></i>SERVICIO RELACIONADO (Opcional)
+                        </label>
+                        <select name="service_id" id="incidentServiceSelect" class="form-select">
+                            <option value="">No vinculado a ningún servicio</option>
+                            {% for task in pending_tasks %}
+                            <option value="{{ task.id }}">
+                                {{ task.date.strftime('%d/%m/%Y') }} - {{ task.client_name }} - {{ task.service_type }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <small class="text-muted">Selecciona un servicio si la incidencia está relacionada con un trabajo específico</small>
+                    </div>
+
+                    <!-- Título -->
+                    <div class="mb-3">
+                        <label class="form-label text-white fw-bold">
+                            <i class="bi bi-card-heading me-2"></i>TÍTULO *
+                        </label>
+                        <input type="text" name="title" id="incidentTitle" class="form-control" required
+                               placeholder="Ej: Error al guardar parte, Cliente no aparece en sistema...">
+                    </div>
+
+                    <!-- Descripción -->
+                    <div class="mb-3">
+                        <label class="form-label text-white fw-bold">
+                            <i class="bi bi-text-paragraph me-2"></i>DESCRIPCIÓN DETALLADA *
+                        </label>
+                        <textarea name="description" id="incidentDescription" class="form-control" rows="6" required
+                                  placeholder="Describe el problema con el mayor detalle posible..."></textarea>
+                        <small class="text-muted">Incluye pasos para reproducir el problema, mensajes de error, etc.</small>
+                    </div>
+
+                    <!-- Prioridad -->
+                    <div class="mb-4">
+                        <label class="form-label text-white fw-bold">
+                            <i class="bi bi-flag me-2"></i>PRIORIDAD
+                        </label>
+                        <select name="priority" class="form-select">
+                            <option value="normal" selected>Normal</option>
+                            <option value="alta">Alta</option>
+                            <option value="urgente">Urgente</option>
+                        </select>
+                    </div>
+
+                    <!-- Información de destino -->
+                    <div class="alert alert-info border-info bg-black mb-4">
+                        <i class="bi bi-info-circle me-2"></i>
+                        <strong id="incidentDestInfo">Esta incidencia se enviará a: paco@oslaprint.com</strong>
+                    </div>
+
+                    <!-- Botones -->
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-danger flex-grow-1">
+                            <i class="bi bi-send-fill me-2"></i>ENVIAR INCIDENCIA
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" onclick="document.getElementById('incidentForm').reset(); toggleServiceField()">
+                            <i class="bi bi-arrow-clockwise me-2"></i>Limpiar
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Historial de Incidencias -->
+            <div class="card bg-dark border-secondary p-4 mt-4">
+                <h5 class="text-white fw-bold mb-3">
+                    <i class="bi bi-clock-history me-2"></i>Mis Incidencias Recientes
+                </h5>
+                <div id="incidentsHistory">
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-hourglass-split"></i> Cargando...
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -2247,28 +2405,366 @@
             });
         }
 
-        // CONTADOR DE SESIÓN ACTIVA
-        let sessionStartTime = Date.now();
-        let sessionTimerInterval;
+        // ============================================================
+        // CRONÓMETRO DE TRABAJO (para sección Nuevo Parte)
+        // ============================================================
+        
+        let workTimer = {
+            startTime: null,
+            elapsedTime: 0,  // Tiempo acumulado en milisegundos
+            intervalId: null,
+            isRunning: false,
+            isPaused: false
+        };
 
-        function updateSessionTimer() {
-            const elapsed = Date.now() - sessionStartTime;
-            const hours = Math.floor(elapsed / 3600000);
-            const minutes = Math.floor((elapsed % 3600000) / 60000);
-            const seconds = Math.floor((elapsed % 60000) / 1000);
-            
-            const timerText = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-            const timerEl = document.getElementById('sessionTimer');
-            if (timerEl) {
-                timerEl.innerText = timerText;
+        function loadWorkTimerState() {
+            // Cargar estado del cronómetro desde localStorage
+            const saved = localStorage.getItem('workTimerState');
+            if (saved) {
+                try {
+                    const state = JSON.parse(saved);
+                    workTimer.elapsedTime = state.elapsedTime || 0;
+                    workTimer.isRunning = state.isRunning || false;
+                    workTimer.isPaused = state.isPaused || false;
+                    
+                    if (state.startTime) {
+                        workTimer.startTime = state.startTime;
+                    }
+                    
+                    updateWorkTimerDisplay();
+                    
+                    // Si estaba corriendo, continuar
+                    if (workTimer.isRunning && !workTimer.isPaused) {
+                        startWorkTimerInterval();
+                        updateTimerButtons('running');
+                    } else if (workTimer.isPaused) {
+                        updateTimerButtons('paused');
+                    }
+                } catch (e) {
+                    console.error('Error cargando estado del cronómetro:', e);
+                    resetWorkTimer();
+                }
             }
         }
 
-        // Iniciar contador de sesión
+        function saveWorkTimerState() {
+            // Guardar estado del cronómetro en localStorage
+            const state = {
+                startTime: workTimer.startTime,
+                elapsedTime: workTimer.elapsedTime,
+                isRunning: workTimer.isRunning,
+                isPaused: workTimer.isPaused
+            };
+            localStorage.setItem('workTimerState', JSON.stringify(state));
+        }
+
+        function startWorkTimer() {
+            if (workTimer.isRunning) return;
+            
+            workTimer.startTime = Date.now();
+            workTimer.isRunning = true;
+            workTimer.isPaused = false;
+            
+            startWorkTimerInterval();
+            updateTimerButtons('running');
+            saveWorkTimerState();
+        }
+
+        function pauseWorkTimer() {
+            if (!workTimer.isRunning || workTimer.isPaused) return;
+            
+            // Guardar tiempo acumulado
+            const currentTime = Date.now();
+            workTimer.elapsedTime += (currentTime - workTimer.startTime);
+            workTimer.isPaused = true;
+            
+            clearInterval(workTimer.intervalId);
+            workTimer.intervalId = null;
+            
+            updateTimerButtons('paused');
+            saveWorkTimerState();
+        }
+
+        function resumeWorkTimer() {
+            if (!workTimer.isPaused) return;
+            
+            workTimer.startTime = Date.now();
+            workTimer.isPaused = false;
+            
+            startWorkTimerInterval();
+            updateTimerButtons('running');
+            saveWorkTimerState();
+        }
+
+        function resetWorkTimer() {
+            // Detener el cronómetro
+            if (workTimer.intervalId) {
+                clearInterval(workTimer.intervalId);
+            }
+            
+            // Resetear valores
+            workTimer.startTime = null;
+            workTimer.elapsedTime = 0;
+            workTimer.isRunning = false;
+            workTimer.isPaused = false;
+            workTimer.intervalId = null;
+            
+            // Actualizar display
+            updateWorkTimerDisplay();
+            updateTimerButtons('stopped');
+            
+            // Limpiar localStorage
+            localStorage.removeItem('workTimerState');
+            
+            // Limpiar campo oculto
+            document.getElementById('workDurationInput').value = '0';
+        }
+
+        function startWorkTimerInterval() {
+            workTimer.intervalId = setInterval(() => {
+                updateWorkTimerDisplay();
+                saveWorkTimerState();
+            }, 1000);
+        }
+
+        function updateWorkTimerDisplay() {
+            let totalElapsed = workTimer.elapsedTime;
+            
+            if (workTimer.isRunning && !workTimer.isPaused && workTimer.startTime) {
+                totalElapsed += (Date.now() - workTimer.startTime);
+            }
+            
+            const hours = Math.floor(totalElapsed / 3600000);
+            const minutes = Math.floor((totalElapsed % 3600000) / 60000);
+            const seconds = Math.floor((totalElapsed % 60000) / 1000);
+            
+            const display = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            
+            const timerEl = document.getElementById('workTimerDisplay');
+            if (timerEl) {
+                timerEl.textContent = display;
+            }
+            
+            // Actualizar campo oculto con duración total en segundos
+            document.getElementById('workDurationInput').value = Math.floor(totalElapsed / 1000);
+        }
+
+        function updateTimerButtons(state) {
+            const startBtn = document.getElementById('startTimerBtn');
+            const pauseBtn = document.getElementById('pauseTimerBtn');
+            const resumeBtn = document.getElementById('resumeTimerBtn');
+            
+            if (!startBtn || !pauseBtn || !resumeBtn) return;
+            
+            if (state === 'running') {
+                startBtn.style.display = 'none';
+                pauseBtn.style.display = 'inline-block';
+                resumeBtn.style.display = 'none';
+            } else if (state === 'paused') {
+                startBtn.style.display = 'none';
+                pauseBtn.style.display = 'none';
+                resumeBtn.style.display = 'inline-block';
+            } else { // stopped
+                startBtn.style.display = 'inline-block';
+                pauseBtn.style.display = 'none';
+                resumeBtn.style.display = 'none';
+            }
+        }
+
+        // Cargar estado del cronómetro cuando se carga la página
         document.addEventListener('DOMContentLoaded', function() {
-            sessionTimerInterval = setInterval(updateSessionTimer, 1000);
-            updateSessionTimer();
+            loadWorkTimerState();
+            loadStockCategories();  // Cargar stock organizado
+            
+            // Limpiar el cronómetro cuando se envía el formulario exitosamente
+            const reportForm = document.querySelector('form[action="/save_report"]');
+            if (reportForm) {
+                const originalHandler = reportForm.onsubmit;
+                reportForm.addEventListener('submit', function(e) {
+                    // Asegurarse de que el tiempo final esté guardado
+                    updateWorkTimerDisplay();
+                    
+                    // Opcional: Limpiar el cronómetro después de enviar
+                    // (descomenta la siguiente línea si quieres que se limpie automáticamente)
+                    // setTimeout(() => resetWorkTimer(), 1000);
+                });
+            }
         });
+
+        // ============================================================
+        // CARGAR STOCK ORGANIZADO POR CATEGORÍAS
+        // ============================================================
+        
+        function loadStockCategories() {
+            fetch('/api/stock_categories')
+                .then(res => res.json())
+                .then(categories => {
+                    populateStockSelect(categories);
+                })
+                .catch(err => {
+                    console.error('Error cargando categorías de stock:', err);
+                });
+        }
+
+        function populateStockSelect(categories) {
+            const select = document.getElementById('stockItemSelect');
+            if (!select) return;
+            
+            // Limpiar opciones existentes excepto la primera
+            select.innerHTML = '<option value="">Sin artículo de stock</option>';
+            
+            // Función recursiva para añadir categorías y sus items
+            function addCategoryItems(cat, level = 0) {
+                // Añadir items de esta categoría
+                if (cat.items && cat.items.length > 0) {
+                    const optgroup = document.createElement('optgroup');
+                    optgroup.label = '─'.repeat(level) + (level > 0 ? ' ' : '') + cat.name;
+                    
+                    cat.items.forEach(item => {
+                        const option = document.createElement('option');
+                        option.value = item.id;
+                        option.textContent = `${item.name} (${item.quantity} disponibles)`;
+                        optgroup.appendChild(option);
+                    });
+                    
+                    select.appendChild(optgroup);
+                }
+                
+                // Procesar subcategorías recursivamente
+                if (cat.children && cat.children.length > 0) {
+                    cat.children.forEach(child => {
+                        addCategoryItems(child, level + 1);
+                    });
+                }
+            }
+            
+            // Añadir todas las categorías principales
+            categories.forEach(cat => {
+                addCategoryItems(cat, 0);
+            });
+        }
+
+        // ============================================================
+        // GESTIÓN DE INCIDENCIAS
+        // ============================================================
+        
+        function toggleServiceField() {
+            const serviceDiv = document.getElementById('serviceSelectDiv');
+            const destInfo = document.getElementById('incidentDestInfo');
+            const isServiceIncident = document.getElementById('incidentTypeService').checked;
+            
+            if (isServiceIncident) {
+                serviceDiv.style.display = 'block';
+                destInfo.textContent = 'Esta incidencia se enviará a: paco@oslaprint.com';
+            } else {
+                serviceDiv.style.display = 'none';
+                document.getElementById('incidentServiceSelect').value = '';
+                destInfo.textContent = 'Esta incidencia se enviará a: nintecdeveloper@gmail.com';
+            }
+        }
+
+        // Manejar envío del formulario de incidencias
+        document.addEventListener('DOMContentLoaded', function() {
+            const incidentForm = document.getElementById('incidentForm');
+            if (incidentForm) {
+                incidentForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    
+                    const formData = new FormData(this);
+                    
+                    // Mostrar indicador de carga
+                    const submitBtn = this.querySelector('button[type="submit"]');
+                    const originalText = submitBtn.innerHTML;
+                    submitBtn.disabled = true;
+                    submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Enviando...';
+                    
+                    fetch('/submit_incident', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = originalText;
+                        
+                        if (data.success) {
+                            alert('✅ Incidencia enviada correctamente\n\nSe ha notificado al equipo correspondiente.');
+                            this.reset();
+                            toggleServiceField();
+                            loadIncidentsHistory();
+                        } else {
+                            alert('❌ Error al enviar incidencia: ' + data.msg);
+                        }
+                    })
+                    .catch(err => {
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = originalText;
+                        console.error('Error:', err);
+                        alert('Error de conexión al enviar la incidencia');
+                    });
+                });
+            }
+        });
+
+        function loadIncidentsHistory() {
+            fetch('/api/incidents')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success && data.incidents) {
+                        displayIncidentsHistory(data.incidents);
+                    }
+                })
+                .catch(err => {
+                    console.error('Error cargando historial:', err);
+                });
+        }
+
+        function displayIncidentsHistory(incidents) {
+            const container = document.getElementById('incidentsHistory');
+            if (!container) return;
+            
+            if (incidents.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-inbox"></i> No tienes incidencias registradas
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = '<div class="list-group">';
+            incidents.slice(0, 10).forEach(inc => {
+                const statusClass = {
+                    'Abierta': 'danger',
+                    'En proceso': 'warning',
+                    'Cerrada': 'success'
+                }[inc.status] || 'secondary';
+                
+                const typeIcon = inc.type === 'servicio' ? 'tools' : 'bug';
+                const typeClass = inc.type === 'servicio' ? 'warning' : 'danger';
+                
+                html += `
+                    <div class="list-group-item bg-black border-secondary mb-2">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <h6 class="mb-1 text-white">
+                                    <i class="bi bi-${typeIcon} text-${typeClass} me-2"></i>${inc.title}
+                                </h6>
+                                <p class="small text-muted mb-2">${inc.description.substring(0, 100)}${inc.description.length > 100 ? '...' : ''}</p>
+                                <small class="text-muted">
+                                    <i class="bi bi-calendar me-1"></i>${inc.created_at}
+                                    ${inc.service_info ? `<i class="bi bi-link-45deg ms-2 me-1"></i>Servicio #${inc.service_info.id}` : ''}
+                                </small>
+                            </div>
+                            <span class="badge bg-${statusClass}">${inc.status}</span>
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            
+            container.innerHTML = html;
+        }
 
     </script>
 </body>

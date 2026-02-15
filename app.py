@@ -10,6 +10,9 @@ from werkzeug.utils import secure_filename
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 import io
 import re
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
@@ -124,6 +127,23 @@ class Alarm(db.Model):
     is_read = db.Column(db.Boolean, default=False)
     priority = db.Column(db.String(20), default='normal')
 
+class Incident(db.Model):
+    """Modelo para gestionar incidencias reportadas por técnicos"""
+    id = db.Column(db.Integer, primary_key=True)
+    tech_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    incident_type = db.Column(db.String(50), nullable=False)  # 'servicio' o 'aplicacion'
+    title = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, nullable=False)
+    service_id = db.Column(db.Integer, db.ForeignKey('task.id'), nullable=True)  # Si está relacionado con un servicio
+    status = db.Column(db.String(20), default='Abierta')  # Abierta, En proceso, Cerrada
+    priority = db.Column(db.String(20), default='normal')  # baja, normal, alta, urgente
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    resolved_at = db.Column(db.DateTime, nullable=True)
+    notes = db.Column(db.Text, nullable=True)
+    
+    tech = db.relationship('User', backref='incidents')
+    service = db.relationship('Task', backref='incidents', foreign_keys=[service_id])
+
 @login_manager.user_loader
 def load_user(id):
     return User.query.get(int(id))
@@ -175,6 +195,92 @@ def check_low_stock():
     except SQLAlchemyError as e:
         db.session.rollback()
         print(f"Error en check_low_stock: {str(e)}")
+
+def send_incident_email(to_email, incident_data):
+    """Enviar email de notificación de incidencia"""
+    try:
+        # Configuración del servidor SMTP (usar variables de entorno en producción)
+        smtp_server = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
+        smtp_port = int(os.getenv('SMTP_PORT', '587'))
+        smtp_user = os.getenv('SMTP_USER', 'oslaprint@gmail.com')
+        smtp_password = os.getenv('SMTP_PASSWORD', '')
+        
+        # Si no hay credenciales configuradas, solo registrar en consola
+        if not smtp_password:
+            print(f"📧 [SIMULADO] Email de incidencia enviado a {to_email}")
+            print(f"   Tipo: {incident_data['type']}")
+            print(f"   Título: {incident_data['title']}")
+            print(f"   Descripción: {incident_data['description']}")
+            return True
+        
+        # Crear mensaje
+        msg = MIMEMultipart('alternative')
+        msg['From'] = smtp_user
+        msg['To'] = to_email
+        msg['Subject'] = f"[OSLAPRINT] Nueva Incidencia: {incident_data['title']}"
+        
+        # Cuerpo del email en HTML
+        html_body = f"""
+        <html>
+        <head>
+            <style>
+                body {{ font-family: Arial, sans-serif; color: #333; }}
+                .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+                .header {{ background-color: #f37021; color: white; padding: 20px; text-align: center; }}
+                .content {{ background-color: #f9f9f9; padding: 20px; }}
+                .footer {{ text-align: center; padding: 10px; font-size: 12px; color: #666; }}
+                .field {{ margin-bottom: 15px; }}
+                .label {{ font-weight: bold; color: #f37021; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>OSLAPRINT - Nueva Incidencia</h1>
+                </div>
+                <div class="content">
+                    <div class="field">
+                        <span class="label">Tipo de Incidencia:</span> 
+                        {incident_data['type']}
+                    </div>
+                    <div class="field">
+                        <span class="label">Título:</span> 
+                        {incident_data['title']}
+                    </div>
+                    <div class="field">
+                        <span class="label">Descripción:</span><br>
+                        {incident_data['description']}
+                    </div>
+                    <div class="field">
+                        <span class="label">Reportado por:</span> 
+                        {incident_data['tech_name']}
+                    </div>
+                    <div class="field">
+                        <span class="label">Fecha:</span> 
+                        {incident_data['date']}
+                    </div>
+                    {f'<div class="field"><span class="label">Servicio relacionado:</span> {incident_data["service_info"]}</div>' if incident_data.get('service_info') else ''}
+                </div>
+                <div class="footer">
+                    Este es un mensaje automático del sistema OSLAPRINT
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        msg.attach(MIMEText(html_body, 'html'))
+        
+        # Enviar email
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
+            server.starttls()
+            server.login(smtp_user, smtp_password)
+            server.send_message(msg)
+        
+        return True
+    except Exception as e:
+        print(f"Error enviando email: {str(e)}")
+        return False
 
 # --- CONTEXT PROCESSOR ---
 @app.context_processor
@@ -895,18 +1001,33 @@ def get_all_tasks():
     else:
         tasks = Task.query.filter_by(tech_id=current_user.id).all()
     
+    # Mapeo de colores oscuros a colores claros con buen contraste
+    color_map = {
+        '#fd7e14': '#FFD580',  # Naranja claro
+        '#0d6efd': '#A8D8FF',  # Azul claro
+        '#6f42c1': '#D4A5FF',  # Púrpura claro
+        '#20c997': '#8FFFD6',  # Verde/turquesa claro
+        '#6c757d': '#D3D3D3',  # Gris claro
+        '#dc3545': '#FFB3BA',  # Rojo claro
+        '#ffc107': '#FFEB99',  # Amarillo claro
+        '#198754': '#A5F5C4',  # Verde claro
+    }
+    
     events = []
     for task in tasks:
         service_type = ServiceType.query.get(task.service_type_id) if task.service_type_id else None
-        color = service_type.color if service_type else '#6c757d'
+        original_color = service_type.color if service_type else '#6c757d'
+        # Usar color claro si existe en el mapa, sino usar un color claro por defecto
+        light_color = color_map.get(original_color, '#E0E0E0')
         
         events.append({
             'id': task.id,
             'title': f"{task.client_name} - {service_type.name if service_type else 'Sin tipo'}",
             'start': f"{task.date}T{task.start_time}:00" if task.start_time else str(task.date),
             'end': f"{task.date}T{task.end_time}:00" if task.end_time else str(task.date),
-            'backgroundColor': color,
-            'borderColor': color,
+            'backgroundColor': light_color,
+            'borderColor': original_color,  # Usar color original para el borde
+            'textColor': '#000000',  # Texto negro para mejor contraste
             'extendedProps': {
                 'client': task.client_name,
                 'client_id': task.client_id,  # Agregar client_id para poder obtener más información
@@ -1897,6 +2018,115 @@ def api_get_client(client_id):
                 'support_sunday': client.support_sunday
             }
         })
+    except Exception as e:
+        return jsonify({'success': False, 'msg': str(e)}), 500
+
+# --- GESTIÓN DE INCIDENCIAS ---
+@app.route('/submit_incident', methods=['POST'])
+@login_required
+def submit_incident():
+    """Crear nueva incidencia y enviar email correspondiente"""
+    try:
+        incident_type = request.form.get('incident_type')  # 'servicio' o 'aplicacion'
+        title = request.form.get('title')
+        description = request.form.get('description')
+        service_id = request.form.get('service_id')
+        priority = request.form.get('priority', 'normal')
+        
+        # Validar campos obligatorios
+        if not all([incident_type, title, description]):
+            return jsonify({'success': False, 'msg': 'Todos los campos son obligatorios'}), 400
+        
+        # Crear incidencia
+        incident = Incident(
+            tech_id=current_user.id,
+            incident_type=incident_type,
+            title=title,
+            description=description,
+            service_id=int(service_id) if service_id and service_id != '' else None,
+            priority=priority,
+            status='Abierta'
+        )
+        
+        db.session.add(incident)
+        db.session.commit()
+        
+        # Determinar email de destino
+        if incident_type == 'aplicacion':
+            to_email = 'nintecdeveloper@gmail.com'
+            type_label = 'Incidencia de Aplicación'
+        else:  # servicio
+            to_email = 'paco@oslaprint.com'
+            type_label = 'Incidencia de Servicio'
+        
+        # Preparar datos para el email
+        service_info = ''
+        if incident.service_id:
+            task = Task.query.get(incident.service_id)
+            if task:
+                service_info = f"Tarea #{task.id} - {task.client_name} ({task.date.strftime('%d/%m/%Y')})"
+        
+        email_data = {
+            'type': type_label,
+            'title': title,
+            'description': description,
+            'tech_name': current_user.username,
+            'date': datetime.now().strftime('%d/%m/%Y %H:%M'),
+            'service_info': service_info if service_info else None
+        }
+        
+        # Enviar email
+        send_incident_email(to_email, email_data)
+        
+        flash(f'Incidencia registrada correctamente. Se ha enviado notificación a {to_email}', 'success')
+        return jsonify({
+            'success': True,
+            'msg': 'Incidencia creada y notificación enviada',
+            'incident_id': incident.id
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error creando incidencia: {str(e)}")
+        return jsonify({'success': False, 'msg': f'Error al crear incidencia: {str(e)}'}), 500
+
+@app.route('/api/incidents')
+@login_required
+def get_incidents():
+    """Obtener listado de incidencias"""
+    try:
+        if current_user.role == 'admin':
+            # Admin ve todas las incidencias
+            incidents = Incident.query.order_by(Incident.created_at.desc()).all()
+        else:
+            # Técnico solo ve sus incidencias
+            incidents = Incident.query.filter_by(tech_id=current_user.id).order_by(Incident.created_at.desc()).all()
+        
+        incidents_list = []
+        for inc in incidents:
+            service_info = None
+            if inc.service_id:
+                task = Task.query.get(inc.service_id)
+                if task:
+                    service_info = {
+                        'id': task.id,
+                        'client_name': task.client_name,
+                        'date': task.date.strftime('%d/%m/%Y')
+                    }
+            
+            incidents_list.append({
+                'id': inc.id,
+                'type': inc.incident_type,
+                'title': inc.title,
+                'description': inc.description,
+                'status': inc.status,
+                'priority': inc.priority,
+                'tech_name': inc.tech.username,
+                'created_at': inc.created_at.strftime('%d/%m/%Y %H:%M'),
+                'service_info': service_info
+            })
+        
+        return jsonify({'success': True, 'incidents': incidents_list})
     except Exception as e:
         return jsonify({'success': False, 'msg': str(e)}), 500
 
