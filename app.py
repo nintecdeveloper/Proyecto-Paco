@@ -196,6 +196,110 @@ def check_low_stock():
         db.session.rollback()
         print(f"Error en check_low_stock: {str(e)}")
 
+def send_password_reset_email(to_email, username, reset_link):
+    """Enviar email de recuperación de contraseña"""
+    try:
+        # Configuración del servidor SMTP
+        smtp_server = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
+        smtp_port = int(os.getenv('SMTP_PORT', '587'))
+        smtp_user = os.getenv('SMTP_USER', 'oslaprint@gmail.com')
+        smtp_password = os.getenv('SMTP_PASSWORD', '')
+        
+        # Si no hay credenciales configuradas, solo registrar en consola
+        if not smtp_password:
+            print("\n" + "="*60)
+            print("📧 [SIMULADO] Email de recuperación de contraseña")
+            print("="*60)
+            print(f"   Para: {to_email}")
+            print(f"   Usuario: {username}")
+            print(f"   Enlace: {reset_link}")
+            print("="*60 + "\n")
+            return True
+        
+        # Crear mensaje
+        msg = MIMEMultipart('alternative')
+        msg['From'] = smtp_user
+        msg['To'] = to_email
+        msg['Subject'] = "[OSLAPRINT] Recuperación de Contraseña"
+        
+        # Cuerpo del email en HTML
+        html_body = f"""
+        <html>
+        <head>
+            <style>
+                body {{ font-family: Arial, sans-serif; color: #333; }}
+                .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+                .header {{ background-color: #f37021; color: white; padding: 20px; text-align: center; }}
+                .content {{ background-color: #f9f9f9; padding: 20px; }}
+                .footer {{ text-align: center; padding: 10px; font-size: 12px; color: #666; }}
+                .button {{ 
+                    display: inline-block; 
+                    background-color: #f37021; 
+                    color: white; 
+                    padding: 15px 30px; 
+                    text-decoration: none; 
+                    border-radius: 5px; 
+                    margin: 20px 0;
+                    font-weight: bold;
+                }}
+                .warning {{ 
+                    background-color: #fff3cd; 
+                    border-left: 4px solid #ffc107; 
+                    padding: 10px; 
+                    margin: 15px 0; 
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>🔐 OSLAPRINT</h1>
+                    <h2>Recuperación de Contraseña</h2>
+                </div>
+                <div class="content">
+                    <p>Hola <strong>{username}</strong>,</p>
+                    <p>Hemos recibido una solicitud para restablecer la contraseña de tu cuenta en OSLAPRINT.</p>
+                    <p>Haz clic en el siguiente botón para crear una nueva contraseña:</p>
+                    
+                    <div style="text-align: center;">
+                        <a href="{reset_link}" class="button">Restablecer Contraseña</a>
+                    </div>
+                    
+                    <p style="margin-top: 20px;">O copia y pega este enlace en tu navegador:</p>
+                    <p style="word-break: break-all; background: #eee; padding: 10px; font-size: 12px;">
+                        {reset_link}
+                    </p>
+                    
+                    <div class="warning">
+                        ⚠️ <strong>Importante:</strong> Este enlace expirará en 24 horas por seguridad.
+                    </div>
+                    
+                    <p style="margin-top: 20px; font-size: 13px; color: #666;">
+                        Si no solicitaste este cambio, puedes ignorar este correo. Tu contraseña no cambiará hasta que accedas al enlace y crees una nueva.
+                    </p>
+                </div>
+                <div class="footer">
+                    Este es un mensaje automático del sistema OSLAPRINT<br>
+                    Por favor no respondas a este correo
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        msg.attach(MIMEText(html_body, 'html'))
+        
+        # Enviar email
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
+            server.starttls()
+            server.login(smtp_user, smtp_password)
+            server.send_message(msg)
+        
+        return True
+    except Exception as e:
+        print(f"Error enviando email de recuperación: {str(e)}")
+        return False
+
 def send_incident_email(to_email, incident_data):
     """Enviar email de notificación de incidencia"""
     try:
@@ -352,7 +456,7 @@ def forgot_password():
             flash('Por favor ingresa tu correo electrónico', 'danger')
             return redirect(url_for('login'))
         
-        # ✅ MEJORADO: Buscar TODOS los usuarios con este email (puede haber varios)
+        # Buscar TODOS los usuarios con este email (puede haber varios)
         users = User.query.filter_by(email=email).all()
         
         if not users:
@@ -360,30 +464,24 @@ def forgot_password():
             flash('Si el correo existe en nuestro sistema, recibirás un enlace de recuperación', 'info')
             return redirect(url_for('login'))
         
-        # ✅ Generar token para CADA usuario con este email
+        # Generar token y enviar email para CADA usuario con este email
+        emails_sent = 0
         for user in users:
             reset_token = secrets.token_urlsafe(32)
             user.reset_token = reset_token
             user.reset_token_expiry = datetime.now() + timedelta(hours=24)
             
-            # En producción, aquí se enviaría un email con el enlace
-            # Por ahora, mostramos el enlace en consola para desarrollo
+            # Generar enlace de recuperación
             reset_link = url_for('reset_password', token=reset_token, _external=True)
-            print("\n" + "="*60)
-            print("🔐 ENLACE DE RECUPERACIÓN DE CONTRASEÑA")
-            print("="*60)
-            print(f"Usuario: {user.username} ({user.role})")
-            print(f"Email: {user.email}")
-            print(f"Enlace: {reset_link}")
-            print("="*60 + "\n")
+            
+            # Enviar email
+            if send_password_reset_email(user.email, user.username, reset_link):
+                emails_sent += 1
         
         db.session.commit()
         
-        num_accounts = len(users)
-        if num_accounts > 1:
-            flash(f'Se han generado {num_accounts} enlaces de recuperación para las cuentas asociadas a este email. Revisa la consola del servidor.', 'success')
-        else:
-            flash('Se ha generado un enlace de recuperación. Revisa la consola del servidor.', 'success')
+        # Mensaje genérico por seguridad
+        flash('Si el correo existe en nuestro sistema, recibirás un enlace de recuperación en tu bandeja de entrada', 'success')
         
         return redirect(url_for('login'))
         
