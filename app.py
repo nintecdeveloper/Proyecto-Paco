@@ -7,6 +7,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 import io
 import re
 
@@ -31,8 +32,8 @@ login_manager.login_view = 'login'
 # --- MODELOS ---
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(50), unique=True, nullable=False)
-    email = db.Column(db.String(100), unique=True, nullable=True)
+    username = db.Column(db.String(50), unique=True, nullable=False, index=True)
+    email = db.Column(db.String(100), unique=True, nullable=False, index=True)  # ✅ CORREGIDO: unique=True
     password_hash = db.Column(db.String(128))
     role = db.Column(db.String(20))  # 'admin' o 'tech'
     reset_token = db.Column(db.String(100), unique=True, nullable=True)
@@ -145,26 +146,35 @@ def validate_password(password):
         return False, "La contraseña debe contener al menos un carácter especial"
     return True, "Contraseña válida"
 
+def validate_email(email):
+    """Validar formato de email"""
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return re.match(pattern, email) is not None
+
 def check_low_stock():
     """Verificar stock bajo y crear alarmas"""
-    low_items = Stock.query.filter(Stock.quantity <= Stock.min_stock).all()
-    for item in low_items:
-        existing = Alarm.query.filter_by(
-            alarm_type='low_stock',
-            stock_item_id=item.id,
-            is_read=False
-        ).first()
-        
-        if not existing:
-            alarm = Alarm(
+    try:
+        low_items = Stock.query.filter(Stock.quantity <= Stock.min_stock).all()
+        for item in low_items:
+            existing = Alarm.query.filter_by(
                 alarm_type='low_stock',
-                title=f'Stock bajo: {item.name}',
-                description=f'El stock de {item.name} está en {item.quantity} unidades (mínimo: {item.min_stock})',
                 stock_item_id=item.id,
-                priority='high'
-            )
-            db.session.add(alarm)
-    db.session.commit()
+                is_read=False
+            ).first()
+            
+            if not existing:
+                alarm = Alarm(
+                    alarm_type='low_stock',
+                    title=f'Stock bajo: {item.name}',
+                    description=f'El stock de {item.name} está en {item.quantity} unidades (mínimo: {item.min_stock})',
+                    stock_item_id=item.id,
+                    priority='high'
+                )
+                db.session.add(alarm)
+        db.session.commit()
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        print(f"Error en check_low_stock: {str(e)}")
 
 # --- CONTEXT PROCESSOR ---
 @app.context_processor
@@ -236,33 +246,39 @@ def forgot_password():
             flash('Por favor ingresa tu correo electrónico', 'danger')
             return redirect(url_for('login'))
         
-        # Buscar usuario por email
-        user = User.query.filter_by(email=email).first()
+        # ✅ MEJORADO: Buscar TODOS los usuarios con este email (puede haber varios)
+        users = User.query.filter_by(email=email).all()
         
-        if not user:
+        if not users:
             # Por seguridad, no revelamos si el email existe o no
             flash('Si el correo existe en nuestro sistema, recibirás un enlace de recuperación', 'info')
             return redirect(url_for('login'))
         
-        # Generar token único
-        reset_token = secrets.token_urlsafe(32)
-        user.reset_token = reset_token
-        user.reset_token_expiry = datetime.now() + timedelta(hours=24)
+        # ✅ Generar token para CADA usuario con este email
+        for user in users:
+            reset_token = secrets.token_urlsafe(32)
+            user.reset_token = reset_token
+            user.reset_token_expiry = datetime.now() + timedelta(hours=24)
+            
+            # En producción, aquí se enviaría un email con el enlace
+            # Por ahora, mostramos el enlace en consola para desarrollo
+            reset_link = url_for('reset_password', token=reset_token, _external=True)
+            print("\n" + "="*60)
+            print("🔐 ENLACE DE RECUPERACIÓN DE CONTRASEÑA")
+            print("="*60)
+            print(f"Usuario: {user.username} ({user.role})")
+            print(f"Email: {user.email}")
+            print(f"Enlace: {reset_link}")
+            print("="*60 + "\n")
         
         db.session.commit()
         
-        # En producción, aquí se enviaría un email con el enlace
-        # Por ahora, mostramos el enlace en consola para desarrollo
-        reset_link = url_for('reset_password', token=reset_token, _external=True)
-        print("\n" + "="*60)
-        print("🔐 ENLACE DE RECUPERACIÓN DE CONTRASEÑA")
-        print("="*60)
-        print(f"Usuario: {user.username}")
-        print(f"Email: {user.email}")
-        print(f"Enlace: {reset_link}")
-        print("="*60 + "\n")
+        num_accounts = len(users)
+        if num_accounts > 1:
+            flash(f'Se han generado {num_accounts} enlaces de recuperación para las cuentas asociadas a este email. Revisa la consola del servidor.', 'success')
+        else:
+            flash('Se ha generado un enlace de recuperación. Revisa la consola del servidor.', 'success')
         
-        flash('Se ha generado un enlace de recuperación. Revisa la consola del servidor.', 'success')
         return redirect(url_for('login'))
         
     except Exception as e:
@@ -396,46 +412,82 @@ def manage_users():
     
     action = request.form.get('action')
     
-    if action == 'add':
-        username = request.form.get('username')
-        email = request.form.get('email')
-        password = request.form.get('password')
-        role = request.form.get('role', 'tech')
-        
-        if User.query.filter_by(username=username).first():
-            flash('Ya existe un usuario con ese nombre', 'danger')
-            return redirect(url_for('dashboard'))
-        
-        if User.query.filter_by(email=email).first():
-            flash('Ya existe un usuario con ese email', 'danger')
-            return redirect(url_for('dashboard'))
-        
-        is_valid, message = validate_password(password)
-        if not is_valid:
-            flash(message, 'danger')
-            return redirect(url_for('dashboard'))
-        
-        new_user = User(
-            username=username,
-            email=email,
-            password_hash=generate_password_hash(password),
-            role=role
-        )
-        db.session.add(new_user)
-        db.session.commit()
-        
-        flash(f'Usuario {username} creado correctamente', 'success')
-    
-    elif action == 'delete':
-        user_id = request.form.get('user_id')
-        user = User.query.get(user_id)
-        
-        if user and user.id != current_user.id:
-            db.session.delete(user)
+    try:
+        if action == 'add':
+            username = request.form.get('username', '').strip()
+            email = request.form.get('email', '').strip()
+            password = request.form.get('password', '')
+            role = request.form.get('role', 'tech')
+            
+            # ✅ VALIDACIONES MEJORADAS
+            if not username or not email or not password:
+                flash('Todos los campos son obligatorios', 'danger')
+                return redirect(url_for('dashboard'))
+            
+            # Validar formato de email
+            if not validate_email(email):
+                flash('El formato del correo electrónico no es válido', 'danger')
+                return redirect(url_for('dashboard'))
+            
+            # ✅ VALIDACIÓN: Verificar username único
+            if User.query.filter_by(username=username).first():
+                flash('Ya existe un usuario con ese nombre', 'danger')
+                return redirect(url_for('dashboard'))
+            
+            # ✅ VALIDACIÓN: Verificar email único
+            if User.query.filter_by(email=email).first():
+                flash('Ya existe un usuario con ese correo electrónico', 'danger')
+                return redirect(url_for('dashboard'))
+            
+            # Validar contraseña
+            is_valid, message = validate_password(password)
+            if not is_valid:
+                flash(message, 'danger')
+                return redirect(url_for('dashboard'))
+            
+            new_user = User(
+                username=username,
+                email=email,
+                password_hash=generate_password_hash(password),
+                role=role
+            )
+            db.session.add(new_user)
             db.session.commit()
-            flash('Usuario eliminado correctamente', 'success')
+            
+            flash(f'Usuario {username} creado correctamente', 'success')
+        
+        elif action == 'delete':
+            user_id = request.form.get('user_id')
+            user = User.query.get(user_id)
+            
+            if user and user.id != current_user.id:
+                # ✅ Verificar si tiene tareas asignadas
+                if user.tasks:
+                    flash(f'No se puede eliminar el usuario porque tiene {len(user.tasks)} tareas asignadas', 'danger')
+                    return redirect(url_for('dashboard'))
+                
+                db.session.delete(user)
+                db.session.commit()
+                flash('Usuario eliminado correctamente', 'success')
+            else:
+                flash('No puedes eliminar tu propio usuario', 'danger')
+        
         else:
-            flash('No puedes eliminar tu propio usuario', 'danger')
+            flash('Acción no válida', 'danger')
+    
+    except IntegrityError as e:
+        db.session.rollback()
+        print(f"Error de integridad en manage_users: {str(e)}")
+        if 'username' in str(e).lower():
+            flash('Error: El nombre de usuario ya existe', 'danger')
+        elif 'email' in str(e).lower():
+            flash('Error: El correo electrónico ya existe', 'danger')
+        else:
+            flash('Error de integridad en la base de datos', 'danger')
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        print(f"Error en manage_users: {str(e)}")
+        flash('Error al procesar la solicitud', 'danger')
     
     return redirect(url_for('dashboard'))
 
@@ -1890,23 +1942,22 @@ with app.app_context():
     except Exception as e:
         print(f"Nota: Migración de 'link': {e}")
     
-    # Usuarios - SOLO ESTOS DOS
-    # 1. Paco (admin)
-    if not User.query.filter_by(username='Paco').first():
+    # Usuarios de prueba
+    if not User.query.filter_by(username='admin').first():
         db.session.add(User(
-            username='Paco',
-            email='paco@oslaprint.com', 
+            username='admin',
+            email='admin@oslaprint.com',
             role='admin', 
-            password_hash=generate_password_hash('Paco123!')
+            password_hash=generate_password_hash('Admin123!')
         ))
     
-    # 2. Paco_tec (técnico)
-    if not User.query.filter_by(username='Paco_tec').first():
+    # 2. Técnico de prueba
+    if not User.query.filter_by(username='tecnico').first():
         db.session.add(User(
-            username='Paco_tec',
-            email='paco_tec@oslaprint.com', 
+            username='tecnico',
+            email='tecnico@oslaprint.com',
             role='tech', 
-            password_hash=generate_password_hash('Paco123!')
+            password_hash=generate_password_hash('Tecnico123!')
         ))
     
     # Tipos de Servicio
