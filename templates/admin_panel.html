@@ -1700,91 +1700,8 @@
             modalActionAdmin.show();
         }
 
-        // CALENDARIO GLOBAL
-        document.getElementById('tabGlobalBtn').addEventListener('click', function () {
-            if (calendarGlobalInstance) {
-                calendarGlobalInstance.render();
-                updateGlobalFilters();
-                return;
-            }
-
-            var calendarEl = document.getElementById('calendarGlobal');
-            var isMobile = window.innerWidth < 768;
-
-            calendarGlobalInstance = new FullCalendar.Calendar(calendarEl, {
-                initialView: isMobile ? 'listWeek' : 'dayGridMonth',
-                locale: 'es',
-                headerToolbar: {
-                    left: 'prev,next today',
-                    center: 'title',
-                    right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek'
-                },
-                buttonText: {
-                    today: 'Hoy',
-                    month: 'Mes',
-                    week: 'Semana',
-                    day: 'Día',
-                    list: 'Lista'
-                },
-                height: 'auto',
-                navLinks: true,
-                editable: false,
-                dayMaxEvents: true,
-                events: '/api/admin/all_tasks',
-                dateClick: handleAdminDateClickGlobal,
-                selectable: true,
-
-                // FILTRADO DINÁMICO Y COLORES MEJORADOS
-                eventDidMount: function (info) {
-                    const type = info.event.extendedProps.service_type;
-                    const activeTypes = getActiveFilters();
-
-                    if (!activeTypes.includes(type)) {
-                        info.el.style.display = 'none';
-                    } else {
-                        info.el.style.display = '';
-
-                        // Colores claros según tipo de servicio
-                        const serviceColors = {
-                            'Avería': 'rgba(253, 126, 20, 0.3)',
-                            'Revisión': 'rgba(13, 110, 253, 0.3)',
-                            'Instalación': 'rgba(111, 66, 193, 0.3)',
-                            'Mantenimiento': 'rgba(255, 193, 7, 0.3)',
-                            'Otros servicios': 'rgba(32, 201, 151, 0.3)'
-                        };
-
-                        const serviceBorderColors = {
-                            'Avería': '#fd7e14',
-                            'Revisión': '#0d6efd',
-                            'Instalación': '#6f42c1',
-                            'Mantenimiento': '#ffc107',
-                            'Otros servicios': '#20c997'
-                        };
-
-                        // Aplicar colores
-                        info.el.style.backgroundColor = serviceColors[type] || 'rgba(108, 117, 125, 0.3)';
-                        info.el.style.borderColor = serviceBorderColors[type] || '#6c757d';
-                        info.el.style.color = '#000';  // Texto negro siempre
-
-                        // Estilo especial para completados
-                        if (info.event.extendedProps.status === 'Completado') {
-                            info.el.style.opacity = '0.7';
-                            info.el.style.fontStyle = 'italic';
-                        }
-                    }
-                },
-
-                eventContent: function (arg) {
-                    let techName = arg.event.extendedProps.tech_name || '';
-                    let title = arg.event.title;
-                    let attachmentIcon = arg.event.extendedProps.has_attachments ? '<i class="bi bi-paperclip text-warning ms-1"></i>' : '';
-                    return { html: `<div class="fc-content overflow-hidden text-truncate"><span class="fw-bold badge bg-dark text-white me-1 border border-secondary">${techName}</span> ${title}${attachmentIcon}</div>` };
-                },
-
-                eventClick: handleEventClick
-            });
-            calendarGlobalInstance.render();
-        });
+        // CALENDARIO GLOBAL - Ya manejado en DOMContentLoaded más abajo
+        // La inicialización se hace en initializeGlobalCalendar()
 
         // --- LÓGICA DE FILTRADO DINÁMICO ---
         function getActiveFilters() {
@@ -2948,20 +2865,37 @@
         // ==================== VISTA JERÁRQUICA DE STOCK ====================
 
         function loadStockTree() {
+            console.log('📦 loadStockTree() iniciada');
             const container = document.getElementById('stockCategoriesTree');
-            container.innerHTML = '<div class="text-center text-muted py-3"><i class="bi bi-hourglass-split"></i> Cargando...</div>';
+            if (!container) {
+                console.error('❌ Container stockCategoriesTree no encontrado');
+                return;
+            }
+            
+            container.innerHTML = '<div class="text-center text-muted py-3"><i class="bi bi-hourglass-split"></i> Cargando inventario...</div>';
 
+            console.log('📦 Haciendo fetch a /api/stock_categories');
             fetch('/api/stock_categories')
-                .then(res => res.json())
+                .then(res => {
+                    console.log('📦 Respuesta recibida:', res.status, res.statusText);
+                    if (!res.ok) {
+                        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+                    }
+                    return res.json();
+                })
                 .then(data => {
+                    console.log('✅ Stock categories cargadas:', data.length, 'categorías');
                     updateStockTreeView(data);
                 })
                 .catch(err => {
-                    console.error('Error:', err);
+                    console.error('❌ Error cargando stock:', err);
                     container.innerHTML = `
-                        <div class="text-center text-danger py-3">
-                            <i class="bi bi-exclamation-triangle me-2"></i>
-                            Error cargando inventario
+                        <div class="alert alert-danger m-3">
+                            <h6><i class="bi bi-exclamation-triangle me-2"></i>Error al cargar inventario</h6>
+                            <p class="mb-0 small">${err.message}</p>
+                            <button class="btn btn-sm btn-outline-danger mt-2" onclick="loadStockTree()">
+                                <i class="bi bi-arrow-clockwise"></i> Reintentar
+                            </button>
                         </div>
                     `;
                 });
@@ -3118,20 +3052,153 @@
 
         // Event listeners para cargar stock tree y categories tree al abrir las pestañas
         document.addEventListener('DOMContentLoaded', function () {
+            console.log('🚀 DOM Cargado - Inicializando eventos');
+            
             const stockTabButton = document.querySelector('button[data-bs-target="#stock"]');
             if (stockTabButton) {
                 stockTabButton.addEventListener('click', function () {
-                    setTimeout(() => loadStockTree(), 100);
+                    setTimeout(() => {
+                        console.log('📦 Cargando stock tree...');
+                        loadStockTree();
+                    }, 100);
                 });
+                
+                // Cargar stock inmediatamente si la pestaña está activa
+                if (stockTabButton.classList.contains('active')) {
+                    console.log('📦 Stock tab activa - cargando inmediatamente');
+                    setTimeout(() => loadStockTree(), 500);
+                }
             }
 
             const configTabButton = document.querySelector('button[data-bs-target="#config"]');
             if (configTabButton) {
                 configTabButton.addEventListener('click', function () {
-                    setTimeout(() => loadCategoriesTree(), 100);
+                    setTimeout(() => {
+                        console.log('⚙️ Cargando categories tree...');
+                        loadCategoriesTree();
+                    }, 100);
                 });
             }
+            
+            // Inicializar calendario global si el botón existe
+            const globalTabButton = document.getElementById('tabGlobalBtn');
+            if (globalTabButton) {
+                console.log('📅 Botón calendario global encontrado');
+                globalTabButton.addEventListener('click', function () {
+                    setTimeout(() => {
+                        console.log('📅 Click en calendario global');
+                        if (!calendarGlobalInstance) {
+                            initializeGlobalCalendar();
+                        } else {
+                            calendarGlobalInstance.render();
+                            updateGlobalFilters();
+                        }
+                    }, 100);
+                });
+            } else {
+                console.warn('⚠️ Botón calendario global NO encontrado');
+            }
         });
+        
+        // Función para inicializar el calendario global
+        function initializeGlobalCalendar() {
+            console.log('📅 Iniciando calendario global...');
+            var calendarEl = document.getElementById('calendarGlobal');
+            if (!calendarEl) {
+                console.error('❌ Elemento calendarGlobal no encontrado');
+                return;
+            }
+            
+            var isMobile = window.innerWidth < 768;
+
+            calendarGlobalInstance = new FullCalendar.Calendar(calendarEl, {
+                initialView: isMobile ? 'listWeek' : 'dayGridMonth',
+                locale: 'es',
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek'
+                },
+                buttonText: {
+                    today: 'Hoy',
+                    month: 'Mes',
+                    week: 'Semana',
+                    day: 'Día',
+                    list: 'Lista'
+                },
+                height: 'auto',
+                navLinks: true,
+                editable: false,
+                dayMaxEvents: true,
+                events: function(info, successCallback, failureCallback) {
+                    console.log('📅 Cargando eventos del calendario...');
+                    fetch('/api/admin/all_tasks')
+                        .then(res => {
+                            console.log('📅 Respuesta recibida:', res.status);
+                            if (!res.ok) {
+                                throw new Error('Error al cargar eventos: ' + res.status);
+                            }
+                            return res.json();
+                        })
+                        .then(data => {
+                            console.log('✅ Eventos cargados:', data.length);
+                            successCallback(data);
+                        })
+                        .catch(err => {
+                            console.error('❌ Error cargando eventos:', err);
+                            failureCallback(err);
+                        });
+                },
+                dateClick: handleAdminDateClickGlobal,
+                selectable: true,
+                eventDidMount: function (info) {
+                    const type = info.event.extendedProps.service_type;
+                    const activeTypes = getActiveFilters();
+
+                    if (!activeTypes.includes(type)) {
+                        info.el.style.display = 'none';
+                    } else {
+                        info.el.style.display = '';
+                        const serviceColors = {
+                            'Avería': 'rgba(253, 126, 20, 0.3)',
+                            'Revisión': 'rgba(13, 110, 253, 0.3)',
+                            'Instalación': 'rgba(111, 66, 193, 0.3)',
+                            'Mantenimiento': 'rgba(255, 193, 7, 0.3)',
+                            'Otros servicios': 'rgba(32, 201, 151, 0.3)'
+                        };
+                        const serviceBorderColors = {
+                            'Avería': '#fd7e14',
+                            'Revisión': '#0d6efd',
+                            'Instalación': '#6f42c1',
+                            'Mantenimiento': '#ffc107',
+                            'Otros servicios': '#20c997'
+                        };
+                        info.el.style.backgroundColor = serviceColors[type] || 'rgba(108, 117, 125, 0.3)';
+                        info.el.style.borderColor = serviceBorderColors[type] || '#6c757d';
+                        info.el.style.color = '#000';
+                        if (info.event.extendedProps.status === 'Completado') {
+                            info.el.style.opacity = '0.7';
+                            info.el.style.fontStyle = 'italic';
+                        }
+                    }
+                },
+                eventContent: function (arg) {
+                    let techName = arg.event.extendedProps.tech_name || '';
+                    let title = arg.event.title;
+                    let attachmentIcon = arg.event.extendedProps.has_attachments ? '<i class="bi bi-paperclip text-warning ms-1"></i>' : '';
+                    return { html: `<div class="fc-content overflow-hidden text-truncate"><span class="fw-bold badge bg-dark text-white me-1 border border-secondary">${techName}</span> ${title}${attachmentIcon}</div>` };
+                },
+                eventClick: handleEventClick
+            });
+            
+            try {
+                calendarGlobalInstance.render();
+                console.log('✅ Calendario global renderizado correctamente');
+                updateGlobalFilters();
+            } catch (err) {
+                console.error('❌ Error renderizando calendario:', err);
+            }
+        }
 
         // ==================== GESTIÓN DE STOCK MEJORADA ====================
 
