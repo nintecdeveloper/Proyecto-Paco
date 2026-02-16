@@ -311,6 +311,13 @@
                     <p class="text-muted small">Estadísticas y rendimiento</p>
                 </div>
             </div>
+            <div class="col-12 col-md-6" onclick="showSection('section-incidencias')">
+                <div class="menu-card">
+                    <i class="bi bi-exclamation-triangle fs-1 text-danger mb-2 d-block"></i>
+                    <h4 class="text-white">INCIDENCIAS</h4>
+                    <p class="text-muted small">Reportar problemas</p>
+                </div>
+            </div>
         </div>
 
         <div id="section-parte" class="d-none" style="max-width: 900px; margin: auto;">
@@ -585,26 +592,11 @@
             <!-- Gráficos -->
             <div class="row g-3 mb-4">
                 <!-- Distribución de Servicios -->
-                <div class="col-lg-6">
+                <div class="col-lg-12">
                     <div class="card bg-dark border-secondary p-4">
                         <h5 class="text-white fw-bold mb-3"><i class="bi bi-pie-chart me-2"></i>Distribución de
                             Servicios</h5>
                         <canvas id="serviceDistributionChart" style="max-height: 300px;"></canvas>
-                    </div>
-                </div>
-
-                <!-- Evolución Temporal -->
-                <div class="col-lg-6">
-                    <div class="card bg-dark border-secondary p-4">
-                        <h5 class="text-white fw-bold mb-3"><i class="bi bi-graph-up me-2"></i>Evolución Temporal</h5>
-                        <div class="mb-3">
-                            <select id="metricSelector" class="form-select form-select-sm"
-                                onchange="updateTimelineChart()">
-                                <option value="services">Servicios Realizados</option>
-                                <option value="maintenances">Mantenimientos</option>
-                            </select>
-                        </div>
-                        <canvas id="timelineChart" style="max-height: 250px;"></canvas>
                     </div>
                 </div>
             </div>
@@ -612,6 +604,53 @@
 
         </div>
     </div>
+
+
+        <!-- SECCIÓN INCIDENCIAS -->
+        <div id="section-incidencias" class="d-none" style="max-width: 700px; margin: auto;">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h3 class="text-danger fw-bold m-0 fs-4"><i class="bi bi-exclamation-triangle me-2"></i>Reportar Incidencia</h3>
+                <button class="btn btn-outline-secondary btn-sm px-3" onclick="showSection('home-menu')">Atrás</button>
+            </div>
+
+            <div class="card bg-dark border-danger p-4">
+                <form id="formIncidencias" method="POST">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-white">Tipo de Incidencia *</label>
+                        <select id="incidencia_tipo" name="tipo" class="form-select" required onchange="updateIncidenciaEmail()">
+                            <option value="">-- Seleccionar --</option>
+                            <option value="operativa">Incidencia Operativa (Cliente, Servicio, etc.)</option>
+                            <option value="tecnica">Error Técnico de la Web</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-white">Asunto *</label>
+                        <input type="text" id="incidencia_asunto" name="asunto" class="form-control" placeholder="Resumen breve del problema" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-white">Descripción Detallada *</label>
+                        <textarea id="incidencia_descripcion" name="descripcion" class="form-control" rows="5" 
+                                  placeholder="Describe el problema con el mayor detalle posible..." required></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-white">Cliente Relacionado (opcional)</label>
+                        <input type="text" id="incidencia_cliente" name="cliente" class="form-control" placeholder="Nombre del cliente si aplica">
+                    </div>
+
+                    <div class="alert alert-info border-info">
+                        <i class="bi bi-info-circle me-2"></i>
+                        <strong>Destinatario:</strong> <span id="emailDestinatario" class="text-warning">Selecciona un tipo de incidencia</span>
+                    </div>
+
+                    <button type="submit" class="btn btn-danger w-100 btn-lg fw-bold">
+                        <i class="bi bi-send-fill me-2"></i>Enviar Incidencia
+                    </button>
+                </form>
+            </div>
+        </div>
 
     <!-- MODALES -->
     <div class="modal fade" id="modalEventAction" tabindex="-1">
@@ -1183,7 +1222,7 @@
 
         function renderTaskList() {
             const container = document.getElementById('taskListContainer');
-            const showCompleted = document.getElementById('toggleCompleted').checked;
+            const showCompleted = document.getElementById('toggleCompleted')?.checked || false;
 
             // 1. Filtrar
             let filtered = cachedTasks.filter(t => {
@@ -1217,22 +1256,23 @@
 
                 const div = document.createElement('div');
                 div.className = `task-item d-flex justify-content-between align-items-center`;
-                div.style.borderLeftColor = typeColor; // Borde izquierdo del color del tipo
+                div.style.borderLeftColor = typeColor;
                 if (isDone) div.style.opacity = '0.6';
 
                 div.innerHTML = `
-                <div style="cursor:pointer;" onclick="focusCalendarEvent('${t.id}')">
-                    <div class="fw-bold text-white">${t.extendedProps.client}</div>
+                <div style="cursor:pointer; flex-grow: 1;" onclick="focusCalendarEvent('${t.id}')">
+                    <div class="fw-bold text-white">${t.extendedProps.client || 'Sin cliente'}</div>
                     <div class="small text-secondary">
                         <i class="bi bi-calendar-event me-1"></i>${dateStr} ${timeStr ? '| ' + timeStr : ''}
                         <br>
                         <span class="badge ${isDone ? 'bg-success' : 'bg-secondary'}">${t.extendedProps.status}</span>
-                        <span class="badge" style="background:${typeColor}">${t.extendedProps.service_type}</span>
+                        <span class="badge" style="background:${typeColor}">${t.extendedProps.service_type || 'Sin tipo'}</span>
                     </div>
                 </div>
-                <div class="d-flex gap-2">
-                    <button class="btn btn-sm btn-outline-secondary" onclick="openEditFromList('${t.id}')"><i class="bi bi-pencil"></i></button>
-                    ${isDone ? `<button class="btn btn-sm btn-outline-danger" onclick="deleteFromList('${t.id}')"><i class="bi bi-trash"></i></button>` : ''}
+                <div class="d-flex gap-1 flex-shrink-0">
+                    ${!isDone ? `<button class="btn btn-sm btn-success" onclick="event.stopPropagation(); openCompleteTaskModal('${t.id}')" title="Completar"><i class="bi bi-check-lg"></i></button>` : ''}
+                    <button class="btn btn-sm btn-outline-secondary" onclick="event.stopPropagation(); openEditFromList('${t.id}')" title="Editar"><i class="bi bi-pencil"></i></button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="event.stopPropagation(); deleteFromList('${t.id}')" title="Eliminar"><i class="bi bi-trash"></i></button>
                 </div>
             `;
                 container.appendChild(div);
@@ -1270,14 +1310,50 @@
 
         // Función auxiliar para editar desde la lista
         function openEditFromList(id) {
+            // Buscar el evento en el calendario
+            const task = cachedTasks.find(t => t.id == id);
+            if (!task) {
+                alert('No se encontró la tarea');
+                return;
+            }
+            
+            // Setear el ID y abrir el modal de edición
             document.getElementById('evtId').value = id;
-            openEditTechModal();
+            
+            // Cargar los datos y abrir el modal de edición
+            fetch(`/api/get_task/${id}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('editTechClientInput').value = data.data.client_name;
+                        document.getElementById('editTechDate').value = data.data.date;
+                        document.getElementById('editTechTime').value = data.data.time;
+                        document.getElementById('editTechService').value = data.data.service_type;
+                        document.getElementById('editTechNotes').value = data.data.notes || '';
+                        document.getElementById('formEditApptTech').action = `/edit_appointment/${id}`;
+                        new bootstrap.Modal(document.getElementById('modalEditAppointmentTech')).show();
+                        setupAutocomplete('editTechClientInput', 'editTechClientList');
+                    } else {
+                        alert('Error al cargar los datos de la tarea');
+                    }
+                })
+                .catch(err => {
+                    console.error('Error:', err);
+                    alert('Error al cargar la tarea');
+                });
         }
 
         function focusCalendarEvent(id) {
-            let task = cachedTasks.find(t => t.id == id);
+            const task = cachedTasks.find(t => t.id == id);
             if (task) {
+                // Navegar al día en el calendario
                 calendar.gotoDate(task.start);
+                
+                // Simular clic en el evento para abrir el modal
+                const evt = calendar.getEventById(id);
+                if (evt) {
+                    handleEventClick({ event: evt });
+                }
             }
         }
 
@@ -1539,7 +1615,6 @@
                     analyticsData = data;
                     updateAnalyticsSummary(data);
                     updateServiceDistributionChart(data);
-                    updateTimelineChart();
                 })
                 .catch(err => {
                     console.error('Error cargando analíticas:', err);
@@ -1602,71 +1677,6 @@
                                     return `${label}: ${value} (${percentage}%)`;
                                 }
                             }
-                        }
-                    }
-                }
-            });
-        }
-
-        function updateTimelineChart() {
-            const ctx = document.getElementById('timelineChart');
-            const metric = document.getElementById('metricSelector').value;
-
-            if (lineChart) {
-                lineChart.destroy();
-            }
-
-            if (!analyticsData || !analyticsData.timeline) {
-                return;
-            }
-
-            const timeline = analyticsData.timeline;
-            const labels = timeline.map(t => t.date);
-            let data, label, color;
-
-            if (metric === 'services') {
-                data = timeline.map(t => t.services);
-                label = 'Servicios Realizados';
-                color = '#4bc0c0';
-            } else if (metric === 'maintenances') {
-                data = timeline.map(t => t.maintenances);
-                label = 'Mantenimientos';
-                color = '#ffcd56';
-            }
-
-            lineChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: label,
-                        data: data,
-                        borderColor: color,
-                        backgroundColor: color + '33',
-                        borderWidth: 3,
-                        fill: true,
-                        tension: 0.4,
-                        pointRadius: 4,
-                        pointHoverRadius: 6
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: true,
-                    plugins: {
-                        legend: {
-                            labels: { color: '#ffffff' }
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: { color: '#aaaaaa' },
-                            grid: { color: '#333333' }
-                        },
-                        x: {
-                            ticks: { color: '#aaaaaa' },
-                            grid: { color: '#333333' }
                         }
                     }
                 }
@@ -2321,6 +2331,68 @@
             const row = button.closest('.stock-item-row');
             row.remove();
         }
+
+
+        // ==================== INCIDENCIAS ====================
+        function updateIncidenciaEmail() {
+            const tipo = document.getElementById('incidencia_tipo').value;
+            const emailSpan = document.getElementById('emailDestinatario');
+            
+            if (tipo === 'operativa') {
+                emailSpan.textContent = 'paco@oslaprint.com';
+            } else if (tipo === 'tecnica') {
+                emailSpan.textContent = 'nintecdeveloper@gmail.com';
+            } else {
+                emailSpan.textContent = 'Selecciona un tipo de incidencia';
+            }
+        }
+
+        // Manejar envío de formulario de incidencias
+        document.getElementById('formIncidencias')?.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const tipo = document.getElementById('incidencia_tipo').value;
+            const asunto = document.getElementById('incidencia_asunto').value;
+            const descripcion = document.getElementById('incidencia_descripcion').value;
+            const cliente = document.getElementById('incidencia_cliente').value;
+            
+            // Validar campos
+            if (!tipo || !asunto || !descripcion) {
+                alert('Por favor, complete todos los campos obligatorios');
+                return;
+            }
+            
+            // Enviar al servidor
+            fetch('/report_incidencia', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    tipo: tipo,
+                    asunto: asunto,
+                    descripcion: descripcion,
+                    cliente: cliente,
+                    usuario: '{{ current_user.username }}',
+                    email_usuario: '{{ current_user.email }}'
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert('✓ Incidencia reportada correctamente. Recibirás una respuesta pronto.');
+                    this.reset();
+                    updateIncidenciaEmail();
+                    showSection('home-menu');
+                } else {
+                    alert('❌ Error al enviar incidencia: ' + (data.msg || 'Error desconocido'));
+                }
+            })
+            .catch(err => {
+                console.error('Error:', err);
+                alert('❌ Error de conexión al enviar la incidencia');
+            });
+        });
 
     </script>
 </body>
