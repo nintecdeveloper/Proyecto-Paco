@@ -1251,7 +1251,7 @@ def get_task_full(task_id):
     
     service_type = ServiceType.query.get(task.service_type_id) if task.service_type_id else None
     
-    # ✅ INCLUIR INFORMACIÓN COMPLETA DEL CLIENTE
+    # INCLUIR INFORMACIÓN COMPLETA DEL CLIENTE
     client_info = None
     if task.client:
         client_info = {
@@ -1259,12 +1259,9 @@ def get_task_full(task_id):
             'phone': task.client.phone,
             'email': task.client.email,
             'address': task.client.address,
-            'link': task.client.link,
-            'notes': task.client.notes,
-            'has_support': task.client.has_support,
-            'support_monday_friday': task.client.support_monday_friday,
-            'support_saturday': task.client.support_saturday,
-            'support_sunday': task.client.support_sunday
+            'link': task.client.link or '',
+            'notes': task.client.notes or '',
+            'has_support': task.client.has_support
         }
     
     return jsonify({
@@ -1272,11 +1269,12 @@ def get_task_full(task_id):
         'data': {
             'id': task.id,
             'client_name': task.client_name,
-            'client_info': client_info,  # ✅ AÑADIDO
+            'client_info': client_info,
             'date': task.date.strftime('%Y-%m-%d'),
             'start_time': task.start_time or '',
             'end_time': task.end_time or '',
             'service_type': service_type.name if service_type else '',
+            'service_type_id': task.service_type_id,
             'description': task.description or ''
         }
     })
@@ -1298,7 +1296,7 @@ def get_task_details(task_id):
     
     service_type = ServiceType.query.get(task.service_type_id) if task.service_type_id else None
     
-    # ✅ INCLUIR INFORMACIÓN COMPLETA DEL CLIENTE
+    # INCLUIR INFORMACIÓN COMPLETA DEL CLIENTE
     client_info = None
     if task.client:
         client_info = {
@@ -1306,12 +1304,9 @@ def get_task_details(task_id):
             'phone': task.client.phone,
             'email': task.client.email,
             'address': task.client.address,
-            'link': task.client.link,
-            'notes': task.client.notes,
-            'has_support': task.client.has_support,
-            'support_monday_friday': task.client.support_monday_friday,
-            'support_saturday': task.client.support_saturday,
-            'support_sunday': task.client.support_sunday
+            'link': task.client.link or '',
+            'notes': task.client.notes or '',
+            'has_support': task.client.has_support
         }
     
     return jsonify({
@@ -1756,17 +1751,23 @@ def print_report(report_id):
         flash('Error al cargar el reporte', 'danger')
         return redirect(url_for('dashboard'))
 
-@app.route('/api/task_action/<int:task_id>/<action>', methods=['POST'])
+@app.route('/api/task_action/<int:task_id>/<action>', methods=['POST', 'OPTIONS'])
 @login_required
 def task_action(task_id, action):
     """Endpoint para acciones sobre tareas (completar, eliminar, cancelar)"""
-    task = Task.query.get_or_404(task_id)
-    
-    # Verificar permisos
-    if current_user.role != 'admin' and task.tech_id != current_user.id:
-        return jsonify({'success': False, 'msg': 'No autorizado'}), 403
+    # Manejar preflight CORS
+    if request.method == 'OPTIONS':
+        return jsonify({'success': True}), 200
     
     try:
+        task = Task.query.get(task_id)
+        if not task:
+            return jsonify({'success': False, 'msg': 'Tarea no encontrada'}), 404
+        
+        # Verificar permisos
+        if current_user.role != 'admin' and task.tech_id != current_user.id:
+            return jsonify({'success': False, 'msg': 'No autorizado'}), 403
+        
         if action == 'complete':
             task.status = 'Completado'
             if not task.actual_end_time:
@@ -1787,10 +1788,14 @@ def task_action(task_id, action):
         else:
             return jsonify({'success': False, 'msg': 'Acción no válida'}), 400
     
+    except SQLAlchemyError as e:
+        print(f"Database error in task_action: {e}")
+        db.session.rollback()
+        return jsonify({'success': False, 'msg': 'Error de base de datos'}), 500
     except Exception as e:
         print(f"Error in task_action: {e}")
         db.session.rollback()
-        return jsonify({'success': False, 'msg': 'Error al procesar la acción'}), 500
+        return jsonify({'success': False, 'msg': str(e)}), 500
 
 @app.route('/api/get_task/<int:task_id>')
 @login_required
@@ -2027,6 +2032,46 @@ def edit_appointment(task_id):
         db.session.rollback()
         flash('Error al editar la cita', 'danger')
         return redirect(url_for('dashboard'))
+
+@app.route('/api/edit_task/<int:task_id>', methods=['POST', 'PUT'])
+@login_required
+def api_edit_task(task_id):
+    """API endpoint para editar una tarea (JSON)"""
+    try:
+        task = Task.query.get(task_id)
+        if not task:
+            return jsonify({'success': False, 'msg': 'Tarea no encontrada'}), 404
+        
+        # Verificar permisos
+        if current_user.role != 'admin' and task.tech_id != current_user.id:
+            return jsonify({'success': False, 'msg': 'No autorizado'}), 403
+        
+        # Obtener datos del request
+        data = request.get_json() if request.is_json else request.form
+        
+        # Actualizar campos si se proporcionan
+        if 'client_name' in data:
+            task.client_name = data['client_name']
+        if 'date' in data:
+            task.date = datetime.strptime(data['date'], '%Y-%m-%d').date()
+        if 'start_time' in data:
+            task.start_time = data['start_time']
+        if 'end_time' in data:
+            task.end_time = data['end_time']
+        if 'description' in data:
+            task.description = data['description']
+        if 'service_type' in data:
+            service_type = ServiceType.query.filter_by(name=data['service_type']).first()
+            if service_type:
+                task.service_type_id = service_type.id
+        
+        db.session.commit()
+        return jsonify({'success': True, 'msg': 'Tarea actualizada correctamente'})
+        
+    except Exception as e:
+        print(f"Error in api_edit_task: {str(e)}")
+        db.session.rollback()
+        return jsonify({'success': False, 'msg': str(e)}), 500
 
 @app.route('/schedule_appointment', methods=['POST'])
 @login_required
@@ -2320,12 +2365,9 @@ def api_get_client(client_id):
                 'phone': client.phone,
                 'email': client.email,
                 'address': client.address,
-                'link': client.link,
-                'notes': client.notes,
-                'has_support': client.has_support,
-                'support_monday_friday': client.support_monday_friday,
-                'support_saturday': client.support_saturday,
-                'support_sunday': client.support_sunday
+                'link': client.link or '',
+                'notes': client.notes or '',
+                'has_support': client.has_support
             }
         })
     except Exception as e:

@@ -645,27 +645,12 @@
 
             <!-- Gráficos -->
             <div class="row g-3 mb-4">
-                <!-- Distribución de Servicios -->
-                <div class="col-lg-6">
+                <!-- Distribución de Servicios (pantalla completa) -->
+                <div class="col-12">
                     <div class="card bg-dark border-secondary p-4">
                         <h5 class="text-white fw-bold mb-3"><i class="bi bi-pie-chart me-2"></i>Distribución de
                             Servicios</h5>
-                        <canvas id="serviceDistributionChart" style="max-height: 300px;"></canvas>
-                    </div>
-                </div>
-
-                <!-- Evolución Temporal -->
-                <div class="col-lg-6">
-                    <div class="card bg-dark border-secondary p-4">
-                        <h5 class="text-white fw-bold mb-3"><i class="bi bi-graph-up me-2"></i>Evolución Temporal</h5>
-                        <div class="mb-3">
-                            <select id="metricSelector" class="form-select form-select-sm"
-                                onchange="updateTimelineChart()">
-                                <option value="services">Servicios Realizados</option>
-                                <option value="maintenances">Mantenimientos</option>
-                            </select>
-                        </div>
-                        <canvas id="timelineChart" style="max-height: 250px;"></canvas>
+                        <canvas id="serviceDistributionChart" style="max-height: 400px;"></canvas>
                     </div>
                 </div>
             </div>
@@ -1010,8 +995,40 @@
 
                     <!-- Material/Piezas -->
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Material Utilizado o Retirado</label>
-                        <select id="completeStockItem" class="form-select mb-2">
+                        <label class="form-label fw-bold">
+                            <i class="bi bi-box-seam"></i> Objetos/Piezas Utilizadas
+                        </label>
+                        
+                        <!-- Botones de acción -->
+                        <div class="d-flex gap-2 mb-3">
+                            <button type="button" class="btn btn-outline-info btn-sm" onclick="showStockSelectorModal()">
+                                <i class="bi bi-plus-circle"></i> Añadir desde Stock
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="addManualPart()">
+                                <i class="bi bi-pencil"></i> Añadir Manual
+                            </button>
+                            <button type="button" class="btn btn-outline-danger btn-sm" onclick="clearAllParts()">
+                                <i class="bi bi-trash"></i> Limpiar Todo
+                            </button>
+                        </div>
+                        
+                        <!-- Lista de objetos seleccionados -->
+                        <div id="selectedPartsList" class="border border-secondary rounded p-3 mb-2" 
+                             style="min-height: 80px; background: #000;">
+                            <small class="text-muted">
+                                <i class="bi bi-info-circle"></i> No hay objetos seleccionados. 
+                                Usa los botones de arriba para añadir.
+                            </small>
+                        </div>
+                        
+                        <!-- Campo oculto que contendrá el JSON de partes -->
+                        <input type="hidden" name="parts_text" id="partsTextJSON" value="[]">
+                    </div>
+
+                    <!-- Material de Stock (sistema antiguo mantenido por compatibilidad) -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Material de Stock (Opcional)</label>
+                        <select id="completeStockItem" class="form-select mb-2" name="stock_item">
                             <option value="">-- No se usó material --</option>
                             {% for item in stock_items %}
                             <option value="{{ item.id }}">{{ item.name }} (Stock: {{ item.quantity }})</option>
@@ -1023,11 +1040,11 @@
                                 <div class="col-md-6 mb-2">
                                     <label class="form-label small">Cantidad</label>
                                     <input type="number" id="completeStockQuantity" class="form-control" min="1"
-                                        value="1">
+                                        value="1" name="stock_qty">
                                 </div>
                                 <div class="col-md-6 mb-2">
                                     <label class="form-label small">Acción</label>
-                                    <select id="completeStockAction" class="form-select">
+                                    <select id="completeStockAction" class="form-select" name="stock_action">
                                         <option value="used">Utilizado</option>
                                         <option value="removed">Retirado</option>
                                         <option value="added">Añadido</option>
@@ -1035,13 +1052,6 @@
                                 </div>
                             </div>
                         </div>
-                    </div>
-
-                    <!-- Notas adicionales -->
-                    <div class="mb-3">
-                        <label class="form-label">Notas o Material Adicional</label>
-                        <input type="text" id="completeParts" class="form-control"
-                            placeholder="Otras piezas, observaciones...">
                     </div>
 
                     <!-- Archivos adjuntos -->
@@ -1510,10 +1520,21 @@
         function deleteFromList(id) {
             if (!confirm('¿Eliminar esta tarea terminada?')) return;
 
-            fetch(`/api/task_action/${id}/delete`, { method: 'POST' })
+            fetch(`/api/task_action/${id}/delete`, { 
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin'
+            })
                 .then(res => {
                     if (!res.ok) {
-                        throw new Error(`HTTP error! status: ${res.status}`);
+                        return res.json().then(err => {
+                            throw new Error(err.msg || `Error HTTP: ${res.status}`);
+                        }).catch(() => {
+                            throw new Error(`Error HTTP: ${res.status}`);
+                        });
                     }
                     return res.json();
                 })
@@ -1527,7 +1548,7 @@
                 })
                 .catch(err => {
                     console.error('Error:', err);
-                    alert('❌ Error de conexión. Por favor, intenta de nuevo.');
+                    alert('❌ Error: ' + err.message);
                 });
         }
 
@@ -1546,6 +1567,11 @@
 
         function performTaskAction(action) {
             const id = document.getElementById('evtId').value;
+            
+            if (!id) {
+                alert('❌ Error: No se ha seleccionado ninguna tarea');
+                return;
+            }
 
             // Si la acción es completar, abrir el modal de completar con firma
             if (action === 'complete') {
@@ -1563,10 +1589,21 @@
 
             if (!confirm(`¿Confirmar ${actionName} esta tarea?`)) return;
 
-            fetch(`/api/task_action/${id}/${action}`, { method: 'POST' })
+            fetch(`/api/task_action/${id}/${action}`, { 
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin'
+            })
                 .then(res => {
                     if (!res.ok) {
-                        throw new Error(`HTTP error! status: ${res.status}`);
+                        return res.json().then(err => {
+                            throw new Error(err.msg || `Error HTTP: ${res.status}`);
+                        }).catch(() => {
+                            throw new Error(`Error HTTP: ${res.status}`);
+                        });
                     }
                     return res.json();
                 })
@@ -1586,7 +1623,7 @@
                 })
                 .catch(err => {
                     console.error('Error en performTaskAction:', err);
-                    alert('❌ Error de conexión. Por favor, intenta de nuevo.');
+                    alert('❌ Error: ' + err.message);
                 });
         }
 
@@ -1598,6 +1635,7 @@
                 document.getElementById('fieldClient').value = '';
                 document.getElementById('fieldDate').value = "{{ today_date }}";
                 document.getElementById('fieldEntryTime').value = '';
+                document.getElementById('fieldExitTime').value = '';
                 document.getElementById('fieldService').selectedIndex = 0;
                 document.getElementById('fieldDescription').value = '';
                 return;
@@ -1609,13 +1647,23 @@
                 .then(res => res.json())
                 .then(data => {
                     if (data.success) {
-                        // Sincronizar todos los campos
-                        document.getElementById('fieldClient').value = data.data.client_name;
-                        document.getElementById('fieldDate').value = data.data.date;
-                        document.getElementById('fieldEntryTime').value = data.data.start_time;
-                        document.getElementById('fieldService').value = data.data.service_type;
-                        document.getElementById('fieldDescription').value = data.data.description;
+                        // Sincronizar TODOS los campos automáticamente
+                        document.getElementById('fieldClient').value = data.data.client_name || '';
+                        document.getElementById('fieldDate').value = data.data.date || '';
+                        document.getElementById('fieldEntryTime').value = data.data.start_time || '';
+                        document.getElementById('fieldExitTime').value = data.data.end_time || '';
+                        document.getElementById('fieldService').value = data.data.service_type || '';
+                        document.getElementById('fieldDescription').value = data.data.description || '';
+                        
+                        // Si hay información del cliente, mostrarla (opcional)
+                        if (data.data.client_info) {
+                            console.log('Cliente:', data.data.client_info);
+                        }
                     }
+                })
+                .catch(err => {
+                    console.error('Error al cargar datos de la tarea:', err);
+                    alert('Error al cargar los datos de la cita');
                 });
         }
 
@@ -1802,7 +1850,6 @@
                     analyticsData = data;
                     updateAnalyticsSummary(data);
                     updateServiceDistributionChart(data);
-                    updateTimelineChart();
                 })
                 .catch(err => {
                     console.error('Error cargando analíticas:', err);
@@ -1865,71 +1912,6 @@
                                     return `${label}: ${value} (${percentage}%)`;
                                 }
                             }
-                        }
-                    }
-                }
-            });
-        }
-
-        function updateTimelineChart() {
-            const ctx = document.getElementById('timelineChart');
-            const metric = document.getElementById('metricSelector').value;
-
-            if (lineChart) {
-                lineChart.destroy();
-            }
-
-            if (!analyticsData || !analyticsData.timeline) {
-                return;
-            }
-
-            const timeline = analyticsData.timeline;
-            const labels = timeline.map(t => t.date);
-            let data, label, color;
-
-            if (metric === 'services') {
-                data = timeline.map(t => t.services);
-                label = 'Servicios Realizados';
-                color = '#4bc0c0';
-            } else if (metric === 'maintenances') {
-                data = timeline.map(t => t.maintenances);
-                label = 'Mantenimientos';
-                color = '#ffcd56';
-            }
-
-            lineChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: label,
-                        data: data,
-                        borderColor: color,
-                        backgroundColor: color + '33',
-                        borderWidth: 3,
-                        fill: true,
-                        tension: 0.4,
-                        pointRadius: 4,
-                        pointHoverRadius: 6
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: true,
-                    plugins: {
-                        legend: {
-                            labels: { color: '#ffffff' }
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: { color: '#aaaaaa' },
-                            grid: { color: '#333333' }
-                        },
-                        x: {
-                            ticks: { color: '#aaaaaa' },
-                            grid: { color: '#333333' }
                         }
                     }
                 }
@@ -2282,7 +2264,6 @@
         function saveTaskCompletion() {
             const taskId = document.getElementById('completeTaskId').value;
             const description = document.getElementById('completeDescription').value.trim();
-            const parts = document.getElementById('completeParts').value.trim();
 
             // VALIDACIONES
             if (!description) {
@@ -2310,10 +2291,10 @@
             const stockQuantity = document.getElementById('completeStockQuantity').value;
             const stockAction = document.getElementById('completeStockAction').value;
 
-            // Preparar datos
+            // Preparar datos (parts se eliminó porque ya no hay campo manual)
             const data = {
                 description: description,
-                parts: parts,
+                parts: '', // Campo eliminado según requerimientos
                 signature: signatureData,
                 signature_client_name: signatureClientName,
                 stock_item_id: stockItemId || null,
@@ -3286,6 +3267,304 @@
         });
 
     </script>
+
+    <!-- Modal: Selector de Stock para Múltiples Objetos -->
+    <div class="modal fade" id="modalStockSelector" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">
+                        <i class="bi bi-box-seam"></i> Seleccionar del Stock
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" style="max-height: 500px; overflow-y: auto;">
+                    <div class="mb-3">
+                        <input type="text" id="stockSearchInput" class="form-control" 
+                               placeholder="🔍 Buscar artículo..." onkeyup="filterStockItems()">
+                    </div>
+                    <div id="stockCategoriesContainer">
+                        <div class="text-center text-muted py-4">
+                            <i class="bi bi-hourglass-split"></i> Cargando stock...
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // ==========================================
+    // GESTIÓN DE OBJETOS/PIEZAS MÚLTIPLES
+    // ==========================================
+
+    let selectedParts = [];
+
+    // Mostrar selector de stock
+    function showStockSelectorModal() {
+        fetch('/api/stock_items_grouped')
+            .then(r => r.json())
+            .then(data => {
+                let html = '';
+                
+                data.forEach(cat => {
+                    html += `
+                        <div class="mb-4 stock-category" data-category="${cat.name.toLowerCase()}">
+                            <h6 class="text-warning border-bottom border-secondary pb-2">
+                                <i class="bi bi-folder-fill"></i> ${cat.name}
+                            </h6>
+                    `;
+                    
+                    // Items directos de la categoría
+                    if (cat.items && cat.items.length > 0) {
+                        cat.items.forEach(item => {
+                            html += `
+                                <div class="form-check mb-2 stock-item" data-item-name="${item.name.toLowerCase()}">
+                                    <input class="form-check-input" type="checkbox" id="item_${item.id}" 
+                                           onchange="toggleStockItem(${item.id}, '${escapeHtml(item.name)}', ${item.quantity})">
+                                    <label class="form-check-label d-flex justify-content-between w-100" for="item_${item.id}">
+                                        <span>${item.name}</span>
+                                        <span class="badge ${item.quantity > 5 ? 'bg-success' : 'bg-warning'}">
+                                            ${item.quantity} disponibles
+                                        </span>
+                                    </label>
+                                </div>
+                            `;
+                        });
+                    }
+                    
+                    // Subcategorías
+                    if (cat.subcategories && cat.subcategories.length > 0) {
+                        cat.subcategories.forEach(subcat => {
+                            html += `
+                                <div class="ms-3 mt-3 mb-3">
+                                    <small class="text-info fw-bold">
+                                        <i class="bi bi-folder2"></i> ${subcat.name}
+                                    </small>
+                            `;
+                            
+                            subcat.items.forEach(item => {
+                                html += `
+                                    <div class="form-check mb-2 stock-item" data-item-name="${item.name.toLowerCase()}">
+                                        <input class="form-check-input" type="checkbox" id="item_${item.id}"
+                                               onchange="toggleStockItem(${item.id}, '${escapeHtml(item.name)}', ${item.quantity})">
+                                        <label class="form-check-label d-flex justify-content-between w-100" for="item_${item.id}">
+                                            <span>${item.name}</span>
+                                            <span class="badge ${item.quantity > 5 ? 'bg-success' : 'bg-warning'}">
+                                                ${item.quantity} disponibles
+                                            </span>
+                                        </label>
+                                    </div>
+                                `;
+                            });
+                            
+                            html += `</div>`;
+                        });
+                    }
+                    
+                    html += `</div>`;
+                });
+                
+                if (html === '') {
+                    html = '<div class="alert alert-warning"><i class="bi bi-exclamation-triangle"></i> No hay artículos en stock</div>';
+                }
+                
+                document.getElementById('stockCategoriesContainer').innerHTML = html;
+                
+                // Marcar items ya seleccionados
+                selectedParts.forEach(part => {
+                    if (part.stock_id) {
+                        const checkbox = document.getElementById(`item_${part.stock_id}`);
+                        if (checkbox) checkbox.checked = true;
+                    }
+                });
+                
+                // Mostrar modal
+                new bootstrap.Modal(document.getElementById('modalStockSelector')).show();
+            })
+            .catch(err => {
+                console.error('Error loading stock:', err);
+                alert('Error al cargar el stock. Revisa la conexión.');
+            });
+    }
+
+    // Filtrar items de stock
+    function filterStockItems() {
+        const searchTerm = document.getElementById('stockSearchInput').value.toLowerCase();
+        const items = document.querySelectorAll('.stock-item');
+        const categories = document.querySelectorAll('.stock-category');
+        
+        items.forEach(item => {
+            const itemName = item.getAttribute('data-item-name');
+            if (itemName.includes(searchTerm)) {
+                item.style.display = 'block';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+        
+        // Ocultar categorías vacías
+        categories.forEach(cat => {
+            const visibleItems = cat.querySelectorAll('.stock-item[style="display: block;"], .stock-item:not([style])');
+            if (searchTerm && visibleItems.length === 0) {
+                cat.style.display = 'none';
+            } else {
+                cat.style.display = 'block';
+            }
+        });
+    }
+
+    // Toggle de item de stock
+    function toggleStockItem(id, name, maxQty) {
+        const index = selectedParts.findIndex(p => p.stock_id === id);
+        
+        if (index === -1) {
+            // Añadir
+            const qty = prompt(`¿Cuántas unidades de "${name}"?\n(Disponibles: ${maxQty})`, '1');
+            
+            if (qty === null) {
+                // Usuario canceló
+                document.getElementById(`item_${id}`).checked = false;
+                return;
+            }
+            
+            const qtyNum = parseInt(qty);
+            
+            if (isNaN(qtyNum) || qtyNum <= 0) {
+                alert('Cantidad no válida');
+                document.getElementById(`item_${id}`).checked = false;
+                return;
+            }
+            
+            if (qtyNum > maxQty) {
+                alert(`Solo hay ${maxQty} unidades disponibles`);
+                document.getElementById(`item_${id}`).checked = false;
+                return;
+            }
+            
+            selectedParts.push({
+                stock_id: id,
+                item: name,
+                quantity: qtyNum,
+                from_stock: true
+            });
+        } else {
+            // Quitar
+            selectedParts.splice(index, 1);
+        }
+        
+        updatePartsDisplay();
+    }
+
+    // Añadir parte manual
+    function addManualPart() {
+        const name = prompt('Nombre del objeto/pieza:');
+        if (!name || name.trim() === '') {
+            return;
+        }
+        
+        const qty = prompt('Cantidad:', '1');
+        if (!qty) {
+            return;
+        }
+        
+        const qtyNum = parseInt(qty);
+        if (isNaN(qtyNum) || qtyNum <= 0) {
+            alert('Cantidad no válida');
+            return;
+        }
+        
+        selectedParts.push({
+            item: name.trim(),
+            quantity: qtyNum,
+            from_stock: false
+        });
+        
+        updatePartsDisplay();
+    }
+
+    // Actualizar visualización de partes seleccionadas
+    function updatePartsDisplay() {
+        const container = document.getElementById('selectedPartsList');
+        
+        if (selectedParts.length === 0) {
+            container.innerHTML = `
+                <small class="text-muted">
+                    <i class="bi bi-info-circle"></i> No hay objetos seleccionados. 
+                    Usa los botones de arriba para añadir.
+                </small>
+            `;
+        } else {
+            let html = '<div class="d-flex flex-wrap gap-2">';
+            selectedParts.forEach((part, index) => {
+                const icon = part.from_stock ? 'box-seam' : 'pencil';
+                const bgColor = part.from_stock ? 'bg-info' : 'bg-secondary';
+                
+                html += `
+                    <span class="badge ${bgColor} d-flex align-items-center gap-2 py-2 px-3" style="font-size: 0.9em;">
+                        <i class="bi bi-${icon}"></i>
+                        <span><strong>${escapeHtml(part.item)}</strong> × ${part.quantity}</span>
+                        <i class="bi bi-x-circle" style="cursor:pointer; font-size: 1.2em;" 
+                           onclick="removePart(${index})" title="Eliminar"></i>
+                    </span>
+                `;
+            });
+            html += '</div>';
+            container.innerHTML = html;
+        }
+        
+        // Actualizar campo oculto
+        document.getElementById('partsTextJSON').value = JSON.stringify(selectedParts);
+    }
+
+    // Eliminar parte
+    function removePart(index) {
+        const part = selectedParts[index];
+        
+        // Si es de stock, desmarcar checkbox
+        if (part.stock_id) {
+            const checkbox = document.getElementById(`item_${part.stock_id}`);
+            if (checkbox) checkbox.checked = false;
+        }
+        
+        selectedParts.splice(index, 1);
+        updatePartsDisplay();
+    }
+
+    // Limpiar todas las partes
+    function clearAllParts() {
+        if (selectedParts.length === 0) return;
+        
+        if (confirm('¿Eliminar todos los objetos seleccionados?')) {
+            // Desmarcar todos los checkboxes
+            selectedParts.forEach(part => {
+                if (part.stock_id) {
+                    const checkbox = document.getElementById(`item_${part.stock_id}`);
+                    if (checkbox) checkbox.checked = false;
+                }
+            });
+            
+            selectedParts = [];
+            updatePartsDisplay();
+        }
+    }
+
+    // Escapar HTML para prevenir XSS
+    function escapeHtml(text) {
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
+    }
+    </script>
+
 </body>
 
 </html>

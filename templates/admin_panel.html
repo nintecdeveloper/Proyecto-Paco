@@ -576,7 +576,7 @@
                             <div class="card-footer bg-black border-secondary">
                                 <div class="d-flex gap-2">
                                     <button class="btn btn-sm btn-outline-warning flex-fill"
-                                        onclick="openEditClientModalFull({{ c.id }}, '{{ c.name }}', '{{ c.phone }}', '{{ c.email }}', '{{ c.address }}', '{{ c.link or '' }}', '{{ c.notes or '' }}', {{ c.has_support|lower }}, {{ c.support_monday_friday|lower }}, {{ c.support_saturday|lower }}, {{ c.support_sunday|lower }})">
+                                        onclick="openEditClientModalFull({{ c.id }}, '{{ c.name }}', '{{ c.phone }}', '{{ c.email }}', '{{ c.address }}', '{{ c.link or '' }}', '{{ c.notes or '' }}', {{ c.has_support|lower }})">
                                         <i class="bi bi-pencil-fill"></i> Editar
                                     </button>
                                     <form method="POST" action="/manage_clients" class="flex-fill">
@@ -1011,7 +1011,8 @@
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Enlace/URL (Opcional)</label>
-                                <input type="url" name="link" class="form-control" placeholder="https://www.ejemplo.com">
+                                <input type="url" name="link" class="form-control"
+                                    placeholder="https://www.ejemplo.com">
                                 <small class="text-muted">
                                     <i class="bi bi-info-circle me-1"></i>Portal web, sistema interno, etc.
                                 </small>
@@ -1175,18 +1176,48 @@
         <div class="modal-dialog">
             <div class="modal-content bg-dark text-white">
                 <div class="modal-header border-secondary">
-                    <h5 class="modal-title">Importar Clientes (JSON)</h5>
+                    <h5 class="modal-title">
+                        <i class="bi bi-upload me-2"></i>Importar Clientes (JSON)
+                    </h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <form method="POST" action="/import_clients" enctype="multipart/form-data">
+                <form method="POST" action="/manage_clients" enctype="multipart/form-data">
+                    <input type="hidden" name="action" value="import_json">
                     <div class="modal-body">
-                        <label class="form-label">Archivo JSON</label>
-                        <input type="file" name="file" class="form-control" accept=".json" required>
-                        <small class="text-muted">Formato esperado: [{"name": "Cliente1"}, {"name":
-                            "Cliente2"}]</small>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="bi bi-file-earmark-code"></i> Archivo JSON
+                            </label>
+                            <input type="file" name="json_file" class="form-control" accept=".json" required>
+                        </div>
+
+                        <div class="alert alert-info">
+                            <h6 class="alert-heading">Formato JSON Esperado:</h6>
+                            <pre class="mb-0"
+                                style="font-size: 0.75em; background: #000; padding: 10px; border-radius: 5px; overflow-x: auto;">
+[
+  {
+    "name": "Cliente 1",
+    "phone": "900123456",
+    "email": "<a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="40232c29252e34257100252d30322533216e232f2d">[email&#160;protected]</a>",
+    "address": "Calle Principal 123",
+    "link": "https://maps.google.com/?q=...",
+    "notes": "Notas opcionales",
+    "has_support": true
+  }
+]</pre>
+                        </div>
+
+                        <small class="text-muted">
+                            <i class="bi bi-info-circle"></i>
+                            Los clientes duplicados (mismo nombre) serán omitidos automáticamente.
+                        </small>
                     </div>
                     <div class="modal-footer border-secondary">
-                        <button type="submit" class="btn btn-info">Importar</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-info">
+                            <i class="bi bi-upload"></i> Importar
+                        </button>
                     </div>
                 </form>
             </div>
@@ -1534,6 +1565,7 @@
 
 
     <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script>
+    <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <!-- Modal: Estadísticas del Técnico -->
@@ -1615,7 +1647,7 @@
                 selectable: true,
                 eventDidMount: function (info) {
                     const type = info.event.extendedProps.service_type;
-                    
+
                     // Colores claros según tipo de servicio
                     const serviceColors = {
                         'Avería': 'rgba(253, 126, 20, 0.3)',
@@ -1624,7 +1656,7 @@
                         'Mantenimiento': 'rgba(255, 193, 7, 0.3)',
                         'Otros servicios': 'rgba(32, 201, 151, 0.3)'
                     };
-                    
+
                     const serviceBorderColors = {
                         'Avería': '#fd7e14',
                         'Revisión': '#0d6efd',
@@ -1632,11 +1664,11 @@
                         'Mantenimiento': '#ffc107',
                         'Otros servicios': '#20c997'
                     };
-                    
+
                     info.el.style.backgroundColor = serviceColors[type] || 'rgba(108, 117, 125, 0.3)';
                     info.el.style.borderColor = serviceBorderColors[type] || '#6c757d';
                     info.el.style.color = '#000';  // Texto negro
-                    
+
                     if (info.event.extendedProps.status === 'Completado') {
                         info.el.style.opacity = '0.7';
                         info.el.style.fontStyle = 'italic';
@@ -1711,7 +1743,7 @@
                         info.el.style.display = 'none';
                     } else {
                         info.el.style.display = '';
-                        
+
                         // Colores claros según tipo de servicio
                         const serviceColors = {
                             'Avería': 'rgba(253, 126, 20, 0.3)',
@@ -1720,7 +1752,7 @@
                             'Mantenimiento': 'rgba(255, 193, 7, 0.3)',
                             'Otros servicios': 'rgba(32, 201, 151, 0.3)'
                         };
-                        
+
                         const serviceBorderColors = {
                             'Avería': '#fd7e14',
                             'Revisión': '#0d6efd',
@@ -1728,12 +1760,12 @@
                             'Mantenimiento': '#ffc107',
                             'Otros servicios': '#20c997'
                         };
-                        
+
                         // Aplicar colores
                         info.el.style.backgroundColor = serviceColors[type] || 'rgba(108, 117, 125, 0.3)';
                         info.el.style.borderColor = serviceBorderColors[type] || '#6c757d';
                         info.el.style.color = '#000';  // Texto negro siempre
-                        
+
                         // Estilo especial para completados
                         if (info.event.extendedProps.status === 'Completado') {
                             info.el.style.opacity = '0.7';
@@ -1868,7 +1900,7 @@
         }
 
         // Nueva función completa para editar clientes con todos los campos
-        function openEditClientModalFull(id, name, phone, email, address, link, notes, hasSupport, supportMF, supportSat, supportSun) {
+        function openEditClientModalFull(id, name, phone, email, address, link, notes, hasSupport) {
             document.getElementById('editClientId').value = id;
             document.getElementById('editClientName').value = name;
             document.getElementById('editClientPhone').value = phone;
@@ -1876,12 +1908,8 @@
             document.getElementById('editClientAddress').value = address;
             document.getElementById('editClientLink').value = link || '';
             document.getElementById('editClientNotes').value = notes || '';
-            document.getElementById('editHasSupport').checked = hasSupport;
-            document.getElementById('editSupportMF').checked = supportMF;
-            document.getElementById('editSupportSat').checked = supportSat;
-            document.getElementById('editSupportSun').checked = supportSun;
+            document.getElementById('editClientSupport').checked = hasSupport;
 
-            toggleEditSupportOptions();
             new bootstrap.Modal(document.getElementById('modalEditClient')).show();
         }
 
@@ -3318,13 +3346,4 @@
 
                     new bootstrap.Modal(document.getElementById('modalAttachments')).show();
                 })
-                .catch(err => {
-                    console.error('Error cargando archivos:', err);
-                    alert('Error al cargar los archivos adjuntos');
-                });
         }
-
-    </script>
-</body>
-
-</html>
