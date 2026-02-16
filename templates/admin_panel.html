@@ -207,7 +207,7 @@
 
     <div class="container mt-3 pb-5">
         {% with messages = get_flashed_messages() %}
-        {% if messages %}{% for m in messages %}<div class="alert alert-info py-2 small">{{ m }}</div>{% endfor %}{%
+        {% if messages %}{% for m in messages %}<div class="alert alert-info py-2 small flash-message">{{ m }}</div>{% endfor %}{%
         endif %}
         {% endwith %}
 
@@ -1594,29 +1594,14 @@
     </div>
 
     <script>
+        console.log('🔍 VERSION: 2026-02-16-FINAL');
+        console.log('🌐 DOMAIN:', window.location.hostname);
+        console.log('📍 FULL URL:', window.location.href);
         var calendar = null;
         var calendarGlobalInstance = null;
         var modalActionAdmin = null;
         var currentEmployeeId = null;
 
-        // Aplicar colores dinámicos a los labels de filtros
-        document.addEventListener('DOMContentLoaded', function () {
-            // Inicializar modal después de que el DOM esté listo
-            const modalEl = document.getElementById('modalActionAdmin');
-            if (modalEl) {
-                modalActionAdmin = new bootstrap.Modal(modalEl);
-            } else {
-                console.warn('⚠️ Modal modalActionAdmin no encontrado');
-            }
-            
-            document.querySelectorAll('label[data-color]').forEach(function (label) {
-                const color = label.dataset.color;
-                label.style.borderColor = color;
-                label.style.color = color;
-            });
-        });
-
-        setupAutocomplete('scheduleClientInput', 'scheduleClientList');
 
         function loadEmployeeCalendar(userId) {
             currentEmployeeId = userId;
@@ -2763,20 +2748,6 @@
 
         // ==================== INICIALIZACIÓN ====================
 
-        document.addEventListener('DOMContentLoaded', function () {
-            // Cargar categorías al inicio
-            loadCategoriesTree();
-
-            // Recargar cuando se abre el modal de añadir stock
-            const modalAddStock = document.getElementById('modalAddStock');
-            if (modalAddStock) {
-                modalAddStock.addEventListener('show.bs.modal', function () {
-                    loadCategoriesTree();
-                });
-            }
-        });
-
-
         // ==================== ANALÍTICAS POR TÉCNICO ====================
 
         function viewTechStats(techId) {
@@ -2882,7 +2853,7 @@
                 console.error('❌ Container stockCategoriesTree no encontrado');
                 return;
             }
-            
+
             console.log('✅ Container encontrado');
             container.innerHTML = '<div class="text-center text-muted py-5"><i class="bi bi-hourglass-split fs-1 text-warning"></i><br><br><strong>Cargando inventario...</strong></div>';
 
@@ -2898,13 +2869,13 @@
                 .then(data => {
                     console.log('📊 Tipo de datos recibidos:', typeof data, Array.isArray(data) ? `Array[${data.length}]` : 'No es array');
                     console.log('📦 Datos completos:', data);
-                    
+
                     // VALIDACIÓN CRÍTICA: Verificar que data es un array
                     if (!Array.isArray(data)) {
                         console.error('❌ ERROR: Los datos recibidos no son un array válido');
                         throw new Error(`Formato de datos incorrecto. Recibido: ${typeof data}`);
                     }
-                    
+
                     console.log(`✅ Datos validados: ${data.length} categorías`);
                     updateStockTreeView(data);
                 })
@@ -2913,7 +2884,7 @@
                     console.error('Tipo:', err.constructor.name);
                     console.error('Mensaje:', err.message);
                     console.error('Stack:', err.stack);
-                    
+
                     container.innerHTML = `
                         <div class="alert alert-danger m-3">
                             <h6><i class="bi bi-exclamation-triangle me-2"></i>Error al cargar inventario</h6>
@@ -2958,7 +2929,7 @@
             }
 
             console.log(`✅ Procesando ${categories.length} categorías...`);
-            
+
             try {
                 let html = '<div class="list-group">';
                 categories.forEach((cat, index) => {
@@ -3122,17 +3093,66 @@
         // SOLUCIÓN DEFINITIVA - Usando evento Bootstrap correcto
         // ===========================================
         document.addEventListener('DOMContentLoaded', function () {
-            console.log('🚀 DOM Cargado - Versión CORREGIDA');
-            
+            console.log('🚀 DOM Cargado - Sistema Consolidado');
+
+            // ==================== AUTO-OCULTAR MENSAJES FLASH ====================
+            const flashMessages = document.querySelectorAll('.flash-message');
+            if (flashMessages.length > 0) {
+                console.log('📨 Mensajes flash detectados:', flashMessages.length);
+                flashMessages.forEach(function(message) {
+                    setTimeout(function() {
+                        message.style.transition = 'opacity 0.5s ease-out';
+                        message.style.opacity = '0';
+                        setTimeout(function() {
+                            message.remove();
+                            console.log('✅ Mensaje flash eliminado');
+                        }, 500);
+                    }, 2000); // 2 segundos
+                });
+            }
+
+            // ==================== INICIALIZACIÓN GLOBAL ====================
+
+            // Inicializar modal de acciones
+            const modalEl = document.getElementById('modalActionAdmin');
+            if (modalEl) {
+                modalActionAdmin = new bootstrap.Modal(modalEl);
+            } else {
+                console.warn('⚠️ Modal modalActionAdmin no encontrado');
+            }
+
+            // Aplicar colores dinámicos a los labels de filtros
+            document.querySelectorAll('label[data-color]').forEach(function (label) {
+                const color = label.dataset.color;
+                label.style.borderColor = color;
+                label.style.color = color;
+            });
+
+            // Configurar autocompletado
+            setupAutocomplete('scheduleClientInput', 'scheduleClientList');
+
+            // Cargar categorías para el tab de configuración
+            // (Se ejecutará solo cuando el usuario visite ese tab)
+
+            // Configurar evento para modal de añadir stock
+            const modalAddStock = document.getElementById('modalAddStock');
+            if (modalAddStock) {
+                // Cargar categorías al abrir el modal
+                modalAddStock.addEventListener('show.bs.modal', function () {
+                    loadCategoriesTree(); // Para el tab de configuración
+                    loadCategoriesForStockForm('addStock'); // Para el formulario de stock
+                });
+            }
+
             // ========== CALENDARIO GLOBAL - USANDO EVENTO BOOTSTRAP CORRECTO ==========
             const globalTabButton = document.getElementById('tabGlobalBtn');
             if (globalTabButton) {
                 console.log('✅ Botón calendario encontrado');
-                
+
                 // USAR shown.bs.tab - Evento que Bootstrap dispara DESPUÉS de mostrar el tab
                 globalTabButton.addEventListener('shown.bs.tab', function (e) {
                     console.log('📅 Evento shown.bs.tab disparado - Tab completamente visible');
-                    
+
                     // SOLUCIÓN DEFINITIVA: SIEMPRE destruir y recrear el calendario
                     // Esto garantiza que se renderice con las dimensiones correctas del contenedor visible
                     if (calendarGlobalInstance) {
@@ -3140,32 +3160,48 @@
                         calendarGlobalInstance.destroy();
                         calendarGlobalInstance = null;
                     }
-                    
+
                     console.log('Creando calendario...');
                     initializeGlobalCalendar();
                 });
+                
+                // 🔥 SOLUCIÓN URGENTE: Si el tab de AGENDA GLOBAL está activo al cargar la página, inicializar inmediatamente
+                setTimeout(function() {
+                    if (globalTabButton.classList.contains('active')) {
+                        console.log('🔥 Tab AGENDA GLOBAL activo al inicio - Inicializando calendario...');
+                        initializeGlobalCalendar();
+                    }
+                }, 500);
             } else {
                 console.error('❌ Botón tabGlobalBtn NO encontrado');
             }
-            
+
             // ========== INVENTARIO - USANDO EVENTO BOOTSTRAP CORRECTO ==========
             const stockTabButton = document.querySelector('button[data-bs-target="#stock"]');
             if (stockTabButton) {
                 console.log('✅ Botón stock encontrado');
-                
+
                 stockTabButton.addEventListener('shown.bs.tab', function (e) {
                     console.log('📦 Evento shown.bs.tab disparado - Tab stock visible');
                     loadStockTree();
                 });
+                
+                // 🔥 SOLUCIÓN URGENTE: Si el tab de STOCK está activo al cargar la página, cargar inmediatamente
+                setTimeout(function() {
+                    if (stockTabButton.classList.contains('active')) {
+                        console.log('🔥 Tab STOCK activo al inicio - Cargando inventario...');
+                        loadStockTree();
+                    }
+                }, 500);
             } else {
                 console.error('❌ Botón stock NO encontrado');
             }
-            
+
             // ========== CONFIGURACIÓN - USANDO EVENTO BOOTSTRAP CORRECTO ==========
             const configTabButton = document.querySelector('button[data-bs-target="#config"]');
             if (configTabButton) {
                 console.log('✅ Botón config encontrado');
-                
+
                 configTabButton.addEventListener('shown.bs.tab', function (e) {
                     console.log('⚙️ Evento shown.bs.tab disparado - Tab config visible');
                     loadCategoriesTree();
@@ -3174,20 +3210,20 @@
                 console.error('❌ Botón config NO encontrado');
             }
         });
-        
+
         // Función SIMPLE para inicializar el calendario global
         function initializeGlobalCalendar() {
             console.log('📅 === INICIANDO CALENDARIO GLOBAL ===');
-            
+
             var calendarEl = document.getElementById('calendarGlobal');
             if (!calendarEl) {
                 console.error('❌ Elemento calendarGlobal no encontrado');
                 return;
             }
-            
+
             console.log('✅ Elemento encontrado');
             console.log('Dimensiones del contenedor:', calendarEl.offsetWidth, 'x', calendarEl.offsetHeight);
-            
+
             var isMobile = window.innerWidth < 768;
 
             calendarGlobalInstance = new FullCalendar.Calendar(calendarEl, {
@@ -3209,7 +3245,7 @@
                 navLinks: true,
                 editable: false,
                 dayMaxEvents: true,
-                events: function(info, successCallback, failureCallback) {
+                events: function (info, successCallback, failureCallback) {
                     console.log('📅 Cargando eventos...');
                     fetch('/api/admin/all_tasks')
                         .then(res => res.json())
@@ -3263,42 +3299,38 @@
                 },
                 eventClick: handleEventClick
             });
-            
+
             console.log('📅 Renderizando calendario...');
             calendarGlobalInstance.render();
             console.log('✅ Calendario renderizado');
-            
+
             // CRÍTICO: Múltiples actualizaciones escalonadas para garantizar el ajuste correcto
             // en diferentes navegadores y velocidades de renderizado
-            setTimeout(function() {
+            setTimeout(function () {
                 if (calendarGlobalInstance) {
                     calendarGlobalInstance.updateSize();
                     console.log('✅ Dimensiones actualizadas (50ms)');
                 }
             }, 50);
-            
-            setTimeout(function() {
+
+            setTimeout(function () {
                 if (calendarGlobalInstance) {
                     calendarGlobalInstance.updateSize();
                     console.log('✅ Dimensiones actualizadas (200ms)');
                 }
             }, 200);
-            
-            setTimeout(function() {
+
+            setTimeout(function () {
                 if (calendarGlobalInstance) {
                     calendarGlobalInstance.updateSize();
                     console.log('✅ Dimensiones actualizadas (500ms)');
                 }
             }, 500);
-            
+
             updateGlobalFilters();
         }
 
         // ==================== GESTIÓN DE STOCK MEJORADA ====================
-
-        document.getElementById('modalAddStock').addEventListener('show.bs.modal', function () {
-            loadCategoriesForStockForm('addStock');
-        });
 
         function loadCategoriesForStockForm(prefix) {
             const select = document.getElementById(prefix + 'Category');
