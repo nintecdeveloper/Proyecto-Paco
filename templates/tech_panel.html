@@ -325,13 +325,13 @@
                 <h3 class="text-warning fw-bold m-0 fs-4">Parte de Trabajo</h3>
                 <button class="btn btn-outline-secondary btn-sm px-3" onclick="showSection('home-menu')">Atrás</button>
             </div>
-            <form action="/save_report" method="POST" enctype="multipart/form-data"
+            <form id="mainPartForm" action="/save_report" method="POST" enctype="multipart/form-data"
                 class="card bg-dark border-secondary p-3 p-md-4">
 
                 <div class="mb-3 p-3 rounded" style="background: #1f1f1f; border-left: 4px solid var(--osla-orange);">
                     <label class="form-label text-warning fw-bold mb-2 small">VINCULAR CITA (OPCIONAL)</label>
                     <select name="linked_task_id" id="linkedTaskSelect" class="form-select form-select-lg"
-                        onchange="fillFromTask(this)">
+                        onchange="fillFromTask(this)" onchange="onLinkedTaskChange()" onchange="onLinkedTaskChange()">
                         <option value="none" selected>Nueva incidencia (Sin cita)</option>
                         {% for task in pending_tasks %}
                         <option value="{{ task.id }}" data-client="{{ task.client_name }}"
@@ -344,31 +344,33 @@
                 </div>
 
                 <!-- CRONÓMETRO DE TRABAJO -->
-                <div class="mb-4 p-4 rounded" style="background: linear-gradient(135deg, #1f1f1f 0%, #2a2a2a 100%); border: 2px solid var(--osla-orange);">
+                <div class="mb-4 p-4 rounded"
+                    style="background: linear-gradient(135deg, #1f1f1f 0%, #2a2a2a 100%); border: 2px solid var(--osla-orange);">
                     <div class="text-center">
                         <label class="form-label text-warning fw-bold mb-3 d-block">
                             <i class="bi bi-stopwatch me-2"></i>CRONÓMETRO DE TRABAJO
                         </label>
                         <div class="mb-3">
-                            <div id="workTimerDisplay" class="badge text-white border border-success" 
-                                 style="background-color: #000; color: #00ff00 !important; font-family: 'Courier New', monospace; font-size: 2rem; padding: 15px 30px; min-width: 200px;">
+                            <div id="timerDisplay" class="d-inline-block fw-bold rounded"
+                                style="background-color: #000; color: #00ff00 !important; font-family: 'Courier New', monospace; font-size: 2rem; padding: 15px 30px; min-width: 200px;">
                                 00:00:00
                             </div>
                         </div>
                         <div class="d-flex gap-2 justify-content-center flex-wrap">
-                            <button type="button" id="startTimerBtn" class="btn btn-success" onclick="startWorkTimer()">
+                            <button type="button" id="btnStartTimer" class="btn btn-success px-4 py-2"
+                                onclick="startTimer()">
                                 <i class="bi bi-play-fill me-1"></i>Iniciar
                             </button>
-                            <!-- MODIFICACIÓN #1: Solo Iniciar y Finalizar (sin Pausar) -->
-                            <button type="button" id="stopTimerBtn" class="btn btn-danger" onclick="stopWorkTimer()" style="display: none;">
+                            <button type="button" id="btnStopTimer" class="btn btn-danger px-4 py-2 d-none"
+                                onclick="stopTimer()" disabled>
                                 <i class="bi bi-stop-fill me-1"></i>Finalizar
                             </button>
                         </div>
                         <small class="text-muted d-block mt-2">
-                            <i class="bi bi-info-circle me-1"></i>Inicia el cronómetro cuando comiences el trabajo. Al finalizar, se guardará el tiempo.
+                            <i class="bi bi-info-circle me-1"></i>Inicia el cronómetro cuando comiences el trabajo. Al
+                            finalizar, se guardará el tiempo.
                         </small>
-                        <!-- Campo oculto para guardar la duración total -->
-                        <input type="hidden" name="work_duration" id="workDurationInput" value="0">
+                        <input type="hidden" name="work_duration_seconds" id="workDurationSeconds" value="0">
                     </div>
                 </div>
 
@@ -381,7 +383,8 @@
                     </div>
                     <div class="col-12 col-md-4">
                         <label class="form-label">TIPO SERVICIO</label>
-                        <select name="service_type" id="fieldService" class="form-select" onchange="toggleCustomServiceMain()">
+                        <select name="service_type" id="fieldService" class="form-select"
+                            onchange="toggleCustomServiceMain()">
                             {% for s in all_service_types %}
                             <option value="{{ s.name }}">{{ s.name }}</option>
                             {% endfor %}
@@ -389,12 +392,12 @@
                         </select>
                     </div>
                 </div>
-                
+
                 <!-- MODIFICACIÓN #2: Campo para servicio personalizado -->
                 <div id="customServiceMainDiv" class="mb-3" style="display: none;">
                     <label class="form-label">Servicio Personalizado</label>
-                    <input type="text" name="custom_service_name" id="customServiceMainInput" class="form-control" 
-                           placeholder="Ej: Limpieza profunda, Revisión especial, Mantenimiento preventivo...">
+                    <input type="text" name="custom_service_name" id="customServiceMainInput" class="form-control"
+                        placeholder="Ej: Limpieza profunda, Revisión especial, Mantenimiento preventivo...">
                     <small class="text-muted">
                         <i class="bi bi-info-circle me-1"></i>Este servicio se guardará exactamente como lo escribas
                     </small>
@@ -458,8 +461,10 @@
                             <div class="object-item mb-2">
                                 <div class="input-group">
                                     <span class="input-group-text bg-dark text-white border-secondary">1</span>
-                                    <input type="text" name="objects[]" class="form-control" placeholder="Nombre del objeto o pieza">
-                                    <button type="button" class="btn btn-outline-danger" onclick="removeObject(this)" disabled>
+                                    <input type="text" name="objects[]" class="form-control"
+                                        placeholder="Nombre del objeto o pieza">
+                                    <button type="button" class="btn btn-outline-danger" onclick="removeObject(this)"
+                                        disabled>
                                         <i class="bi bi-trash"></i>
                                     </button>
                                 </div>
@@ -502,7 +507,8 @@
                     </label>
                     <small class="text-muted d-block mb-3">
                         <i class="bi bi-info-circle me-1"></i>
-                        Solicite al cliente que firme en el recuadro blanco para confirmar la asistencia y conformidad con el
+                        Solicite al cliente que firme en el recuadro blanco para confirmar la asistencia y conformidad
+                        con el
                         trabajo realizado.
                     </small>
 
@@ -685,25 +691,30 @@
                         </label>
                         <div class="row g-2">
                             <div class="col-md-6">
-                                <div class="form-check p-3 rounded" style="background: #1f1f1f; border: 2px solid #444; cursor: pointer;"
-                                     onclick="document.getElementById('incidentTypeService').checked = true; toggleServiceField()">
-                                    <input class="form-check-input" type="radio" name="incident_type" id="incidentTypeService" 
-                                           value="servicio" checked onchange="toggleServiceField()">
+                                <div class="form-check p-3 rounded"
+                                    style="background: #1f1f1f; border: 2px solid #444; cursor: pointer;"
+                                    onclick="document.getElementById('incidentTypeService').checked = true; toggleServiceField()">
+                                    <input class="form-check-input" type="radio" name="incident_type"
+                                        id="incidentTypeService" value="servicio" checked
+                                        onchange="toggleServiceField()">
                                     <label class="form-check-label fw-bold" for="incidentTypeService">
                                         <i class="bi bi-tools text-warning me-2"></i>Relacionada con Servicio
                                     </label>
-                                    <p class="small text-muted mb-0 mt-2">Problemas con un servicio específico realizado</p>
+                                    <p class="small text-muted mb-0 mt-2">Problemas con un servicio específico realizado
+                                    </p>
                                 </div>
                             </div>
                             <div class="col-md-6">
-                                <div class="form-check p-3 rounded" style="background: #1f1f1f; border: 2px solid #444; cursor: pointer;"
-                                     onclick="document.getElementById('incidentTypeApp').checked = true; toggleServiceField()">
-                                    <input class="form-check-input" type="radio" name="incident_type" id="incidentTypeApp" 
-                                           value="aplicacion" onchange="toggleServiceField()">
+                                <div class="form-check p-3 rounded"
+                                    style="background: #1f1f1f; border: 2px solid #444; cursor: pointer;"
+                                    onclick="document.getElementById('incidentTypeApp').checked = true; toggleServiceField()">
+                                    <input class="form-check-input" type="radio" name="incident_type"
+                                        id="incidentTypeApp" value="aplicacion" onchange="toggleServiceField()">
                                     <label class="form-check-label fw-bold" for="incidentTypeApp">
                                         <i class="bi bi-bug text-danger me-2"></i>Problema con la Aplicación
                                     </label>
-                                    <p class="small text-muted mb-0 mt-2">Errores o fallos en la aplicación OSLAPRINT</p>
+                                    <p class="small text-muted mb-0 mt-2">Errores o fallos en la aplicación OSLAPRINT
+                                    </p>
                                 </div>
                             </div>
                         </div>
@@ -722,7 +733,8 @@
                             </option>
                             {% endfor %}
                         </select>
-                        <small class="text-muted">Selecciona un servicio si la incidencia está relacionada con un trabajo específico</small>
+                        <small class="text-muted">Selecciona un servicio si la incidencia está relacionada con un
+                            trabajo específico</small>
                     </div>
 
                     <!-- Título -->
@@ -731,7 +743,7 @@
                             <i class="bi bi-card-heading me-2"></i>TÍTULO *
                         </label>
                         <input type="text" name="title" id="incidentTitle" class="form-control" required
-                               placeholder="Ej: Error al guardar parte, Cliente no aparece en sistema...">
+                            placeholder="Ej: Error al guardar parte, Cliente no aparece en sistema...">
                     </div>
 
                     <!-- Descripción -->
@@ -740,8 +752,9 @@
                             <i class="bi bi-text-paragraph me-2"></i>DESCRIPCIÓN DETALLADA *
                         </label>
                         <textarea name="description" id="incidentDescription" class="form-control" rows="6" required
-                                  placeholder="Describe el problema con el mayor detalle posible..."></textarea>
-                        <small class="text-muted">Incluye pasos para reproducir el problema, mensajes de error, etc.</small>
+                            placeholder="Describe el problema con el mayor detalle posible..."></textarea>
+                        <small class="text-muted">Incluye pasos para reproducir el problema, mensajes de error,
+                            etc.</small>
                     </div>
 
                     <!-- Prioridad -->
@@ -759,7 +772,9 @@
                     <!-- Información de destino -->
                     <div class="alert alert-info border-info bg-black mb-4">
                         <i class="bi bi-info-circle me-2"></i>
-                        <strong id="incidentDestInfo">Esta incidencia se enviará a: <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="26564745496649554a4756544f48520845494b">[email&#160;protected]</a></strong>
+                        <strong id="incidentDestInfo">Esta incidencia se enviará a: <a
+                                href="/cdn-cgi/l/email-protection" class="__cf_email__"
+                                data-cfemail="26564745496649554a4756544f48520845494b">[email&#160;protected]</a></strong>
                     </div>
 
                     <!-- Botones -->
@@ -767,7 +782,8 @@
                         <button type="submit" class="btn btn-danger flex-grow-1">
                             <i class="bi bi-send-fill me-2"></i>ENVIAR INCIDENCIA
                         </button>
-                        <button type="button" class="btn btn-outline-secondary" onclick="document.getElementById('incidentForm').reset(); toggleServiceField()">
+                        <button type="button" class="btn btn-outline-secondary"
+                            onclick="document.getElementById('incidentForm').reset(); toggleServiceField()">
                             <i class="bi bi-arrow-clockwise me-2"></i>Limpiar
                         </button>
                     </div>
@@ -811,16 +827,16 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <!-- Estado del trabajo -->
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <span id="evtStatus" class="badge p-2"></span>
                     </div>
-                    
+
                     <!-- Descripción del trabajo -->
                     <h6 class="text-warning fw-bold mb-2">Descripción del Trabajo:</h6>
                     <p class="small text-muted bg-black p-3 rounded border border-secondary" id="evtDesc"></p>
-                    
+
                     <input type="hidden" id="evtId">
                     <input type="hidden" id="evtClientId">
                 </div>
@@ -909,7 +925,8 @@
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Tipo de Servicio</label>
-                            <select name="service_type_id" id="modalServiceType" class="form-select" onchange="toggleCustomServiceModal()">
+                            <select name="service_type_id" id="modalServiceType" class="form-select"
+                                onchange="toggleCustomServiceModal()">
                                 <option value="">Seleccionar...</option>
                                 {% for s in all_service_types %}
                                 <option value="{{ s.id }}">{{ s.name }}</option>
@@ -920,8 +937,8 @@
                         <!-- MODIFICACIÓN #2: Campo para servicio personalizado en modal -->
                         <div class="mb-3" id="customServiceModalDiv" style="display: none;">
                             <label class="form-label">Servicio Personalizado</label>
-                            <input type="text" name="custom_service_name" id="customServiceModalInput" class="form-control" 
-                                   placeholder="Ej: Limpieza profunda, Revisión especial...">
+                            <input type="text" name="custom_service_name" id="customServiceModalInput"
+                                class="form-control" placeholder="Ej: Limpieza profunda, Revisión especial...">
                             <small class="text-muted">Este servicio se guardará exactamente como lo escribas</small>
                         </div>
                         <div class="mb-3">
@@ -1094,7 +1111,8 @@
     </div>
 
 
-    <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         let calendar;
         const modalAction = new bootstrap.Modal(document.getElementById('modalEventAction'));
@@ -1127,6 +1145,12 @@
         function initCalendar() {
             const isMobile = window.innerWidth < 768;
             const calendarEl = document.getElementById('calendar');
+            
+            // Destruir instancia anterior si existe (evita duplicaciones)
+            if (calendar) {
+                calendar.destroy();
+                calendar = null;
+            }
 
             calendar = new FullCalendar.Calendar(calendarEl, {
                 initialView: isMobile ? 'listWeek' : 'dayGridMonth',
@@ -1137,23 +1161,52 @@
                     right: 'dayGridMonth,timeGridWeek,listWeek'
                 },
                 height: 'auto',
-                events: function(info, successCallback, failureCallback) {
-                    // MODIFICACIÓN #7: Transformar eventos para añadir indicador visual
+                events: function (info, successCallback, failureCallback) {
                     fetch('/api/tasks')
                         .then(res => res.json())
                         .then(events => {
                             const transformedEvents = events.map(event => {
-                                // Si está completado, añadir emoji y cambiar color
+                                const baseEvent = {
+                                    ...event,
+                                    id: 'task-' + event.id  // ID único con prefijo
+                                };
+                                
+                                // Si está completado
                                 if (event.extendedProps && event.extendedProps.status === 'Completado') {
                                     return {
-                                        ...event,
+                                        ...baseEvent,
                                         title: '✅ ' + event.title,
-                                        backgroundColor: '#28a745',
-                                        borderColor: '#1e7e34',
-                                        textColor: '#ffffff'
+                                        backgroundColor: 'rgba(40, 167, 69, 0.3)',  // Verde claro
+                                        borderColor: '#28a745',  // Verde sólido
+                                        textColor: '#000'  // Texto negro para mejor contraste
                                     };
                                 }
-                                return event;
+                                
+                                // Eventos normales - colores claros según tipo de servicio
+                                const serviceColors = {
+                                    'Avería': 'rgba(253, 126, 20, 0.3)',           // Naranja claro
+                                    'Revisión': 'rgba(13, 110, 253, 0.3)',        // Azul claro
+                                    'Instalación': 'rgba(111, 66, 193, 0.3)',     // Púrpura claro
+                                    'Mantenimiento': 'rgba(255, 193, 7, 0.3)',    // Amarillo claro
+                                    'Otros servicios': 'rgba(32, 201, 151, 0.3)'  // Verde azulado claro
+                                };
+                                
+                                const serviceBorderColors = {
+                                    'Avería': '#fd7e14',
+                                    'Revisión': '#0d6efd',
+                                    'Instalación': '#6f42c1',
+                                    'Mantenimiento': '#ffc107',
+                                    'Otros servicios': '#20c997'
+                                };
+                                
+                                const serviceType = event.extendedProps?.service_type || 'default';
+                                
+                                return {
+                                    ...baseEvent,
+                                    backgroundColor: serviceColors[serviceType] || 'rgba(108, 117, 125, 0.3)',
+                                    borderColor: serviceBorderColors[serviceType] || '#6c757d',
+                                    textColor: '#000'  // Texto negro siempre
+                                };
                             });
                             successCallback(transformedEvents);
                         })
@@ -1166,11 +1219,12 @@
                 dateClick: handleDateClick,
                 selectable: true,
                 eventDidMount: function (info) {
-                    // Mantener estilos personalizados
-                    if (info.backgroundColor) {
-                        info.el.style.backgroundColor = info.backgroundColor;
-                    }
-                    // MODIFICACIÓN #7: Estilo adicional para completados
+                    // Añadir tooltip
+                    const tooltip = info.event.title + 
+                        (info.event.extendedProps.service_type ? '\n' + info.event.extendedProps.service_type : '');
+                    info.el.title = tooltip;
+                    
+                    // Estilo adicional para completados
                     if (info.event.extendedProps.status === 'Completado') {
                         info.el.style.opacity = '0.85';
                         info.el.style.fontStyle = 'italic';
@@ -1182,13 +1236,15 @@
                 }
             });
             calendar.render();
-            
-            // Agregar listener al checkbox de completadas
+
+            // Agregar listener al checkbox de completadas (solo una vez)
             const toggleCheckbox = document.getElementById('toggleCompleted');
             if (toggleCheckbox && !toggleCheckbox.hasAttribute('data-listener-added')) {
                 toggleCheckbox.addEventListener('change', renderTaskList);
                 toggleCheckbox.setAttribute('data-listener-added', 'true');
             }
+            
+            console.log('✅ Calendario inicializado correctamente');
         }
 
         function handleEventClick(info) {
@@ -1213,7 +1269,7 @@
             // CARGAR INFORMACIÓN DEL CLIENTE
             const clientInfoContainer = document.getElementById('evtClientInfo');
             const clientId = evt.extendedProps.client_id;
-            
+
             if (clientId) {
                 // Hacer petición al servidor para obtener información del cliente
                 fetch(`/api/client/${clientId}`)
@@ -1252,7 +1308,7 @@
                                         <span class="text-white fw-bold d-block" style="font-size: 1.05rem;">${client.address}</span>
                                     </div>
                             `;
-                            
+
                             if (client.link) {
                                 html += `
                                     <div class="col-md-12 mt-2">
@@ -1262,7 +1318,7 @@
                                     </div>
                                 `;
                             }
-                            
+
                             if (client.has_support) {
                                 html += `
                                     <div class="col-md-12 mt-2">
@@ -1276,7 +1332,7 @@
                                     </div>
                                 `;
                             }
-                            
+
                             if (client.notes) {
                                 html += `
                                     <div class="col-md-12 mt-3 pt-2 border-top border-secondary">
@@ -1288,7 +1344,7 @@
                                     </div>
                                 `;
                             }
-                            
+
                             html += `</div>`;
                             clientInfoContainer.innerHTML = html;
                         } else {
@@ -1339,7 +1395,7 @@
 
             const form = event.target;
             const formData = new FormData(form);
-            
+
             // MODIFICACIÓN #2: Manejar servicio personalizado
             const serviceTypeId = formData.get('service_type_id');
             const customServiceName = formData.get('custom_service_name');
@@ -1453,7 +1509,7 @@
 
         function deleteFromList(id) {
             if (!confirm('¿Eliminar esta tarea terminada?')) return;
-            
+
             fetch(`/api/task_action/${id}/delete`, { method: 'POST' })
                 .then(res => {
                     if (!res.ok) {
@@ -1504,7 +1560,7 @@
                 'cancel': 'cancelar'
             };
             const actionName = actionNames[action] || action;
-            
+
             if (!confirm(`¿Confirmar ${actionName} esta tarea?`)) return;
 
             fetch(`/api/task_action/${id}/${action}`, { method: 'POST' })
@@ -1518,7 +1574,7 @@
                     if (data.success) {
                         calendar.refetchEvents();
                         modalAction.hide();
-                        
+
                         // Mostrar mensaje de éxito
                         setTimeout(() => {
                             const successMsg = action === 'delete' ? 'Tarea eliminada correctamente' : 'Acción completada correctamente';
@@ -1891,7 +1947,7 @@
             lastX: 0,
             lastY: 0,
 
-            init: function() {
+            init: function () {
                 this.canvas = document.getElementById('signaturePadMain');
                 if (!this.canvas) return;
 
@@ -1924,14 +1980,14 @@
                 this.canvas.addEventListener('touchend', () => this.stopDrawing());
             },
 
-            startDrawing: function(e) {
+            startDrawing: function (e) {
                 this.isDrawing = true;
                 const rect = this.canvas.getBoundingClientRect();
                 this.lastX = e.clientX - rect.left;
                 this.lastY = e.clientY - rect.top;
             },
 
-            draw: function(e) {
+            draw: function (e) {
                 if (!this.isDrawing) return;
 
                 const rect = this.canvas.getBoundingClientRect();
@@ -1947,11 +2003,11 @@
                 this.lastY = currentY;
             },
 
-            stopDrawing: function() {
+            stopDrawing: function () {
                 this.isDrawing = false;
             },
 
-            handleTouch: function(e) {
+            handleTouch: function (e) {
                 e.preventDefault();
                 const touch = e.touches[0];
                 if (!touch) return;
@@ -1968,19 +2024,19 @@
                 this.canvas.dispatchEvent(mouseEvent);
             },
 
-            clear: function() {
+            clear: function () {
                 if (!this.canvas || !this.ctx) return;
                 this.ctx.fillStyle = '#fff';
                 this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
                 document.getElementById('mainSignaturePreview').style.display = 'none';
             },
 
-            toDataURL: function() {
+            toDataURL: function () {
                 if (!this.canvas) return null;
                 return this.canvas.toDataURL('image/png');
             },
 
-            isEmpty: function() {
+            isEmpty: function () {
                 if (!this.canvas) return true;
 
                 const pixelData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height).data;
@@ -1995,7 +2051,7 @@
                 return true;
             },
 
-            preview: function() {
+            preview: function () {
                 if (this.isEmpty()) {
                     alert('La firma está vacía. Por favor, firme en el recuadro.');
                     return;
@@ -2021,10 +2077,10 @@
 
         // Inicializar firma cuando se muestra la sección de parte
         // VALIDACIÓN DEL FORMULARIO ANTES DE ENVIAR
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             const reportForm = document.querySelector('form[action="/save_report"]');
             if (reportForm) {
-                reportForm.addEventListener('submit', function(e) {
+                reportForm.addEventListener('submit', function (e) {
                     // Validar nombre del firmante
                     const signatureName = document.getElementById('signatureName').value.trim();
                     if (!signatureName) {
@@ -2324,10 +2380,10 @@
 
 
         // ==================== INFORMACIÓN DEL CLIENTE ====================
-        
+
         function fillFromTask(selectElement) {
             const selected = selectElement.options[selectElement.selectedIndex];
-            
+
             if (selected.value === 'none') {
                 document.getElementById('fieldClient').value = '';
                 document.getElementById('fieldDate').value = document.querySelector('[name="date"]').value;
@@ -2337,19 +2393,19 @@
                 hideClientInfo();
                 return;
             }
-            
+
             const taskId = selected.value;
-            
+
             fetch(`/api/get_task_full/${taskId}`)
                 .then(res => res.json())
                 .then(response => {
                     if (response.success) {
                         const task = response.data;
-                        
+
                         document.getElementById('fieldClient').value = task.client_name;
                         document.getElementById('fieldDate').value = task.date;
                         document.getElementById('fieldEntryTime').value = task.start_time;
-                        
+
                         // Seleccionar tipo de servicio
                         const serviceSelect = document.getElementById('fieldService');
                         for (let opt of serviceSelect.options) {
@@ -2358,9 +2414,9 @@
                                 break;
                             }
                         }
-                        
+
                         document.getElementById('fieldDescription').value = task.description;
-                        
+
                         // Mostrar información del cliente
                         if (task.client_info) {
                             showClientInfo(task.client_info);
@@ -2369,10 +2425,10 @@
                 })
                 .catch(err => console.error('Error:', err));
         }
-        
+
         function showClientInfo(clientInfo) {
             let infoDiv = document.getElementById('clientInfoDisplay');
-            
+
             if (!infoDiv) {
                 infoDiv = document.createElement('div');
                 infoDiv.id = 'clientInfoDisplay';
@@ -2382,7 +2438,7 @@
                 infoDiv.style.color = 'white';
                 document.querySelector('#fieldClient').parentElement.appendChild(infoDiv);
             }
-            
+
             let html = `
                 <div class="d-flex justify-content-between align-items-start">
                     <div class="flex-grow-1">
@@ -2432,182 +2488,58 @@
                     <button type="button" class="btn-close btn-close-white" onclick="hideClientInfo()"></button>
                 </div>
             `;
-            
+
             infoDiv.innerHTML = html;
             infoDiv.style.display = 'block';
         }
-        
+
         function hideClientInfo() {
             const infoDiv = document.getElementById('clientInfoDisplay');
             if (infoDiv) {
                 infoDiv.style.display = 'none';
             }
         }
-        
+
         // ============================================================
         // CRONÓMETRO DE TRABAJO (para sección Nuevo Parte)
         // ============================================================
-        
-        let workTimer = {
-            startTime: null,
-            elapsedTime: 0,  // Tiempo acumulado en milisegundos
-            intervalId: null,
-            isRunning: false
-        };
+
+
 
         // MODIFICACIÓN #1: Funciones simplificadas sin pausar
-        function loadWorkTimerState() {
-            const saved = localStorage.getItem('workTimerState');
-            if (saved) {
-                try {
-                    const state = JSON.parse(saved);
-                    workTimer.elapsedTime = state.elapsedTime || 0;
-                    workTimer.isRunning = state.isRunning || false;
-                    
-                    if (state.startTime) {
-                        workTimer.startTime = state.startTime;
-                    }
-                    
-                    updateWorkTimerDisplay();
-                    
-                    // Si estaba corriendo, continuar
-                    if (workTimer.isRunning) {
-                        startWorkTimerInterval();
-                        updateTimerButtons('running');
-                    }
-                } catch (e) {
-                    console.error('Error cargando estado del cronómetro:', e);
-                    resetWorkTimer();
-                }
-            }
-        }
 
-        function saveWorkTimerState() {
-            const state = {
-                startTime: workTimer.startTime,
-                elapsedTime: workTimer.elapsedTime,
-                isRunning: workTimer.isRunning
-            };
-            localStorage.setItem('workTimerState', JSON.stringify(state));
-        }
 
-        function startWorkTimer() {
-            if (workTimer.isRunning) return;
-            
-            workTimer.startTime = Date.now();
-            workTimer.isRunning = true;
-            
-            startWorkTimerInterval();
-            updateTimerButtons('running');
-            saveWorkTimerState();
-        }
+        updateWorkTimerDisplay();
 
-        function stopWorkTimer() {
-            if (!workTimer.isRunning) return;
-            
-            // Guardar tiempo final
-            const currentTime = Date.now();
-            workTimer.elapsedTime += (currentTime - workTimer.startTime);
-            workTimer.isRunning = false;
-            
-            if (workTimer.intervalId) {
-                clearInterval(workTimer.intervalId);
-                workTimer.intervalId = null;
-            }
-            
-            updateWorkTimerDisplay();
-            updateTimerButtons('stopped');
-            saveWorkTimerState();
-            
-            alert('⏱️ Cronómetro finalizado. Tiempo registrado correctamente.');
-        }
+        // Si estaba corriendo, continuar
+        startWorkTimerInterval();
+        updateTimerButtons('running');
 
-        function resetWorkTimer() {
-            // Detener el cronómetro
-            if (workTimer.intervalId) {
-                clearInterval(workTimer.intervalId);
-            }
-            
-            // Resetear valores
-            workTimer.startTime = null;
-            workTimer.elapsedTime = 0;
-            workTimer.isRunning = false;
-            workTimer.intervalId = null;
-            
-            // Actualizar display
-            updateWorkTimerDisplay();
-            updateTimerButtons('stopped');
-            
-            // Limpiar localStorage
-            localStorage.removeItem('workTimerState');
-            
-            // Limpiar campo oculto
-            document.getElementById('workDurationInput').value = '0';
-        }
+        updateWorkTimerDisplay();
+        updateTimerButtons('stopped');
+        saveWorkTimerState();
 
-        function startWorkTimerInterval() {
-            workTimer.intervalId = setInterval(() => {
-                updateWorkTimerDisplay();
-                saveWorkTimerState();
-            }, 1000);
-        }
-
-        function updateWorkTimerDisplay() {
-            let totalElapsed = workTimer.elapsedTime;
-            
-            if (workTimer.isRunning && !workTimer.isPaused && workTimer.startTime) {
-                totalElapsed += (Date.now() - workTimer.startTime);
-            }
-            
-            const hours = Math.floor(totalElapsed / 3600000);
-            const minutes = Math.floor((totalElapsed % 3600000) / 60000);
-            const seconds = Math.floor((totalElapsed % 60000) / 1000);
-            
-            const display = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-            
-            const timerEl = document.getElementById('workTimerDisplay');
-            if (timerEl) {
-                timerEl.textContent = display;
-            }
-            
-            // Actualizar campo oculto con duración total en segundos
-            document.getElementById('workDurationInput').value = Math.floor(totalElapsed / 1000);
-        }
-
-        function updateTimerButtons(state) {
-            const startBtn = document.getElementById('startTimerBtn');
-            const stopBtn = document.getElementById('stopTimerBtn');
-            
-            if (!startBtn || !stopBtn) return;
-            
-            // MODIFICACIÓN #1: Solo dos estados - running o stopped
-            if (state === 'running') {
-                startBtn.style.display = 'none';
-                stopBtn.style.display = 'inline-block';
-            } else { // stopped
-                startBtn.style.display = 'inline-block';
-                stopBtn.style.display = 'none';
-            }
-        }
+        // Actualizar display
+        updateWorkTimerDisplay();
+        updateTimerButtons('stopped');
 
         // Cargar estado del cronómetro cuando se carga la página
-        document.addEventListener('DOMContentLoaded', function() {
-            loadWorkTimerState();
+        document.addEventListener('DOMContentLoaded', function () {
             loadStockCategories();  // Cargar stock organizado
-            
+
             // MODIFICACIÓN #1: Limpiar el cronómetro cuando se crea un nuevo parte
             const reportForm = document.querySelector('form[action="/save_report"]');
             if (reportForm) {
-                reportForm.addEventListener('submit', function(e) {
+                reportForm.addEventListener('submit', function (e) {
                     // Asegurarse de que el tiempo final esté guardado
                     updateWorkTimerDisplay();
                 });
             }
-            
+
             // Auto-reset después de enviar parte exitosamente
             const originalFormSubmit = reportForm?.onsubmit;
             if (reportForm) {
-                reportForm.addEventListener('submit', async function(e) {
+                reportForm.addEventListener('submit', async function (e) {
                     // Después del envío exitoso, resetear cronómetro
                     setTimeout(() => {
                         resetWorkTimer();
@@ -2619,7 +2551,7 @@
         // ============================================================
         // CARGAR STOCK ORGANIZADO POR CATEGORÍAS
         // ============================================================
-        
+
         function loadStockCategories() {
             fetch('/api/stock_categories')
                 .then(res => res.json())
@@ -2634,27 +2566,27 @@
         function populateStockSelect(categories) {
             const select = document.getElementById('stockItemSelect');
             if (!select) return;
-            
+
             // Limpiar opciones existentes excepto la primera
             select.innerHTML = '<option value="">Sin artículo de stock</option>';
-            
+
             // Función recursiva para añadir categorías y sus items
             function addCategoryItems(cat, level = 0) {
                 // Añadir items de esta categoría
                 if (cat.items && cat.items.length > 0) {
                     const optgroup = document.createElement('optgroup');
                     optgroup.label = '─'.repeat(level) + (level > 0 ? ' ' : '') + cat.name;
-                    
+
                     cat.items.forEach(item => {
                         const option = document.createElement('option');
                         option.value = item.id;
                         option.textContent = `${item.name} (${item.quantity} disponibles)`;
                         optgroup.appendChild(option);
                     });
-                    
+
                     select.appendChild(optgroup);
                 }
-                
+
                 // Procesar subcategorías recursivamente
                 if (cat.children && cat.children.length > 0) {
                     cat.children.forEach(child => {
@@ -2662,7 +2594,7 @@
                     });
                 }
             }
-            
+
             // Añadir todas las categorías principales
             categories.forEach(cat => {
                 addCategoryItems(cat, 0);
@@ -2672,12 +2604,12 @@
         // ============================================================
         // GESTIÓN DE INCIDENCIAS
         // ============================================================
-        
+
         function toggleServiceField() {
             const serviceDiv = document.getElementById('serviceSelectDiv');
             const destInfo = document.getElementById('incidentDestInfo');
             const isServiceIncident = document.getElementById('incidentTypeService').checked;
-            
+
             if (isServiceIncident) {
                 serviceDiv.style.display = 'block';
                 destInfo.textContent = 'Esta incidencia se enviará a: paco@oslaprint.com';
@@ -2689,44 +2621,44 @@
         }
 
         // Manejar envío del formulario de incidencias
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             const incidentForm = document.getElementById('incidentForm');
             if (incidentForm) {
-                incidentForm.addEventListener('submit', function(e) {
+                incidentForm.addEventListener('submit', function (e) {
                     e.preventDefault();
-                    
+
                     const formData = new FormData(this);
-                    
+
                     // Mostrar indicador de carga
                     const submitBtn = this.querySelector('button[type="submit"]');
                     const originalText = submitBtn.innerHTML;
                     submitBtn.disabled = true;
                     submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Enviando...';
-                    
+
                     fetch('/submit_incident', {
                         method: 'POST',
                         body: formData
                     })
-                    .then(res => res.json())
-                    .then(data => {
-                        submitBtn.disabled = false;
-                        submitBtn.innerHTML = originalText;
-                        
-                        if (data.success) {
-                            alert('✅ Incidencia enviada correctamente\n\nSe ha notificado al equipo correspondiente.');
-                            this.reset();
-                            toggleServiceField();
-                            loadIncidentsHistory();
-                        } else {
-                            alert('❌ Error al enviar incidencia: ' + data.msg);
-                        }
-                    })
-                    .catch(err => {
-                        submitBtn.disabled = false;
-                        submitBtn.innerHTML = originalText;
-                        console.error('Error:', err);
-                        alert('Error de conexión al enviar la incidencia');
-                    });
+                        .then(res => res.json())
+                        .then(data => {
+                            submitBtn.disabled = false;
+                            submitBtn.innerHTML = originalText;
+
+                            if (data.success) {
+                                alert('✅ Incidencia enviada correctamente\n\nSe ha notificado al equipo correspondiente.');
+                                this.reset();
+                                toggleServiceField();
+                                loadIncidentsHistory();
+                            } else {
+                                alert('❌ Error al enviar incidencia: ' + data.msg);
+                            }
+                        })
+                        .catch(err => {
+                            submitBtn.disabled = false;
+                            submitBtn.innerHTML = originalText;
+                            console.error('Error:', err);
+                            alert('Error de conexión al enviar la incidencia');
+                        });
                 });
             }
         });
@@ -2747,7 +2679,7 @@
         function displayIncidentsHistory(incidents) {
             const container = document.getElementById('incidentsHistory');
             if (!container) return;
-            
+
             if (incidents.length === 0) {
                 container.innerHTML = `
                     <div class="text-center text-muted py-4">
@@ -2756,7 +2688,7 @@
                 `;
                 return;
             }
-            
+
             let html = '<div class="list-group">';
             incidents.slice(0, 10).forEach(inc => {
                 const statusClass = {
@@ -2764,10 +2696,10 @@
                     'En proceso': 'warning',
                     'Cerrada': 'success'
                 }[inc.status] || 'secondary';
-                
+
                 const typeIcon = inc.type === 'servicio' ? 'tools' : 'bug';
                 const typeClass = inc.type === 'servicio' ? 'warning' : 'danger';
-                
+
                 html += `
                     <div class="list-group-item bg-black border-secondary mb-2">
                         <div class="d-flex justify-content-between align-items-start">
@@ -2794,12 +2726,12 @@
         // ============================================================
         // MODIFICACIÓN #2: Funciones para servicios personalizados
         // ============================================================
-        
+
         function toggleCustomServiceMain() {
             const select = document.getElementById('fieldService');
             const customDiv = document.getElementById('customServiceMainDiv');
             const customInput = document.getElementById('customServiceMainInput');
-            
+
             if (select.value === '__custom__') {
                 customDiv.style.display = 'block';
                 customInput.required = true;
@@ -2809,12 +2741,12 @@
                 customInput.value = '';
             }
         }
-        
+
         function toggleCustomServiceModal() {
             const select = document.getElementById('modalServiceType');
             const customDiv = document.getElementById('customServiceModalDiv');
             const customInput = document.getElementById('customServiceModalInput');
-            
+
             if (select.value === 'custom') {
                 customDiv.style.display = 'block';
                 customInput.required = true;
@@ -2830,11 +2762,11 @@
         // ============================================================
         // MODIFICACIÓN #8: Funciones para múltiples objetos
         // ============================================================
-        
+
         function addObject() {
             const container = document.getElementById('objectsContainer');
             const count = container.children.length + 1;
-            
+
             const html = `
                 <div class="object-item mb-2">
                     <div class="input-group">
@@ -2846,7 +2778,7 @@
                     </div>
                 </div>
             `;
-            
+
             container.insertAdjacentHTML('beforeend', html);
             updateObjectNumbers();
         }
@@ -2862,11 +2794,11 @@
         function updateObjectNumbers() {
             const container = document.getElementById('objectsContainer');
             const items = container.querySelectorAll('.object-item');
-            
+
             items.forEach((item, index) => {
                 const span = item.querySelector('.input-group-text');
                 span.textContent = index + 1;
-                
+
                 // Deshabilitar botón de eliminar si solo queda uno
                 const btn = item.querySelector('.btn-outline-danger');
                 btn.disabled = items.length === 1;
@@ -2874,16 +2806,16 @@
         }
 
         // Interceptar envío del formulario para convertir objetos a JSON
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             const reportForm = document.querySelector('form[action="/save_report"]');
             if (reportForm) {
-                reportForm.addEventListener('submit', function(e) {
+                reportForm.addEventListener('submit', function (e) {
                     // Recoger todos los objetos
                     const objectInputs = document.querySelectorAll('input[name="objects[]"]');
                     const objects = Array.from(objectInputs)
                         .map(input => input.value.trim())
                         .filter(val => val !== '');
-                    
+
                     // Si hay objetos, guardar como JSON
                     if (objects.length > 0) {
                         // Crear un input hidden con el JSON
@@ -2899,6 +2831,461 @@
                 });
             }
         });
+
+
+        // MODIFICACIÓN 5: Funciones para copiar dirección y abrir Google Maps
+        function copyAddressToClipboard() {
+            const addressField = document.getElementById('partClientAddress');
+            if (!addressField || !addressField.value.trim()) {
+                alert('No hay dirección para copiar');
+                return;
+            }
+
+            navigator.clipboard.writeText(addressField.value.trim())
+                .then(() => {
+                    // Feedback visual
+                    const btn = event.target.closest('button');
+                    const originalHTML = btn.innerHTML;
+                    btn.innerHTML = '<i class="bi bi-check"></i> ¡Copiado!';
+                    btn.classList.add('btn-success');
+                    btn.classList.remove('btn-outline-secondary');
+
+                    setTimeout(() => {
+                        btn.innerHTML = originalHTML;
+                        btn.classList.remove('btn-success');
+                        btn.classList.add('btn-outline-secondary');
+                    }, 2000);
+                })
+                .catch(err => {
+                    console.error('Error al copiar:', err);
+                    alert('Error al copiar la dirección');
+                });
+        }
+
+        function openGoogleMaps() {
+            const addressField = document.getElementById('partClientAddress');
+            if (!addressField || !addressField.value.trim()) {
+                alert('No hay dirección para abrir en Maps');
+                return;
+            }
+
+            const address = encodeURIComponent(addressField.value.trim());
+            const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${address}`;
+            window.open(mapsUrl, '_blank');
+        }
+
+
+
+        // MODIFICACIÓN 8: Funciones para múltiples objetos de stock
+        function addStockRow() {
+            const container = document.getElementById('stockItemsContainer');
+            const newRow = document.createElement('div');
+            newRow.className = 'stock-item-row mb-2';
+            newRow.innerHTML = `
+                <div class="row">
+                    <div class="col-md-8">
+                        <select class="form-select stock-item-select" name="stock_items[]">
+                            <option value="">-- Seleccionar objeto --</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <input type="number" class="form-control" name="stock_quantities[]" placeholder="Cantidad" min="1" value="1">
+                    </div>
+                    <div class="col-md-1">
+                        <button type="button" class="btn btn-danger btn-sm" onclick="removeStockRow(this)">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+            container.appendChild(newRow);
+            loadStockItemsIntoSelect(newRow.querySelector('.stock-item-select'));
+            updateRemoveButtons();
+        }
+
+        function removeStockRow(button) {
+            button.closest('.stock-item-row').remove();
+            updateRemoveButtons();
+        }
+
+        function updateRemoveButtons() {
+            const rows = document.querySelectorAll('.stock-item-row');
+            rows.forEach((row, index) => {
+                const btn = row.querySelector('button[onclick*="removeStockRow"]');
+                if (rows.length > 1) {
+                    btn.style.display = 'block';
+                } else {
+                    btn.style.display = 'none';
+                }
+            });
+        }
+
+        function loadStockItemsIntoSelect(selectElement) {
+            fetch('/api/stock_categories')
+                .then(response => response.json())
+                .then(categories => {
+                    selectElement.innerHTML = '<option value="">-- Seleccionar objeto --</option>';
+
+                    categories.forEach(category => {
+                        const optgroup = document.createElement('optgroup');
+                        optgroup.label = category.name;
+
+                        // Añadir items directos de la categoría
+                        category.items.forEach(item => {
+                            const option = document.createElement('option');
+                            option.value = item.id;
+                            option.textContent = `${item.name} (Stock: ${item.quantity})`;
+                            optgroup.appendChild(option);
+                        });
+
+                        // Añadir subcategorías
+                        category.children.forEach(subcategory => {
+                            const subOptgroup = document.createElement('optgroup');
+                            subOptgroup.label = `  └─ ${subcategory.name}`;
+
+                            subcategory.items.forEach(item => {
+                                const option = document.createElement('option');
+                                option.value = item.id;
+                                option.textContent = `${item.name} (Stock: ${item.quantity})`;
+                                subOptgroup.appendChild(option);
+                            });
+
+                            if (subcategory.items.length > 0) {
+                                selectElement.appendChild(subOptgroup);
+                            }
+                        });
+
+                        if (category.items.length > 0 || category.children.length > 0) {
+                            selectElement.appendChild(optgroup);
+                        }
+                    });
+                })
+                .catch(error => console.error('Error cargando stock:', error));
+        }
+
+        // Cargar stock en todos los selectores al abrir el modal
+        function initializeStockSelects() {
+            document.querySelectorAll('.stock-item-select').forEach(select => {
+                loadStockItemsIntoSelect(select);
+            });
+        }
+
+        // ========== MODIFICACIÓN 5: Botones de Dirección ==========
+        function copyAddressToClipboard() {
+            var addressField = document.getElementById('partClientAddress');
+            if (!addressField || !addressField.value.trim()) {
+                alert('No hay dirección para copiar');
+                return;
+            }
+
+            navigator.clipboard.writeText(addressField.value.trim())
+                .then(function () {
+                    var btn = event.target.closest('button');
+                    var originalHTML = btn.innerHTML;
+                    btn.innerHTML = '<i class="bi bi-check"></i> ¡Copiado!';
+                    btn.classList.add('btn-success');
+                    btn.classList.remove('btn-outline-secondary');
+
+                    setTimeout(function () {
+                        btn.innerHTML = originalHTML;
+                        btn.classList.remove('btn-success');
+                        btn.classList.add('btn-outline-secondary');
+                    }, 2000);
+                })
+                .catch(function (err) {
+                    console.error('Error al copiar:', err);
+                    alert('Error al copiar la dirección');
+                });
+        }
+
+        function openGoogleMaps() {
+            var addressField = document.getElementById('partClientAddress');
+            if (!addressField || !addressField.value.trim()) {
+                alert('No hay dirección para abrir en Maps');
+                return;
+            }
+
+            var address = encodeURIComponent(addressField.value.trim());
+            var mapsUrl = 'https://www.google.com/maps/search/?api=1&query=' + address;
+            window.open(mapsUrl, '_blank');
+        }
+
+        // ========== MODIFICACIÓN 6: Sincronización Parte ↔ Cita ==========
+        function onLinkedTaskChange() {
+            var taskId = document.getElementById('linkedTaskSelect').value;
+
+            if (!taskId || taskId === 'none') {
+                document.getElementById('partClientName').value = '';
+                document.getElementById('partServiceType').value = '';
+                document.getElementById('partDate').value = '';
+                document.getElementById('partEntryTime').value = '';
+                document.getElementById('partExitTime').value = '';
+                document.getElementById('partClientAddress').value = '';
+                document.getElementById('partDescription').value = '';
+                return;
+            }
+
+            fetch('/api/get_task_full/' + taskId)
+                .then(function (response) { return response.json(); })
+                .then(function (data) {
+                    if (data.success) {
+                        var task = data.data;
+                        document.getElementById('partClientName').value = task.client_name || '';
+                        document.getElementById('partServiceType').value = task.service_type || '';
+                        document.getElementById('partDate').value = task.date || '';
+                        document.getElementById('partEntryTime').value = task.start_time || '';
+                        document.getElementById('partExitTime').value = task.end_time || '';
+                        document.getElementById('partDescription').value = task.description || '';
+
+                        if (task.client_info) {
+                            document.getElementById('partClientAddress').value = task.client_info.address || '';
+                        }
+                    }
+                })
+                .catch(function (error) {
+                    console.error('Error sincronizando cita:', error);
+                    alert('Error al cargar los datos de la cita');
+                });
+        }
+
+        // ========== MODIFICACIÓN 8: Múltiples Objetos de Stock ==========
+        function addStockRow() {
+            var container = document.getElementById('stockItemsContainer');
+            var newRow = document.createElement('div');
+            newRow.className = 'stock-item-row mb-2';
+            newRow.innerHTML =
+                '<div class="row">' +
+                '<div class="col-md-8">' +
+                '<select class="form-select stock-item-select" name="stock_items[]">' +
+                '<option value="">-- Seleccionar objeto --</option>' +
+                '</select>' +
+                '</div>' +
+                '<div class="col-md-3">' +
+                '<input type="number" class="form-control" name="stock_quantities[]" placeholder="Cantidad" min="1" value="1">' +
+                '</div>' +
+                '<div class="col-md-1">' +
+                '<button type="button" class="btn btn-danger btn-sm" onclick="removeStockRow(this)">' +
+                '<i class="bi bi-trash"></i>' +
+                '</button>' +
+                '</div>' +
+                '</div>';
+
+            container.appendChild(newRow);
+            loadStockItemsIntoSelect(newRow.querySelector('.stock-item-select'));
+            updateRemoveButtons();
+        }
+
+        function removeStockRow(button) {
+            button.closest('.stock-item-row').remove();
+            updateRemoveButtons();
+        }
+
+        function updateRemoveButtons() {
+            var rows = document.querySelectorAll('.stock-item-row');
+            rows.forEach(function (row) {
+                var btn = row.querySelector('button[onclick*="removeStockRow"]');
+                if (rows.length > 1) {
+                    btn.style.display = 'block';
+                } else {
+                    btn.style.display = 'none';
+                }
+            });
+        }
+
+        function loadStockItemsIntoSelect(selectElement) {
+            fetch('/api/stock_categories')
+                .then(function (response) { return response.json(); })
+                .then(function (categories) {
+                    selectElement.innerHTML = '<option value="">-- Seleccionar objeto --</option>';
+
+                    categories.forEach(function (category) {
+                        var optgroup = document.createElement('optgroup');
+                        optgroup.label = category.name;
+
+                        category.items.forEach(function (item) {
+                            var option = document.createElement('option');
+                            option.value = item.id;
+                            option.textContent = item.name + ' (Stock: ' + item.quantity + ')';
+                            optgroup.appendChild(option);
+                        });
+
+                        category.children.forEach(function (subcategory) {
+                            subcategory.items.forEach(function (item) {
+                                var option = document.createElement('option');
+                                option.value = item.id;
+                                option.textContent = '  └─ ' + item.name + ' (Stock: ' + item.quantity + ')';
+                                optgroup.appendChild(option);
+                            });
+                        });
+
+                        if (category.items.length > 0 || category.children.length > 0) {
+                            selectElement.appendChild(optgroup);
+                        }
+                    });
+                })
+                .catch(function (error) { console.error('Error cargando stock:', error); });
+        }
+
+        function initializeStockSelects() {
+            document.querySelectorAll('.stock-item-select').forEach(function (select) {
+                loadStockItemsIntoSelect(select);
+            });
+        }
+
+        // ============================================================
+        // CRONÓMETRO COMPLETO
+        // ============================================================
+
+        let timerInterval = null;
+        let timerSeconds = 0;
+        let timerStartTime = null;
+        const STORAGE_KEY_RUNNING = 'osla_timer_running';
+        const STORAGE_KEY_START = 'osla_timer_start';
+        const STORAGE_KEY_SECONDS = 'osla_timer_seconds';
+
+        function formatTime(seconds) {
+            const hrs = Math.floor(seconds / 3600);
+            const mins = Math.floor((seconds % 3600) / 60);
+            const secs = seconds % 60;
+            return String(hrs).padStart(2, '0') + ':' +
+                String(mins).padStart(2, '0') + ':' +
+                String(secs).padStart(2, '0');
+        }
+
+        function updateTimerDisplay() {
+            const display = document.getElementById('timerDisplay');
+            if (display) {
+                display.textContent = formatTime(timerSeconds);
+            }
+
+            const hiddenField = document.getElementById('workDurationSeconds');
+            if (hiddenField) {
+                hiddenField.value = timerSeconds;
+            }
+        }
+
+        function startTimer() {
+            if (timerInterval) {
+                alert('El cronómetro ya está en marcha');
+                return;
+            }
+
+            timerStartTime = Date.now();
+            timerInterval = setInterval(function () {
+                timerSeconds++;
+                updateTimerDisplay();
+                localStorage.setItem(STORAGE_KEY_SECONDS, timerSeconds);
+            }, 1000);
+
+            localStorage.setItem(STORAGE_KEY_RUNNING, 'true');
+            localStorage.setItem(STORAGE_KEY_START, timerStartTime);
+
+            const btnStart = document.getElementById('btnStartTimer');
+            const btnStop = document.getElementById('btnStopTimer');
+            if (btnStart) {
+                btnStart.disabled = true;
+                btnStart.classList.add('d-none');
+            }
+            if (btnStop) {
+                btnStop.disabled = false;
+                btnStop.classList.remove('d-none');
+            }
+
+            console.log('✅ Cronómetro iniciado');
+        }
+
+        function stopTimer() {
+            if (!timerInterval) {
+                alert('El cronómetro no está en marcha');
+                return;
+            }
+
+            clearInterval(timerInterval);
+            timerInterval = null;
+
+            localStorage.removeItem(STORAGE_KEY_RUNNING);
+            localStorage.removeItem(STORAGE_KEY_START);
+            localStorage.removeItem(STORAGE_KEY_SECONDS);
+
+            const btnStart = document.getElementById('btnStartTimer');
+            const btnStop = document.getElementById('btnStopTimer');
+            if (btnStart) {
+                btnStart.disabled = false;
+                btnStart.classList.remove('d-none');
+            }
+            if (btnStop) {
+                btnStop.disabled = true;
+                btnStop.classList.add('d-none');
+            }
+
+            console.log('⏹️ Cronómetro detenido. Tiempo total: ' + formatTime(timerSeconds));
+        }
+
+        function restoreTimer() {
+            const wasRunning = localStorage.getItem(STORAGE_KEY_RUNNING) === 'true';
+            const savedStart = parseInt(localStorage.getItem(STORAGE_KEY_START));
+
+            if (wasRunning && savedStart) {
+                const elapsed = Math.floor((Date.now() - savedStart) / 1000);
+                timerSeconds = elapsed;
+
+                timerStartTime = savedStart;
+                timerInterval = setInterval(function () {
+                    timerSeconds++;
+                    updateTimerDisplay();
+                    localStorage.setItem(STORAGE_KEY_SECONDS, timerSeconds);
+                }, 1000);
+
+                updateTimerDisplay();
+
+                const btnStart = document.getElementById('btnStartTimer');
+                const btnStop = document.getElementById('btnStopTimer');
+                if (btnStart) {
+                    btnStart.disabled = true;
+                    btnStart.classList.add('d-none');
+                }
+                if (btnStop) {
+                    btnStop.disabled = false;
+                    btnStop.classList.remove('d-none');
+                }
+
+                console.log('🔄 Cronómetro restaurado: ' + formatTime(timerSeconds));
+            } else {
+                updateTimerDisplay();
+            }
+        }
+
+        function cleanupTimerOnSubmit() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+
+            localStorage.removeItem(STORAGE_KEY_RUNNING);
+            localStorage.removeItem(STORAGE_KEY_START);
+            localStorage.removeItem(STORAGE_KEY_SECONDS);
+
+            console.log('🧹 Cronómetro limpiado al enviar formulario');
+        }
+
+        window.addEventListener('beforeunload', function (e) {
+            if (timerInterval) {
+                e.preventDefault();
+                e.returnValue = '¿Estás seguro? El cronómetro está en marcha.';
+                return e.returnValue;
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', function () {
+            restoreTimer();
+
+            const mainForm = document.getElementById('mainPartForm');
+            if (mainForm) {
+                mainForm.addEventListener('submit', cleanupTimerOnSubmit);
+            }
+        });
+
     </script>
 </body>
+
 </html>

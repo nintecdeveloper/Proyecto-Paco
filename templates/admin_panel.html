@@ -196,8 +196,6 @@
         <span class="fw-bold fs-5 text-white">OSLA<span style="color:var(--osla-orange)">PRINT</span> <small
                 class="badge bg-secondary ms-1" style="font-size: 0.6em;">PACO</small></span>
         <div class="d-flex align-items-center gap-2">
-            <span id="sessionTimer" class="badge text-white border border-success me-2"
-                style="background-color: #000; color: #00ff00 !important; font-family: 'Courier New', monospace; font-size: 0.85rem; padding: 5px 10px;">00:00:00</span>
             <span class="text-white fw-bold me-2">Hola {{ current_user.username }}</span>
             <button class="btn btn-outline-light btn-sm" data-bs-toggle="modal" data-bs-target="#modalChangePassword"
                 title="Cambiar Contraseña">
@@ -512,9 +510,6 @@
                             data-bs-target="#modalAddClient">
                             <i class="bi bi-person-plus-fill me-1"></i> Nuevo Cliente
                         </button>
-                        <a href="/export_clients" class="btn btn-outline-success btn-sm">
-                            <i class="bi bi-download me-1"></i> Exportar
-                        </a>
                         <button class="btn btn-outline-info btn-sm" data-bs-toggle="modal"
                             data-bs-target="#modalImportClients">
                             <i class="bi bi-upload me-1"></i> Importar
@@ -1016,7 +1011,7 @@
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Enlace/URL (Opcional)</label>
-                                <input type="url" name="link" class="form-control" placeholder="https://ejemplo.com">
+                                <input type="url" name="link" class="form-control" placeholder="https://www.ejemplo.com">
                                 <small class="text-muted">
                                     <i class="bi bi-info-circle me-1"></i>Portal web, sistema interno, etc.
                                 </small>
@@ -1099,7 +1094,7 @@
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Enlace/URL (Opcional)</label>
                                 <input type="url" name="link" id="editClientLink" class="form-control"
-                                    placeholder="https://ejemplo.com">
+                                    placeholder="https://www.ejemplo.com">
                             </div>
                         </div>
 
@@ -1618,6 +1613,35 @@
                 eventClick: handleEventClick,
                 dateClick: handleAdminDateClick,
                 selectable: true,
+                eventDidMount: function (info) {
+                    const type = info.event.extendedProps.service_type;
+                    
+                    // Colores claros según tipo de servicio
+                    const serviceColors = {
+                        'Avería': 'rgba(253, 126, 20, 0.3)',
+                        'Revisión': 'rgba(13, 110, 253, 0.3)',
+                        'Instalación': 'rgba(111, 66, 193, 0.3)',
+                        'Mantenimiento': 'rgba(255, 193, 7, 0.3)',
+                        'Otros servicios': 'rgba(32, 201, 151, 0.3)'
+                    };
+                    
+                    const serviceBorderColors = {
+                        'Avería': '#fd7e14',
+                        'Revisión': '#0d6efd',
+                        'Instalación': '#6f42c1',
+                        'Mantenimiento': '#ffc107',
+                        'Otros servicios': '#20c997'
+                    };
+                    
+                    info.el.style.backgroundColor = serviceColors[type] || 'rgba(108, 117, 125, 0.3)';
+                    info.el.style.borderColor = serviceBorderColors[type] || '#6c757d';
+                    info.el.style.color = '#000';  // Texto negro
+                    
+                    if (info.event.extendedProps.status === 'Completado') {
+                        info.el.style.opacity = '0.7';
+                        info.el.style.fontStyle = 'italic';
+                    }
+                },
                 eventContent: function (arg) {
                     let statusIcon = arg.event.extendedProps.status === 'Completado' ? '✅' : '⏳';
                     return { html: `<div class="fc-content overflow-hidden text-truncate">${statusIcon} ${arg.event.title}</div>` };
@@ -1678,7 +1702,7 @@
                 dateClick: handleAdminDateClickGlobal,
                 selectable: true,
 
-                // FILTRADO DINÁMICO
+                // FILTRADO DINÁMICO Y COLORES MEJORADOS
                 eventDidMount: function (info) {
                     const type = info.event.extendedProps.service_type;
                     const activeTypes = getActiveFilters();
@@ -1687,13 +1711,33 @@
                         info.el.style.display = 'none';
                     } else {
                         info.el.style.display = '';
-                        // Usar el color del evento que viene desde backend
-                        if (info.backgroundColor) {
-                            info.el.style.backgroundColor = info.backgroundColor;
-                        }
+                        
+                        // Colores claros según tipo de servicio
+                        const serviceColors = {
+                            'Avería': 'rgba(253, 126, 20, 0.3)',
+                            'Revisión': 'rgba(13, 110, 253, 0.3)',
+                            'Instalación': 'rgba(111, 66, 193, 0.3)',
+                            'Mantenimiento': 'rgba(255, 193, 7, 0.3)',
+                            'Otros servicios': 'rgba(32, 201, 151, 0.3)'
+                        };
+                        
+                        const serviceBorderColors = {
+                            'Avería': '#fd7e14',
+                            'Revisión': '#0d6efd',
+                            'Instalación': '#6f42c1',
+                            'Mantenimiento': '#ffc107',
+                            'Otros servicios': '#20c997'
+                        };
+                        
+                        // Aplicar colores
+                        info.el.style.backgroundColor = serviceColors[type] || 'rgba(108, 117, 125, 0.3)';
+                        info.el.style.borderColor = serviceBorderColors[type] || '#6c757d';
+                        info.el.style.color = '#000';  // Texto negro siempre
+                        
+                        // Estilo especial para completados
                         if (info.event.extendedProps.status === 'Completado') {
-                            info.el.style.opacity = '0.6';
-                            info.el.style.border = '2px solid white';
+                            info.el.style.opacity = '0.7';
+                            info.el.style.fontStyle = 'italic';
                         }
                     }
                 },
@@ -3279,26 +3323,6 @@
                     alert('Error al cargar los archivos adjuntos');
                 });
         }
-
-        // CONTADOR DE SESIÓN ACTIVA
-        let sessionStartTime = Date.now();
-        let sessionTimerInterval;
-
-        function updateSessionTimer() {
-            const elapsed = Date.now() - sessionStartTime;
-            const hours = Math.floor(elapsed / 3600000);
-            const minutes = Math.floor((elapsed % 3600000) / 60000);
-            const seconds = Math.floor((elapsed % 60000) / 1000);
-
-            const timerText = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-            document.getElementById('sessionTimer').innerText = timerText;
-        }
-
-        // Iniciar contador de sesión
-        document.addEventListener('DOMContentLoaded', function () {
-            sessionTimerInterval = setInterval(updateSessionTimer, 1000);
-            updateSessionTimer();
-        });
 
     </script>
 </body>
