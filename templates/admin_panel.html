@@ -196,8 +196,6 @@
         <span class="fw-bold fs-5 text-white">OSLA<span style="color:var(--osla-orange)">PRINT</span> <small
                 class="badge bg-secondary ms-1" style="font-size: 0.6em;">PACO</small></span>
         <div class="d-flex align-items-center gap-2">
-            <span id="sessionTimer" class="badge text-white border border-success me-2"
-                style="background-color: #000; color: #00ff00 !important; font-family: 'Courier New', monospace; font-size: 0.85rem; padding: 5px 10px;">00:00:00</span>
             <span class="text-white fw-bold me-2">Hola {{ current_user.username }}</span>
             <button class="btn btn-outline-light btn-sm" data-bs-toggle="modal" data-bs-target="#modalChangePassword"
                 title="Cambiar Contraseña">
@@ -512,9 +510,6 @@
                             data-bs-target="#modalAddClient">
                             <i class="bi bi-person-plus-fill me-1"></i> Nuevo Cliente
                         </button>
-                        <a href="/export_clients" class="btn btn-outline-success btn-sm">
-                            <i class="bi bi-download me-1"></i> Exportar
-                        </a>
                         <button class="btn btn-outline-info btn-sm" data-bs-toggle="modal"
                             data-bs-target="#modalImportClients">
                             <i class="bi bi-upload me-1"></i> Importar
@@ -566,7 +561,7 @@
                                 {% if c.link %}
                                 <div class="mb-2">
                                     <a href="{{ c.link }}" target="_blank" class="btn btn-sm btn-outline-info w-100">
-                                        <i class="bi bi-link-45deg me-1"></i>Abrir Enlace
+                                        <i class="bi bi-globe me-1"></i>Sitio Web
                                     </a>
                                 </div>
                                 {% endif %}
@@ -581,7 +576,7 @@
                             <div class="card-footer bg-black border-secondary">
                                 <div class="d-flex gap-2">
                                     <button class="btn btn-sm btn-outline-warning flex-fill"
-                                        onclick="openEditClientModalFull({{ c.id }}, '{{ c.name }}', '{{ c.phone }}', '{{ c.email }}', '{{ c.address }}', '{{ c.link or '' }}', '{{ c.notes or '' }}', {{ c.has_support|lower }}, {{ c.support_monday_friday|lower }}, {{ c.support_saturday|lower }}, {{ c.support_sunday|lower }})">
+                                        onclick="openEditClientModalFull({{ c.id }}, '{{ c.name }}', '{{ c.phone }}', '{{ c.email }}', '{{ c.address }}', '{{ c.link or '' }}', '{{ c.notes or '' }}', {{ c.has_support|lower }})">
                                         <i class="bi bi-pencil-fill"></i> Editar
                                     </button>
                                     <form method="POST" action="/manage_clients" class="flex-fill">
@@ -1118,8 +1113,7 @@
                         <div class="mb-3">
                             <label class="form-label fw-bold">¿Tiene Soporte Técnico Contratado?</label>
                             <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" id="editHasSupport" name="has_support"
-                                    value="true" onchange="toggleEditSupportOptions()">
+                                <input class="form-check-input" type="checkbox" id="editHasSupport" name="has_support">
                                 <label class="form-check-label" for="editHasSupport">
                                     Sí, tiene soporte técnico
                                 </label>
@@ -1127,40 +1121,6 @@
                             <small class="text-muted">
                                 <i class="bi bi-info-circle me-1"></i>
                                 Marca esta opción si el cliente tiene contratado soporte técnico con OSLAPRINT
-                            </small>
-                        </div>
-
-                        <!-- Opciones de soporte por día - NUEVO -->
-                        <div id="editSupportDaysOptions" style="display: none;">
-                            <label class="form-label fw-bold text-info">Días de Soporte Disponibles:</label>
-
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="editSupportMF"
-                                    name="support_monday_friday" value="true">
-                                <label class="form-check-label" for="editSupportMF">
-                                    <i class="bi bi-calendar-week me-1"></i>Lunes a Viernes
-                                </label>
-                            </div>
-
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="editSupportSat"
-                                    name="support_saturday" value="true">
-                                <label class="form-check-label" for="editSupportSat">
-                                    <i class="bi bi-calendar-day me-1"></i>Sábado
-                                </label>
-                            </div>
-
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="editSupportSun"
-                                    name="support_sunday" value="true">
-                                <label class="form-check-label" for="editSupportSun">
-                                    <i class="bi bi-calendar-day me-1"></i>Domingo
-                                </label>
-                            </div>
-
-                            <small class="text-muted mt-2 d-block">
-                                <i class="bi bi-info-circle me-1"></i>
-                                Selecciona los días en los que este cliente tiene cobertura de soporte
                             </small>
                         </div>
                     </div>
@@ -1824,7 +1784,7 @@
         }
 
         // Nueva función completa para editar clientes con todos los campos
-        function openEditClientModalFull(id, name, phone, email, address, link, notes, hasSupport, supportMF, supportSat, supportSun) {
+        function openEditClientModalFull(id, name, phone, email, address, link, notes, hasSupport) {
             document.getElementById('editClientId').value = id;
             document.getElementById('editClientName').value = name;
             document.getElementById('editClientPhone').value = phone;
@@ -1833,30 +1793,8 @@
             document.getElementById('editClientLink').value = link || '';
             document.getElementById('editClientNotes').value = notes || '';
             document.getElementById('editHasSupport').checked = hasSupport;
-            document.getElementById('editSupportMF').checked = supportMF;
-            document.getElementById('editSupportSat').checked = supportSat;
-            document.getElementById('editSupportSun').checked = supportSun;
 
-            toggleEditSupportOptions();
             new bootstrap.Modal(document.getElementById('modalEditClient')).show();
-        }
-
-        // Nueva función para mostrar/ocultar opciones de días de soporte en modal de edición
-        function toggleEditSupportOptions() {
-            const hasSupportCheckbox = document.getElementById('editHasSupport');
-            const supportDaysOptions = document.getElementById('editSupportDaysOptions');
-
-            if (hasSupportCheckbox && supportDaysOptions) {
-                if (hasSupportCheckbox.checked) {
-                    supportDaysOptions.style.display = 'block';
-                } else {
-                    supportDaysOptions.style.display = 'none';
-                    // Desmarcar todos los días si se desactiva el soporte
-                    document.getElementById('editSupportMF').checked = false;
-                    document.getElementById('editSupportSat').checked = false;
-                    document.getElementById('editSupportSun').checked = false;
-                }
-            }
         }
 
         function openEditServiceModal(id, name, color) {
@@ -3279,26 +3217,6 @@
                     alert('Error al cargar los archivos adjuntos');
                 });
         }
-
-        // CONTADOR DE SESIÓN ACTIVA
-        let sessionStartTime = Date.now();
-        let sessionTimerInterval;
-
-        function updateSessionTimer() {
-            const elapsed = Date.now() - sessionStartTime;
-            const hours = Math.floor(elapsed / 3600000);
-            const minutes = Math.floor((elapsed % 3600000) / 60000);
-            const seconds = Math.floor((elapsed % 60000) / 1000);
-
-            const timerText = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-            document.getElementById('sessionTimer').innerText = timerText;
-        }
-
-        // Iniciar contador de sesión
-        document.addEventListener('DOMContentLoaded', function () {
-            sessionTimerInterval = setInterval(updateSessionTimer, 1000);
-            updateSessionTimer();
-        });
 
     </script>
 </body>

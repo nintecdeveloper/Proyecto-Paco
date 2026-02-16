@@ -45,12 +45,9 @@ class Client(db.Model):
     phone = db.Column(db.String(20), nullable=False)
     email = db.Column(db.String(100), nullable=False)
     address = db.Column(db.String(250), nullable=False)
-    link = db.Column(db.String(500), nullable=True)  # Google Maps o URL
+    link = db.Column(db.String(500), nullable=True)  # Sitio web o URL
     notes = db.Column(db.Text)
     has_support = db.Column(db.Boolean, default=False)
-    support_monday_friday = db.Column(db.Boolean, default=False)
-    support_saturday = db.Column(db.Boolean, default=False)
-    support_sunday = db.Column(db.Boolean, default=False)
 
 class ServiceType(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -104,9 +101,9 @@ class Task(db.Model):
     # Archivos adjuntos
     attachments = db.Column(db.Text)  # JSON
     
-    # Tiempo real de trabajo
-    actual_start_time = db.Column(db.DateTime)
-    actual_end_time = db.Column(db.DateTime)
+    # Cronómetro de parte (solo inicio y fin)
+    work_start_time = db.Column(db.DateTime)
+    work_end_time = db.Column(db.DateTime)
 
     tech = db.relationship('User', backref='tasks')
     client = db.relationship('Client', backref='tasks')
@@ -509,7 +506,6 @@ def manage_clients():
         link = request.form.get('link', '')
         notes = request.form.get('notes', '')
         has_support = request.form.get('has_support') == 'on'
-        # Los días de soporte se establecen por defecto en False
         
         if Client.query.filter_by(name=name).first():
             flash('Ya existe un cliente con ese nombre', 'danger')
@@ -522,10 +518,7 @@ def manage_clients():
             address=address,
             link=link,
             notes=notes,
-            has_support=has_support,
-            support_monday_friday=False,
-            support_saturday=False,
-            support_sunday=False
+            has_support=has_support
         )
         db.session.add(new_client)
         db.session.commit()
@@ -537,16 +530,23 @@ def manage_clients():
         client = Client.query.get(client_id)
         
         if client:
-            client.name = request.form.get('name')
+            # Verificar si el nombre está siendo cambiado y si ya existe otro cliente con ese nombre
+            new_name = request.form.get('name')
+            if new_name != client.name:
+                existing_client = Client.query.filter_by(name=new_name).first()
+                if existing_client:
+                    flash('Ya existe un cliente con ese nombre', 'danger')
+                    return redirect(url_for('dashboard'))
+            
+            client.name = new_name
             client.phone = request.form.get('phone')
             client.email = request.form.get('email')
             client.address = request.form.get('address')
             client.link = request.form.get('link', '')
             client.notes = request.form.get('notes', '')
-            client.has_support = request.form.get('has_support') == 'on'
-            client.support_monday_friday = request.form.get('support_monday_friday') == 'on'
-            client.support_saturday = request.form.get('support_saturday') == 'on'
-            client.support_sunday = request.form.get('support_sunday') == 'on'
+            # El campo has_support solo se actualiza si está marcado, no cambia automáticamente
+            has_support_value = request.form.get('has_support')
+            client.has_support = (has_support_value == 'on' or has_support_value == 'true')
             
             db.session.commit()
             flash('Cliente actualizado correctamente', 'success')
@@ -669,43 +669,57 @@ def manage_stock_categories():
     if current_user.role != 'admin':
         return jsonify({'success': False, 'msg': 'No autorizado'}), 403
     
-    action = request.form.get('action')
-    
-    if action == 'add':
-        name = request.form.get('name')
-        parent_id = request.form.get('parent_id')
+    try:
+        action = request.form.get('action')
         
-        if StockCategory.query.filter_by(name=name).first():
-            return jsonify({'success': False, 'msg': 'Ya existe una categoría con ese nombre'})
-        
-        new_category = StockCategory(
-            name=name,
-            parent_id=int(parent_id) if parent_id else None
-        )
-        db.session.add(new_category)
-        db.session.commit()
-        
-        return jsonify({'success': True, 'msg': 'Categoría creada correctamente'})
-    
-    elif action == 'delete':
-        category_id = request.form.get('category_id')
-        category = StockCategory.query.get(category_id)
-        
-        if category:
-            # Si tiene subcategorías, no permitir eliminar
-            if category.subcategories:
-                return jsonify({'success': False, 'msg': 'No se puede eliminar una categoría con subcategorías'})
+        if action == 'add':
+            name = request.form.get('name', '').strip()
+            parent_id = request.form.get('parent_id', '').strip()
             
-            # Los productos se quedan sin categoría (category_id = None)
-            for item in category.items:
-                item.category_id = None
+            if not name:
+                return jsonify({'success': False, 'msg': 'El nombre de la categoría es obligatorio'})
             
-            db.session.delete(category)
+            # Verificar si ya existe una categoría con ese nombre
+            if StockCategory.query.filter_by(name=name).first():
+                return jsonify({'success': False, 'msg': 'Ya existe una categoría con ese nombre'})
+            
+            new_category = StockCategory(
+                name=name,
+                parent_id=int(parent_id) if parent_id and parent_id != '' else None
+            )
+            db.session.add(new_category)
             db.session.commit()
             
-            return jsonify({'success': True, 'msg': 'Categoría eliminada'})
+            return jsonify({'success': True, 'msg': 'Categoría creada correctamente'})
+        
+        elif action == 'delete':
+            category_id = request.form.get('category_id')
+            category = StockCategory.query.get(category_id)
+            
+            if category:
+                # Si tiene subcategorías, no permitir eliminar
+                if category.subcategories:
+                    return jsonify({'success': False, 'msg': 'No se puede eliminar una categoría con subcategorías'})
+                
+                # Los productos se quedan sin categoría (category_id = None)
+                for item in category.items:
+                    item.category_id = None
+                
+                db.session.delete(category)
+                db.session.commit()
+                
+                return jsonify({'success': True, 'msg': 'Categoría eliminada'})
+        
+        return jsonify({'success': False, 'msg': 'Acción no válida'})
     
-    return jsonify({'success': False, 'msg': 'Acción no válida'})
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        print(f"Error en manage_stock_categories: {str(e)}")
+        return jsonify({'success': False, 'msg': f'Error en la base de datos: {str(e)}'})
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error inesperado en manage_stock_categories: {str(e)}")
+        return jsonify({'success': False, 'msg': f'Error: {str(e)}'})
 
 # --- GESTIÓN DE TAREAS Y CITAS ---
 @app.route('/save_report', methods=['POST'])
@@ -950,7 +964,6 @@ def get_clients():
     """API para autocompletado de clientes (alias)"""
     return api_clients_search()
 
-# ====== NUEVA RUTA: GET_TASK_FULL ======
 @app.route('/api/get_task_full/<int:task_id>')
 @login_required
 def get_task_full(task_id):
@@ -976,10 +989,7 @@ def get_task_full(task_id):
             'address': task.client.address,
             'link': task.client.link,
             'notes': task.client.notes,
-            'has_support': task.client.has_support,
-            'support_monday_friday': task.client.support_monday_friday,
-            'support_saturday': task.client.support_saturday,
-            'support_sunday': task.client.support_sunday
+            'has_support': task.client.has_support
         }
     
     return jsonify({
@@ -1023,10 +1033,7 @@ def get_task_details(task_id):
             'address': task.client.address,
             'link': task.client.link,
             'notes': task.client.notes,
-            'has_support': task.client.has_support,
-            'support_monday_friday': task.client.support_monday_friday,
-            'support_saturday': task.client.support_saturday,
-            'support_sunday': task.client.support_sunday
+            'has_support': task.client.has_support
         }
     
     return jsonify({
@@ -1602,6 +1609,21 @@ def create_appointment():
         # Convertir fecha
         task_date = datetime.strptime(date_str, '%Y-%m-%d').date()
         
+        # Verificar si ya existe una cita para este técnico en la misma fecha y hora
+        existing_task = Task.query.filter_by(
+            tech_id=current_user.id,
+            client_name=client_name,
+            date=task_date,
+            start_time=start_time,
+            status='Pendiente'
+        ).first()
+        
+        if existing_task:
+            return jsonify({
+                'success': False,
+                'msg': 'Ya existe una cita para este cliente en la misma fecha y hora'
+            }), 400
+        
         # Crear tarea
         new_task = Task(
             tech_id=current_user.id,
@@ -1891,10 +1913,7 @@ def api_get_client(client_id):
                 'address': client.address,
                 'link': client.link,
                 'notes': client.notes,
-                'has_support': client.has_support,
-                'support_monday_friday': client.support_monday_friday,
-                'support_saturday': client.support_saturday,
-                'support_sunday': client.support_sunday
+                'has_support': client.has_support
             }
         })
     except Exception as e:
@@ -2024,8 +2043,7 @@ with app.app_context():
             phone='900123456',
             email='ejemplo@cliente.com',
             address='Calle Ejemplo 1, Madrid',
-            has_support=True,
-            support_monday_friday=True
+            has_support=True
         ))
         
     db.session.commit()

@@ -270,7 +270,6 @@
         <div class="d-flex justify-content-between w-100 align-items-center">
             <span class="fw-bold fs-4 text-white">OSLA<span style="color:var(--osla-orange)">PRINT</span></span>
             <div class="d-flex align-items-center gap-2">
-                <span id="sessionTimer" class="badge text-white border border-success me-2" style="background-color: #000; color: #00ff00 !important; font-family: 'Courier New', monospace; font-size: 0.85rem; padding: 5px 10px;">00:00:00</span>
                 <span class="text-white fw-bold me-2">Hola {{ current_user.username }}</span>
                 <button class="btn btn-outline-light btn-sm" data-bs-toggle="modal"
                     data-bs-target="#modalChangePassword" title="Cambiar Contraseña">
@@ -1039,7 +1038,7 @@
                                 html += `
                                     <div class="col-md-12 mt-2">
                                         <a href="${client.link}" target="_blank" class="btn btn-warning fw-bold w-100">
-                                            <i class="bi bi-map me-1"></i>Abrir en Google Maps
+                                            <i class="bi bi-globe me-1"></i>Sitio Web
                                         </a>
                                     </div>
                                 `;
@@ -2246,29 +2245,6 @@
                 });
             });
         }
-
-        // CONTADOR DE SESIÓN ACTIVA
-        let sessionStartTime = Date.now();
-        let sessionTimerInterval;
-
-        function updateSessionTimer() {
-            const elapsed = Date.now() - sessionStartTime;
-            const hours = Math.floor(elapsed / 3600000);
-            const minutes = Math.floor((elapsed % 3600000) / 60000);
-            const seconds = Math.floor((elapsed % 60000) / 1000);
-            
-            const timerText = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-            const timerEl = document.getElementById('sessionTimer');
-            if (timerEl) {
-                timerEl.innerText = timerText;
-            }
-        }
-
-        // Iniciar contador de sesión
-        document.addEventListener('DOMContentLoaded', function() {
-            sessionTimerInterval = setInterval(updateSessionTimer, 1000);
-            updateSessionTimer();
-        });
 
     </script>
 </body>
