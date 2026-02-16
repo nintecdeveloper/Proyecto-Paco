@@ -764,6 +764,56 @@ def manage_clients():
             db.session.commit()
             flash('Cliente eliminado correctamente', 'success')
     
+    elif action == 'import_json':
+        # NUEVA FUNCIONALIDAD: Importar clientes desde JSON
+        try:
+            if 'json_file' not in request.files:
+                flash('No se seleccionó ningún archivo', 'danger')
+                return redirect(url_for('dashboard'))
+            
+            file = request.files['json_file']
+            if file.filename == '':
+                flash('No se seleccionó ningún archivo', 'danger')
+                return redirect(url_for('dashboard'))
+            
+            if file and file.filename.endswith('.json'):
+                content = file.read().decode('utf-8')
+                clients_data = json.loads(content)
+                
+                if not isinstance(clients_data, list):
+                    flash('El archivo JSON debe contener una lista de clientes', 'danger')
+                    return redirect(url_for('dashboard'))
+                
+                imported_count = 0
+                skipped_count = 0
+                
+                for client_data in clients_data:
+                    # Verificar que el cliente no exista
+                    if Client.query.filter_by(name=client_data.get('name', '')).first():
+                        skipped_count += 1
+                        continue
+                    
+                    new_client = Client(
+                        name=client_data.get('name', ''),
+                        phone=client_data.get('phone', ''),
+                        email=client_data.get('email', ''),
+                        address=client_data.get('address', ''),
+                        link=client_data.get('link', ''),
+                        notes=client_data.get('notes', ''),
+                        has_support=client_data.get('has_support', False)
+                    )
+                    db.session.add(new_client)
+                    imported_count += 1
+                
+                db.session.commit()
+                flash(f'✅ {imported_count} clientes importados correctamente. {skipped_count} omitidos (ya existían)', 'success')
+            else:
+                flash('El archivo debe ser un JSON válido', 'danger')
+        except json.JSONDecodeError:
+            flash('Error al leer el archivo JSON. Verifica el formato', 'danger')
+        except Exception as e:
+            flash(f'Error al importar clientes: {str(e)}', 'danger')
+    
     return redirect(url_for('dashboard'))
 
 # --- GESTIÓN DE TIPOS DE SERVICIO ---
@@ -924,7 +974,23 @@ def save_report():
         entry_time = request.form.get('entry_time')
         exit_time = request.form.get('exit_time')
         description = request.form.get('description')
-        parts_text = request.form.get('parts_text', '')
+        
+        # MODIFICACIÓN #8: Soporte para múltiples objetos en JSON
+        parts_text_raw = request.form.get('parts_text', '')
+        # Si viene como JSON (lista de objetos), mantenerlo como JSON
+        # Si viene como texto plano, convertirlo a JSON con un único objeto
+        try:
+            parts_data = json.loads(parts_text_raw)
+            if isinstance(parts_data, list):
+                parts_text = json.dumps(parts_data)
+            else:
+                parts_text = json.dumps([{'item': parts_text_raw, 'quantity': 1}])
+        except:
+            # Si no es JSON válido, guardarlo como texto plano en un array
+            if parts_text_raw.strip():
+                parts_text = json.dumps([{'item': parts_text_raw, 'quantity': 1}])
+            else:
+                parts_text = '[]'
         
         # Stock
         stock_item_id = request.form.get('stock_item')
@@ -1323,7 +1389,8 @@ def get_tech_analytics():
         if task.service_type:
             service_name = task.service_type.name
         elif task.custom_service_name:
-            service_name = task.custom_service_name
+            # MODIFICACIÓN #6: Los servicios personalizados se cuentan como "Otros servicios"
+            service_name = 'Otros servicios'
         else:
             service_name = 'Sin tipo'
         service_distribution[service_name] = service_distribution.get(service_name, 0) + 1
@@ -1439,8 +1506,17 @@ def get_admin_analytics():
     
     for task in completed_tasks:
         service_type = ServiceType.query.get(task.service_type_id) if task.service_type_id else None
-        service_name = service_type.name if service_type else 'Sin tipo'
-        service_color = service_type.color if service_type else '#6c757d'
+        if service_type:
+            service_name = service_type.name
+            service_color = service_type.color
+        elif task.custom_service_name:
+            # MODIFICACIÓN #6: Servicios personalizados como "Otros servicios"
+            service_name = 'Otros servicios'
+            otros_service = ServiceType.query.filter_by(name='Otros servicios').first()
+            service_color = otros_service.color if otros_service else '#20c997'
+        else:
+            service_name = 'Sin tipo'
+            service_color = '#6c757d'
         
         if service_name not in task_types:
             task_types[service_name] = {
@@ -1510,6 +1586,58 @@ def get_stock_categories():
         return result
     
     return jsonify(build_tree())
+
+@app.route('/api/stock_items_grouped')
+@login_required
+def get_stock_items_grouped():
+    """Obtener items de stock agrupados por categoría para selector de objetos"""
+    categories = StockCategory.query.filter_by(parent_id=None).all()
+    result = []
+    
+    for cat in categories:
+        cat_data = {
+            'id': cat.id,
+            'name': cat.name,
+            'items': [],
+            'subcategories': []
+        }
+        
+        # Añadir items directos de la categoría
+        for item in cat.items:
+            cat_data['items'].append({
+                'id': item.id,
+                'name': item.name,
+                'quantity': item.quantity
+            })
+        
+        # Añadir subcategorías e items
+        for subcat in cat.subcategories:
+            subcat_data = {
+                'id': subcat.id,
+                'name': subcat.name,
+                'items': []
+            }
+            for item in subcat.items:
+                subcat_data['items'].append({
+                    'id': item.id,
+                    'name': item.name,
+                    'quantity': item.quantity
+                })
+            cat_data['subcategories'].append(subcat_data)
+        
+        result.append(cat_data)
+    
+    # Añadir items sin categoría
+    uncategorized_items = Stock.query.filter_by(category_id=None).all()
+    if uncategorized_items:
+        result.append({
+            'id': None,
+            'name': 'Sin categoría',
+            'items': [{'id': item.id, 'name': item.name, 'quantity': item.quantity} for item in uncategorized_items],
+            'subcategories': []
+        })
+    
+    return jsonify(result)
 
 # ✅ NUEVA RUTA: Obtener info de un item de stock para editar
 @app.route('/api/stock_item/<int:item_id>')
@@ -2087,6 +2215,72 @@ def api_get_stock_category(category_id):
             }
         })
     except Exception as e:
+        return jsonify({'success': False, 'msg': str(e)}), 500
+
+@app.route('/api/start_timer/<int:task_id>', methods=['POST'])
+@login_required
+def start_timer(task_id):
+    """Iniciar cronómetro de una tarea"""
+    try:
+        task = Task.query.get_or_404(task_id)
+        
+        # Verificar permisos
+        if current_user.role != 'admin' and task.tech_id != current_user.id:
+            return jsonify({'success': False, 'msg': 'No autorizado'}), 403
+        
+        # Iniciar cronómetro
+        task.actual_start_time = datetime.now()
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'msg': 'Cronómetro iniciado',
+            'start_time': task.actual_start_time.strftime('%H:%M:%S')
+        })
+    except Exception as e:
+        print(f"Error starting timer: {str(e)}")
+        db.session.rollback()
+        return jsonify({'success': False, 'msg': str(e)}), 500
+
+@app.route('/api/stop_timer/<int:task_id>', methods=['POST'])
+@login_required
+def stop_timer(task_id):
+    """Finalizar cronómetro de una tarea"""
+    try:
+        task = Task.query.get_or_404(task_id)
+        
+        # Verificar permisos
+        if current_user.role != 'admin' and task.tech_id != current_user.id:
+            return jsonify({'success': False, 'msg': 'No autorizado'}), 403
+        
+        # Verificar que el cronómetro haya sido iniciado
+        if not task.actual_start_time:
+            return jsonify({'success': False, 'msg': 'El cronómetro no ha sido iniciado'}), 400
+        
+        # Finalizar cronómetro
+        task.actual_end_time = datetime.now()
+        
+        # Calcular duración en segundos
+        duration = (task.actual_end_time - task.actual_start_time).total_seconds()
+        task.work_duration_seconds = int(duration)
+        
+        db.session.commit()
+        
+        # Formatear duración para mostrar
+        hours = int(duration // 3600)
+        minutes = int((duration % 3600) // 60)
+        seconds = int(duration % 60)
+        
+        return jsonify({
+            'success': True,
+            'msg': 'Cronómetro finalizado',
+            'end_time': task.actual_end_time.strftime('%H:%M:%S'),
+            'duration': f"{hours:02d}:{minutes:02d}:{seconds:02d}",
+            'duration_seconds': task.work_duration_seconds
+        })
+    except Exception as e:
+        print(f"Error stopping timer: {str(e)}")
+        db.session.rollback()
         return jsonify({'success': False, 'msg': str(e)}), 500
 
 @app.route('/api/task/<int:task_id>/attachments')
