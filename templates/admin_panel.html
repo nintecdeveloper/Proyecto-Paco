@@ -1637,8 +1637,13 @@
                             info.el.style.backgroundColor = info.backgroundColor;
                         }
                         if (info.event.extendedProps.status === 'Completado') {
-                            info.el.style.opacity = '0.6';
-                            info.el.style.border = '2px solid white';
+                            info.el.style.opacity = '0.7';
+                            info.el.style.border = '2px solid #198754';
+                            // Añadir icono de check
+                            const title = info.el.querySelector('.fc-event-title');
+                            if (title) {
+                                title.innerHTML = '✓ ' + title.innerHTML;
+                            }
                         }
                     }
                 },

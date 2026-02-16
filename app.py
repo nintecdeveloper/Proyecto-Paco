@@ -735,10 +735,15 @@ def save_report():
         description = request.form.get('description')
         parts_text = request.form.get('parts_text', '')
         
-        # Stock - Ahora soporta múltiples items
-        stock_item_ids = request.form.getlist('stock_item[]')
-        stock_qtys = request.form.getlist('stock_qty[]')
-        stock_action = request.form.get('stock_action', 'used')
+        # ✅ VALIDACIÓN: Campos obligatorios
+        if not client_name or not entry_time or not exit_time:
+            flash('⚠️ El nombre del cliente, hora de entrada y hora de salida son obligatorios', 'danger')
+            return redirect(url_for('dashboard'))
+        
+        # Stock - Ahora soporta múltiples items con diferentes acciones
+        stock_item_ids = request.form.getlist('stock_item_id[]')
+        stock_qtys = request.form.getlist('stock_quantity[]')
+        stock_actions = request.form.getlist('stock_action[]')
         
         # Firma digital
         signature_data = request.form.get('signature_data')
@@ -757,25 +762,32 @@ def save_report():
             flash('Tipo de servicio no válido', 'danger')
             return redirect(url_for('dashboard'))
         
-        # Procesar items de stock
+        # ✅ MEJORA: Procesar múltiples items de stock con diferentes acciones
         stock_items_used = []
         for i, item_id in enumerate(stock_item_ids):
             if item_id and item_id != '' and int(item_id) > 0:
                 qty = int(stock_qtys[i]) if i < len(stock_qtys) and stock_qtys[i] else 0
+                action = stock_actions[i] if i < len(stock_actions) else 'usar'
+                
                 if qty > 0:
                     stock_item = Stock.query.get(int(item_id))
                     if stock_item:
-                        # Actualizar cantidad en stock
-                        if stock_action == 'used' or stock_action == 'removed':
-                            stock_item.quantity -= qty
-                        elif stock_action == 'added':
+                        # Actualizar cantidad en stock según la acción
+                        if action in ['usar', 'retirar']:
+                            if stock_item.quantity >= qty:
+                                stock_item.quantity -= qty
+                            else:
+                                flash(f'⚠️ No hay suficiente stock de {stock_item.name}', 'danger')
+                                db.session.rollback()
+                                return redirect(url_for('dashboard'))
+                        elif action == 'devolver':
                             stock_item.quantity += qty
                         
                         stock_items_used.append({
                             'id': stock_item.id,
                             'name': stock_item.name,
                             'quantity': qty,
-                            'action': stock_action
+                            'action': action
                         })
         
         # Si hay una cita vinculada, actualizar esa tarea
@@ -791,15 +803,46 @@ def save_report():
                 task.status = 'Completado'
                 task.work_end_time = datetime.now()
                 
-                # Guardar items de stock como JSON (usamos el campo parts_text ampliado)
+                # Guardar items de stock
                 if stock_items_used:
-                    task.stock_item_id = stock_items_used[0]['id']  # Primer item para compatibilidad
+                    task.stock_item_id = stock_items_used[0]['id']
                     task.stock_quantity_used = stock_items_used[0]['quantity']
-                    task.stock_action = stock_action
-                    # Guardar todos los items en parts_text si hay más de uno
+                    task.stock_action = stock_items_used[0]['action']
                     if len(stock_items_used) > 1:
-                        stock_details = ', '.join([f"{item['name']} ({item['quantity']})" for item in stock_items_used])
+                        stock_details = ', '.join([f"{item['name']} ({item['quantity']}) - {item['action']}" for item in stock_items_used])
                         task.parts_text = f"{parts_text}\n[Stock: {stock_details}]" if parts_text else f"[Stock: {stock_details}]"
+                
+                # ✅ MEJORA: Manejar archivos adjuntos con metadatos completos
+                if 'attachments' in request.files:
+                    files = request.files.getlist('attachments')
+                    attachments_data = []
+                    
+                    # Cargar attachments existentes si los hay
+                    if task.attachments:
+                        try:
+                            attachments_data = json.loads(task.attachments)
+                            if not isinstance(attachments_data, list):
+                                attachments_data = []
+                        except:
+                            attachments_data = []
+                    
+                    for file in files:
+                        if file and file.filename and allowed_file(file.filename):
+                            original_filename = secure_filename(file.filename)
+                            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                            saved_filename = f"task_{task.id}_{timestamp}_{original_filename}"
+                            filepath = os.path.join(app.config['UPLOAD_FOLDER'], saved_filename)
+                            file.save(filepath)
+                            
+                            # Guardar con metadatos
+                            attachments_data.append({
+                                'filename': saved_filename,
+                                'original_name': original_filename,
+                                'size': os.path.getsize(filepath)
+                            })
+                    
+                    if attachments_data:
+                        task.attachments = json.dumps(attachments_data)
                 
                 db.session.commit()
                 check_low_stock()
@@ -829,32 +872,39 @@ def save_report():
         if stock_items_used:
             new_task.stock_item_id = stock_items_used[0]['id']
             new_task.stock_quantity_used = stock_items_used[0]['quantity']
-            new_task.stock_action = stock_action
+            new_task.stock_action = stock_items_used[0]['action']
             if len(stock_items_used) > 1:
-                stock_details = ', '.join([f"{item['name']} ({item['quantity']})" for item in stock_items_used])
+                stock_details = ', '.join([f"{item['name']} ({item['quantity']}) - {item['action']}" for item in stock_items_used])
                 new_task.parts_text = f"{parts_text}\n[Stock: {stock_details}]" if parts_text else f"[Stock: {stock_details}]"
         
         db.session.add(new_task)
         db.session.commit()
-        check_low_stock()
         
-        # Manejar archivos adjuntos si los hay
+        # ✅ MEJORA: Manejar archivos adjuntos con metadatos completos
         if 'attachments' in request.files:
             files = request.files.getlist('attachments')
-            uploaded_filenames = []
+            attachments_data = []
             
             for file in files:
                 if file and file.filename and allowed_file(file.filename):
-                    filename = secure_filename(file.filename)
+                    original_filename = secure_filename(file.filename)
                     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-                    filename = f"task_{new_task.id}_{timestamp}_{filename}"
-                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                    saved_filename = f"task_{new_task.id}_{timestamp}_{original_filename}"
+                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], saved_filename)
                     file.save(filepath)
-                    uploaded_filenames.append(filename)
+                    
+                    # Guardar con metadatos
+                    attachments_data.append({
+                        'filename': saved_filename,
+                        'original_name': original_filename,
+                        'size': os.path.getsize(filepath)
+                    })
             
-            if uploaded_filenames:
-                new_task.attachments = json.dumps(uploaded_filenames)
+            if attachments_data:
+                new_task.attachments = json.dumps(attachments_data)
                 db.session.commit()
+        
+        check_low_stock()
         
         flash('✅ Parte de trabajo creado y firmado correctamente.', 'success')
         return redirect(url_for('dashboard'))
@@ -1422,7 +1472,7 @@ def print_report(report_id):
 @app.route('/api/task_action/<int:task_id>/<action>', methods=['POST'])
 @login_required
 def task_action(task_id, action):
-    """Endpoint para acciones sobre tareas (completar, eliminar, cancelar)"""
+    """Endpoint para acciones sobre tareas (completar, eliminar, cancelar, toggle)"""
     task = Task.query.get_or_404(task_id)
     
     # Verificar permisos
@@ -1432,10 +1482,22 @@ def task_action(task_id, action):
     try:
         if action == 'complete':
             task.status = 'Completado'
-            if not task.actual_end_time:
-                task.actual_end_time = datetime.now()
+            if not task.work_end_time:
+                task.work_end_time = datetime.now()
             db.session.commit()
-            return jsonify({'success': True, 'msg': 'Tarea completada'})
+            return jsonify({'success': True, 'msg': 'Tarea completada', 'status': task.status})
+        
+        elif action == 'toggle':
+            # Toggle entre Completado y Pendiente
+            if task.status == 'Completado':
+                task.status = 'Pendiente'
+                task.work_end_time = None
+            else:
+                task.status = 'Completado'
+                if not task.work_end_time:
+                    task.work_end_time = datetime.now()
+            db.session.commit()
+            return jsonify({'success': True, 'msg': f'Tarea marcada como {task.status}', 'status': task.status})
         
         elif action == 'delete':
             db.session.delete(task)
@@ -1445,7 +1507,7 @@ def task_action(task_id, action):
         elif action == 'cancel':
             task.status = 'Cancelado'
             db.session.commit()
-            return jsonify({'success': True, 'msg': 'Tarea cancelada'})
+            return jsonify({'success': True, 'msg': 'Tarea cancelada', 'status': task.status})
         
         else:
             return jsonify({'success': False, 'msg': 'Acción no válida'}), 400
@@ -1896,8 +1958,34 @@ def api_get_task_attachments(task_id):
         if task.attachments:
             try:
                 attachments_data = json.loads(task.attachments)
-                attachments_list = attachments_data if isinstance(attachments_data, list) else []
-            except:
+                if isinstance(attachments_data, list):
+                    # Verificar si es formato nuevo (con metadatos) o antiguo (solo nombres)
+                    for item in attachments_data:
+                        if isinstance(item, dict):
+                            # Formato nuevo: ya tiene metadata
+                            attachments_list.append(item)
+                        else:
+                            # Formato antiguo: solo nombre de archivo
+                            filepath = os.path.join(app.config['UPLOAD_FOLDER'], item)
+                            if os.path.exists(filepath):
+                                # Extraer nombre original
+                                parts = item.split('_', 3)
+                                original_name = parts[-1] if len(parts) >= 4 else item
+                                
+                                attachments_list.append({
+                                    'filename': item,
+                                    'original_name': original_name,
+                                    'size': os.path.getsize(filepath)
+                                })
+                            else:
+                                # Archivo no encontrado, pero lo incluimos de todos modos
+                                attachments_list.append({
+                                    'filename': item,
+                                    'original_name': item,
+                                    'size': 0
+                                })
+            except Exception as e:
+                print(f"Error parsing attachments: {e}")
                 attachments_list = []
         
         return jsonify({

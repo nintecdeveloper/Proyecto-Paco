@@ -385,22 +385,11 @@
                 <div class="p-3 mb-3 rounded" style="background: #161616; border: 1px dashed #666;">
                     <label class="text-white fw-bold small mb-2 d-block"><i class="bi bi-box-seam me-2"></i>PIEZAS /
                         STOCK</label>
-                    <div class="mb-2 d-flex gap-3">
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio" name="stock_action" value="used" id="radioUsed"
-                                checked>
-                            <label class="form-check-label small" for="radioUsed">Usado</label>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio" name="stock_action" value="removed"
-                                id="radioRemoved">
-                            <label class="form-check-label small" for="radioRemoved">Retirado</label>
-                        </div>
-                    </div>
+                    <small class="text-muted mb-3 d-block">Puede añadir múltiples artículos con diferentes acciones (usar/retirar/devolver)</small>
                     <div id="stockItemsContainer">
                         <div class="row g-2 mb-2 stock-item-row">
-                            <div class="col-7">
-                                <select name="stock_item[]" class="form-select">
+                            <div class="col-5">
+                                <select name="stock_item_id[]" class="form-select">
                                     <option value="">Sin artículo de stock</option>
                                     {% for item in stock_items %}
                                     <option value="{{ item.id }}">{{ item.name }} ({{ item.quantity }} disponibles)
@@ -408,9 +397,16 @@
                                     {% endfor %}
                                 </select>
                             </div>
-                            <div class="col-3">
-                                <input type="number" name="stock_qty[]" class="form-control" min="0" value="0"
+                            <div class="col-2">
+                                <input type="number" name="stock_quantity[]" class="form-control" min="0" value="0"
                                     placeholder="Cant.">
+                            </div>
+                            <div class="col-3">
+                                <select name="stock_action[]" class="form-select">
+                                    <option value="usar">Usar</option>
+                                    <option value="retirar">Retirar</option>
+                                    <option value="devolver">Devolver</option>
+                                </select>
                             </div>
                             <div class="col-2">
                                 <button type="button" class="btn btn-success btn-sm w-100" onclick="addStockItem()">
@@ -1001,8 +997,13 @@
                         info.el.style.backgroundColor = info.backgroundColor;
                     }
                     if (info.event.extendedProps.status === 'Completado') {
-                        info.el.style.opacity = '0.6';
-                        info.el.style.border = '2px solid white';
+                        info.el.style.opacity = '0.7';
+                        info.el.style.border = '2px solid #198754';
+                        // Añadir icono de check
+                        const title = info.el.querySelector('.fc-event-title');
+                        if (title) {
+                            title.innerHTML = '✓ ' + title.innerHTML;
+                        }
                     }
                 },
                 eventsSet: function (events) {
@@ -1257,26 +1258,56 @@
                 const div = document.createElement('div');
                 div.className = `task-item d-flex justify-content-between align-items-center`;
                 div.style.borderLeftColor = typeColor;
-                if (isDone) div.style.opacity = '0.6';
+                if (isDone) {
+                    div.style.opacity = '0.6';
+                    div.style.textDecoration = 'line-through';
+                }
 
                 div.innerHTML = `
-                <div style="cursor:pointer; flex-grow: 1;" onclick="focusCalendarEvent('${t.id}')">
-                    <div class="fw-bold text-white">${t.extendedProps.client || 'Sin cliente'}</div>
-                    <div class="small text-secondary">
-                        <i class="bi bi-calendar-event me-1"></i>${dateStr} ${timeStr ? '| ' + timeStr : ''}
-                        <br>
-                        <span class="badge ${isDone ? 'bg-success' : 'bg-secondary'}">${t.extendedProps.status}</span>
-                        <span class="badge" style="background:${typeColor}">${t.extendedProps.service_type || 'Sin tipo'}</span>
+                <div class="d-flex align-items-center gap-2" style="flex-grow: 1;">
+                    <input type="checkbox" class="form-check-input" style="width: 24px; height: 24px; cursor: pointer;" 
+                        ${isDone ? 'checked' : ''} 
+                        onclick="toggleTaskComplete('${t.id}')" 
+                        title="${isDone ? 'Marcar como pendiente' : 'Marcar como completada'}">
+                    <div style="cursor:pointer; flex-grow: 1;" onclick="focusCalendarEvent('${t.id}')">
+                        <div class="fw-bold text-white">${t.extendedProps.client || 'Sin cliente'}</div>
+                        <div class="small text-secondary">
+                            <i class="bi bi-calendar-event me-1"></i>${dateStr} ${timeStr ? '| ' + timeStr : ''}
+                            <br>
+                            <span class="badge ${isDone ? 'bg-success' : 'bg-secondary'}">${t.extendedProps.status}</span>
+                            <span class="badge" style="background:${typeColor}">${t.extendedProps.service_type || 'Sin tipo'}</span>
+                        </div>
                     </div>
                 </div>
                 <div class="d-flex gap-1 flex-shrink-0">
-                    ${!isDone ? `<button class="btn btn-sm btn-success" onclick="event.stopPropagation(); openCompleteTaskModal('${t.id}')" title="Completar"><i class="bi bi-check-lg"></i></button>` : ''}
                     <button class="btn btn-sm btn-outline-secondary" onclick="event.stopPropagation(); openEditFromList('${t.id}')" title="Editar"><i class="bi bi-pencil"></i></button>
                     <button class="btn btn-sm btn-outline-danger" onclick="event.stopPropagation(); deleteFromList('${t.id}')" title="Eliminar"><i class="bi bi-trash"></i></button>
                 </div>
             `;
                 container.appendChild(div);
             });
+        }
+        
+        // ✅ NUEVA FUNCIÓN: Toggle estado de tarea completada/pendiente
+        function toggleTaskComplete(taskId) {
+            fetch(`/api/task_action/${taskId}/toggle`, { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        // Recargar eventos del calendario
+                        calendar.refetchEvents();
+                        // Mostrar mensaje breve
+                        const msg = data.status === 'Completado' ? '✓ Tarea completada' : '↻ Tarea marcada como pendiente';
+                        // No mostrar alert, solo actualizar visualmente
+                        console.log(msg);
+                    } else {
+                        alert('Error: ' + (data.msg || 'No se pudo actualizar la tarea'));
+                    }
+                })
+                .catch(err => {
+                    console.error('Error:', err);
+                    alert('Error al actualizar la tarea');
+                });
         }
 
         function sortTasks(sortType) {
@@ -1610,7 +1641,12 @@
             document.getElementById('avgTime').textContent = '...';
 
             fetch(`/api/tech_analytics?period=${period}`)
-                .then(res => res.json())
+                .then(res => {
+                    if (!res.ok) {
+                        throw new Error(`HTTP error! status: ${res.status}`);
+                    }
+                    return res.json();
+                })
                 .then(data => {
                     analyticsData = data;
                     updateAnalyticsSummary(data);
@@ -1618,7 +1654,10 @@
                 })
                 .catch(err => {
                     console.error('Error cargando analíticas:', err);
-                    alert('Error al cargar las analíticas');
+                    document.getElementById('totalServices').textContent = '0';
+                    document.getElementById('totalMaintenances').textContent = '0';
+                    document.getElementById('avgTime').textContent = '0h';
+                    alert('Error al cargar las analíticas. Por favor, intenta de nuevo.');
                 });
         }
 
@@ -2313,8 +2352,10 @@
             const firstRow = container.querySelector('.stock-item-row');
             const newRow = firstRow.cloneNode(true);
 
-            // Limpiar valores
-            newRow.querySelector('select').selectedIndex = 0;
+            // Limpiar valores - ahora hay dos selects: item y acción
+            const selects = newRow.querySelectorAll('select');
+            selects[0].selectedIndex = 0; // Stock item
+            selects[1].selectedIndex = 0; // Stock action
             newRow.querySelector('input[type="number"]').value = 0;
 
             // Cambiar botón de + a -
