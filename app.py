@@ -50,15 +50,15 @@ class Client(db.Model):
     address = db.Column(db.String(250), nullable=False)
     link = db.Column(db.String(500), nullable=True)  # Google Maps o URL
     notes = db.Column(db.Text)
+    # MODIFICACIÓN #5: Solo has_support SI/NO (eliminados días de semana)
     has_support = db.Column(db.Boolean, default=False)
-    support_monday_friday = db.Column(db.Boolean, default=False)
-    support_saturday = db.Column(db.Boolean, default=False)
-    support_sunday = db.Column(db.Boolean, default=False)
 
 class ServiceType(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), unique=True, nullable=False)
     color = db.Column(db.String(7), default='#6c757d')
+    # MODIFICACIÓN #2: Permitir servicios personalizados
+    is_custom = db.Column(db.Boolean, default=False)
     
     def __repr__(self):
         return f"{self.name}"
@@ -90,8 +90,12 @@ class Task(db.Model):
     start_time = db.Column(db.String(10)) 
     end_time = db.Column(db.String(10))   
     
-    service_type_id = db.Column(db.Integer, db.ForeignKey('service_type.id'))
-    parts_text = db.Column(db.String(200))  
+    service_type_id = db.Column(db.Integer, db.ForeignKey('service_type.id'), nullable=True)
+    # MODIFICACIÓN #2: Campo para guardar servicio personalizado
+    custom_service_name = db.Column(db.String(100), nullable=True)
+    
+    # MODIFICACIÓN #8: parts_text guardará JSON con múltiples objetos
+    parts_text = db.Column(db.Text)  # JSON array de objetos
     
     stock_item_id = db.Column(db.Integer, db.ForeignKey('stock.id'), nullable=True)
     stock_quantity_used = db.Column(db.Integer, default=0)
@@ -107,9 +111,10 @@ class Task(db.Model):
     # Archivos adjuntos
     attachments = db.Column(db.Text)  # JSON
     
-    # Tiempo real de trabajo
+    # MODIFICACIÓN #1: Tiempo real de trabajo
     actual_start_time = db.Column(db.DateTime)
     actual_end_time = db.Column(db.DateTime)
+    work_duration_seconds = db.Column(db.Integer, default=0)
 
     tech = db.relationship('User', backref='tasks')
     client = db.relationship('Client', backref='tasks')
@@ -713,12 +718,12 @@ def manage_clients():
         link = request.form.get('link', '')
         notes = request.form.get('notes', '')
         has_support = request.form.get('has_support') == 'on'
-        # Los días de soporte se establecen por defecto en False
         
         if Client.query.filter_by(name=name).first():
             flash('Ya existe un cliente con ese nombre', 'danger')
             return redirect(url_for('dashboard'))
         
+        # MODIFICACIÓN #5: Solo has_support, sin días específicos
         new_client = Client(
             name=name,
             phone=phone,
@@ -726,10 +731,7 @@ def manage_clients():
             address=address,
             link=link,
             notes=notes,
-            has_support=has_support,
-            support_monday_friday=False,
-            support_saturday=False,
-            support_sunday=False
+            has_support=has_support
         )
         db.session.add(new_client)
         db.session.commit()
@@ -747,10 +749,8 @@ def manage_clients():
             client.address = request.form.get('address')
             client.link = request.form.get('link', '')
             client.notes = request.form.get('notes', '')
+            # MODIFICACIÓN #5: Solo has_support (sin días)
             client.has_support = request.form.get('has_support') == 'on'
-            client.support_monday_friday = request.form.get('support_monday_friday') == 'on'
-            client.support_saturday = request.form.get('support_saturday') == 'on'
-            client.support_sunday = request.form.get('support_sunday') == 'on'
             
             db.session.commit()
             flash('Cliente actualizado correctamente', 'success')
@@ -1796,22 +1796,31 @@ def create_appointment():
             client_name = data.get('client_name')
             date_str = data.get('date')
             start_time = data.get('start_time')
-            end_time = data.get('end_time', '')  # Opcional
+            end_time = data.get('end_time', '')
             service_type_id = data.get('service_type_id')
-            description = data.get('description', '')  # Opcional
+            custom_service = data.get('custom_service_name', '')  # MODIFICACIÓN #2
+            description = data.get('description', '')
         else:
             client_name = request.form.get('client_name')
             date_str = request.form.get('date')
             start_time = request.form.get('start_time')
-            end_time = request.form.get('end_time', '')  # Opcional
+            end_time = request.form.get('end_time', '')
             service_type_id = request.form.get('service_type_id')
-            description = request.form.get('description', '')  # Opcional
+            custom_service = request.form.get('custom_service_name', '')  # MODIFICACIÓN #2
+            description = request.form.get('description', '')
         
-        # Validación: SOLO estos 4 campos son obligatorios
-        if not client_name or not date_str or not start_time or not service_type_id:
+        # MODIFICACIÓN #2: Validación con soporte para servicio personalizado
+        if not client_name or not date_str or not start_time:
             return jsonify({
                 'success': False, 
-                'msg': 'Faltan campos obligatorios: Cliente, Fecha, Hora de inicio y Tipo de servicio son requeridos'
+                'msg': 'Faltan campos obligatorios: Cliente, Fecha y Hora de inicio son requeridos'
+            }), 400
+        
+        # MODIFICACIÓN #2: Servicio personalizado o de catálogo
+        if not service_type_id and not custom_service:
+            return jsonify({
+                'success': False, 
+                'msg': 'Debe seleccionar un tipo de servicio o escribir uno personalizado'
             }), 400
         
         # Buscar o crear cliente
@@ -1830,7 +1839,8 @@ def create_appointment():
             date=task_date,
             start_time=start_time,
             end_time=end_time if end_time else None,
-            service_type_id=int(service_type_id),
+            service_type_id=int(service_type_id) if service_type_id else None,
+            custom_service_name=custom_service if custom_service else None,  # MODIFICACIÓN #2
             status='Pendiente'
         )
         
@@ -2294,6 +2304,7 @@ with app.app_context():
             {'name': 'Avería', 'color': '#fd7e14'},
             {'name': 'Revisión', 'color': '#0d6efd'},
             {'name': 'Instalación', 'color': '#6f42c1'},
+            {'name': 'Mantenimiento', 'color': '#ffc107'},  # MODIFICACIÓN #2: Servicio fijo
             {'name': 'Otros servicios', 'color': '#20c997'}
         ]
         for s in servicios:
@@ -2352,9 +2363,30 @@ with app.app_context():
             phone='900123456',
             email='ejemplo@cliente.com',
             address='Calle Ejemplo 1, Madrid',
-            has_support=True,
-            support_monday_friday=True
+            has_support=True  # MODIFICACIÓN #5: Solo has_support
         ))
+    
+    # MODIFICACIÓN #2: Migración - Agregar "Mantenimiento" si no existe
+    try:
+        if not ServiceType.query.filter_by(name='Mantenimiento').first():
+            db.session.add(ServiceType(name='Mantenimiento', color='#ffc107', is_custom=False))
+            print("✅ Servicio 'Mantenimiento' agregado")
+    except Exception as e:
+        print(f"Nota: Migración de 'Mantenimiento': {e}")
+    
+    # MODIFICACIÓN #5: Migración - Eliminar columnas de días de clientes existentes
+    try:
+        from sqlalchemy import inspect
+        inspector = inspect(db.engine)
+        client_columns = [col['name'] for col in inspector.get_columns('client')]
+        
+        # Si existen las columnas antiguas, no podemos eliminarlas automáticamente en SQLite
+        # Pero los nuevos clientes no las usarán
+        if 'support_monday_friday' in client_columns:
+            print("⚠️  Nota: Columnas de días de soporte detectadas en BD existente")
+            print("    Los nuevos registros solo usarán 'has_support'")
+    except Exception as e:
+        print(f"Nota: Migración de columnas Client: {e}")
         
     db.session.commit()
 
