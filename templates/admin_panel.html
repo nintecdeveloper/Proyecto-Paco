@@ -1596,11 +1596,19 @@
     <script>
         var calendar = null;
         var calendarGlobalInstance = null;
-        var modalActionAdmin = new bootstrap.Modal(document.getElementById('modalActionAdmin'));
+        var modalActionAdmin = null;
         var currentEmployeeId = null;
 
         // Aplicar colores dinámicos a los labels de filtros
         document.addEventListener('DOMContentLoaded', function () {
+            // Inicializar modal después de que el DOM esté listo
+            const modalEl = document.getElementById('modalActionAdmin');
+            if (modalEl) {
+                modalActionAdmin = new bootstrap.Modal(modalEl);
+            } else {
+                console.warn('⚠️ Modal modalActionAdmin no encontrado');
+            }
+            
             document.querySelectorAll('label[data-color]').forEach(function (label) {
                 const color = label.dataset.color;
                 label.style.borderColor = color;
@@ -1690,15 +1698,6 @@
             }
         }
 
-        function handleEventClick(info) {
-            document.getElementById('evtId').value = info.event.id;
-            document.getElementById('evtClient').innerText = info.event.extendedProps.client;
-            document.getElementById('evtTech').innerText = info.event.extendedProps.tech_name;
-            document.getElementById('evtService').innerText = info.event.extendedProps.service_type;
-            document.getElementById('evtStatus').innerText = info.event.extendedProps.status;
-            document.getElementById('evtDesc').innerText = info.event.extendedProps.desc || '(Sin descripción)';
-            modalActionAdmin.show();
-        }
 
         // CALENDARIO GLOBAL - Ya manejado en DOMContentLoaded más abajo
         // La inicialización se hace en initializeGlobalCalendar()
@@ -2082,14 +2081,26 @@
             // Mostrar indicador si hay archivos adjuntos
             if (info.event.extendedProps.has_attachments) {
                 const attachmentsSection = document.getElementById('attachmentsSection');
-                attachmentsSection.style.display = 'block';
-                const attachmentsList = document.getElementById('attachmentsList');
-                attachmentsList.innerHTML = '<div class="alert alert-info small m-0"><i class="bi bi-paperclip me-1"></i> Esta tarea tiene archivos adjuntos. Haz clic en "Ver Detalles Completos" para acceder a ellos.</div>';
+                if (attachmentsSection) {
+                    attachmentsSection.style.display = 'block';
+                    const attachmentsList = document.getElementById('attachmentsList');
+                    if (attachmentsList) {
+                        attachmentsList.innerHTML = '<div class="alert alert-info small m-0"><i class="bi bi-paperclip me-1"></i> Esta tarea tiene archivos adjuntos. Haz clic en "Ver Detalles Completos" para acceder a ellos.</div>';
+                    }
+                }
             } else {
-                document.getElementById('attachmentsSection').style.display = 'none';
+                const attachmentsSection = document.getElementById('attachmentsSection');
+                if (attachmentsSection) {
+                    attachmentsSection.style.display = 'none';
+                }
             }
 
-            modalActionAdmin.show();
+            if (modalActionAdmin) {
+                modalActionAdmin.show();
+            } else {
+                console.error('❌ modalActionAdmin no está inicializado');
+                alert('Error: Modal no disponible');
+            }
         }
 
         // ============================================================
@@ -2868,11 +2879,19 @@
             console.log('📦 loadStockTree() iniciada');
             const container = document.getElementById('stockCategoriesTree');
             if (!container) {
-                console.error('❌ Container stockCategoriesTree no encontrado');
+                console.error('❌ Container stockCategoriesTree no encontrado en el DOM');
                 return;
             }
             
-            container.innerHTML = '<div class="text-center text-muted py-3"><i class="bi bi-hourglass-split"></i> Cargando inventario...</div>';
+            // Verificar si el contenedor es visible
+            if (container.offsetParent === null) {
+                console.warn('⚠️ Contenedor del inventario no visible, reintentando en 200ms...');
+                setTimeout(() => loadStockTree(), 200);
+                return;
+            }
+            
+            console.log('✅ Contenedor del inventario visible, cargando datos...');
+            container.innerHTML = '<div class="text-center text-muted py-5"><i class="bi bi-hourglass-split fs-1"></i><br><br>Cargando inventario...</div>';
 
             console.log('📦 Haciendo fetch a /api/stock_categories');
             fetch('/api/stock_categories')
@@ -2884,15 +2903,20 @@
                     return res.json();
                 })
                 .then(data => {
-                    console.log('✅ Stock categories cargadas:', data.length, 'categorías');
-                    updateStockTreeView(data);
+                    console.log('✅ Stock categories cargadas:', data.length, 'categorías principales');
+                    if (data && data.length > 0) {
+                        updateStockTreeView(data);
+                    } else {
+                        console.warn('⚠️ No se recibieron categorías');
+                        container.innerHTML = '<div class="alert alert-warning m-3"><i class="bi bi-info-circle me-2"></i>No hay categorías de inventario creadas</div>';
+                    }
                 })
                 .catch(err => {
                     console.error('❌ Error cargando stock:', err);
                     container.innerHTML = `
                         <div class="alert alert-danger m-3">
                             <h6><i class="bi bi-exclamation-triangle me-2"></i>Error al cargar inventario</h6>
-                            <p class="mb-0 small">${err.message}</p>
+                            <p class="mb-2 small">${err.message}</p>
                             <button class="btn btn-sm btn-outline-danger mt-2" onclick="loadStockTree()">
                                 <i class="bi bi-arrow-clockwise"></i> Reintentar
                             </button>
@@ -2902,20 +2926,31 @@
         }
 
         function updateStockTreeView(categories) {
+            console.log('📦 updateStockTreeView() - Renderizando', categories.length, 'categorías');
             const container = document.getElementById('stockCategoriesTree');
+            
+            if (!container) {
+                console.error('❌ Container no encontrado en updateStockTreeView');
+                return;
+            }
 
-            if (categories.length === 0) {
+            if (!categories || categories.length === 0) {
                 container.innerHTML = '<div class="text-center text-muted py-3"><i class="bi bi-inbox me-2"></i>No hay categorías creadas</div>';
                 return;
             }
 
             let html = '<div class="list-group">';
-            categories.forEach(cat => {
-                html += buildStockCategoryTreeHTML(cat, 0);
-            });
-            html += '</div>';
-
-            container.innerHTML = html;
+            try {
+                categories.forEach(cat => {
+                    html += buildStockCategoryTreeHTML(cat, 0);
+                });
+                html += '</div>';
+                container.innerHTML = html;
+                console.log('✅ Árbol de inventario renderizado correctamente');
+            } catch (err) {
+                console.error('❌ Error renderizando árbol:', err);
+                container.innerHTML = `<div class="alert alert-danger m-3">Error renderizando el inventario: ${err.message}</div>`;
+            }
         }
 
         function buildStockCategoryTreeHTML(cat, level) {
@@ -3054,146 +3089,238 @@
         document.addEventListener('DOMContentLoaded', function () {
             console.log('🚀 DOM Cargado - Inicializando eventos');
             
+            // STOCK TAB - Estrategia robusta con múltiples eventos
             const stockTabButton = document.querySelector('button[data-bs-target="#stock"]');
             if (stockTabButton) {
                 console.log('📦 Botón de stock encontrado');
+                
+                // Estrategia 1: Usar shown.bs.tab (evento Bootstrap nativo)
                 stockTabButton.addEventListener('shown.bs.tab', function () {
-                    console.log('📦 Pestaña de stock mostrada - cargando inventario');
-                    loadStockTree();
+                    console.log('📦 [shown.bs.tab] Pestaña de stock mostrada - cargando inventario');
+                    setTimeout(() => loadStockTree(), 50);
                 });
-            } else {
-                console.warn('⚠️ Botón de stock NO encontrado');
-            }
-
-            const configTabButton = document.querySelector('button[data-bs-target="#config"]');
-            if (configTabButton) {
-                console.log('⚙️ Botón de configuración encontrado');
-                configTabButton.addEventListener('shown.bs.tab', function () {
-                    console.log('⚙️ Pestaña de configuración mostrada - cargando categorías');
-                    loadCategoriesTree();
-                });
-            } else {
-                console.warn('⚠️ Botón de configuración NO encontrado');
-            }
-            
-            // Inicializar calendario global usando el evento shown.bs.tab de Bootstrap
-            const globalTabButton = document.getElementById('tabGlobalBtn');
-            if (globalTabButton) {
-                console.log('📅 Botón calendario global encontrado');
-                globalTabButton.addEventListener('shown.bs.tab', function () {
-                    console.log('📅 Pestaña calendario global mostrada');
-                    if (!calendarGlobalInstance) {
-                        console.log('📅 Inicializando calendario global por primera vez');
-                        initializeGlobalCalendar();
-                    } else {
-                        console.log('📅 Re-renderizando calendario global existente');
-                        calendarGlobalInstance.render();
-                        calendarGlobalInstance.updateSize();
-                        updateGlobalFilters();
+                
+                // Estrategia 2: Fallback con click + setTimeout más largo (por si shown.bs.tab no funciona)
+                let stockLoadAttempted = false;
+                stockTabButton.addEventListener('click', function () {
+                    if (!stockLoadAttempted) {
+                        stockLoadAttempted = true;
+                        console.log('📦 [click] Click en stock - cargando con fallback');
+                        setTimeout(() => {
+                            const container = document.getElementById('stockCategoriesTree');
+                            if (container && container.innerHTML.includes('Cargando inventario')) {
+                                console.log('📦 Ejecutando carga por fallback');
+                                loadStockTree();
+                            }
+                        }, 300);
+                        setTimeout(() => { stockLoadAttempted = false; }, 1000);
                     }
                 });
             } else {
-                console.warn('⚠️ Botón calendario global NO encontrado');
+                console.error('⚠️ Botón de stock NO encontrado');
+            }
+
+            // CONFIG TAB - Estrategia robusta
+            const configTabButton = document.querySelector('button[data-bs-target="#config"]');
+            if (configTabButton) {
+                console.log('⚙️ Botón de configuración encontrado');
+                
+                configTabButton.addEventListener('shown.bs.tab', function () {
+                    console.log('⚙️ [shown.bs.tab] Pestaña de configuración mostrada - cargando categorías');
+                    setTimeout(() => loadCategoriesTree(), 50);
+                });
+                
+                let configLoadAttempted = false;
+                configTabButton.addEventListener('click', function () {
+                    if (!configLoadAttempted) {
+                        configLoadAttempted = true;
+                        setTimeout(() => loadCategoriesTree(), 300);
+                        setTimeout(() => { configLoadAttempted = false; }, 1000);
+                    }
+                });
+            } else {
+                console.error('⚠️ Botón de configuración NO encontrado');
+            }
+            
+            // GLOBAL CALENDAR TAB - Estrategia robusta con validaciones
+            const globalTabButton = document.getElementById('tabGlobalBtn');
+            if (globalTabButton) {
+                console.log('📅 Botón calendario global encontrado');
+                
+                // Verificar que FullCalendar esté cargado
+                if (typeof FullCalendar === 'undefined') {
+                    console.error('❌ FullCalendar no está cargado. Verifica el CDN.');
+                    return;
+                }
+                
+                // Estrategia 1: shown.bs.tab
+                globalTabButton.addEventListener('shown.bs.tab', function () {
+                    console.log('📅 [shown.bs.tab] Pestaña calendario global mostrada');
+                    setTimeout(() => {
+                        if (!calendarGlobalInstance) {
+                            console.log('📅 Inicializando calendario global por primera vez');
+                            initializeGlobalCalendar();
+                        } else {
+                            console.log('📅 Re-renderizando calendario global existente');
+                            try {
+                                calendarGlobalInstance.render();
+                                calendarGlobalInstance.updateSize();
+                                updateGlobalFilters();
+                            } catch (err) {
+                                console.error('❌ Error re-renderizando:', err);
+                                // Intentar reinicializar
+                                calendarGlobalInstance = null;
+                                initializeGlobalCalendar();
+                            }
+                        }
+                    }, 100);
+                });
+                
+                // Estrategia 2: Fallback con click
+                let calendarLoadAttempted = false;
+                globalTabButton.addEventListener('click', function () {
+                    if (!calendarLoadAttempted) {
+                        calendarLoadAttempted = true;
+                        setTimeout(() => {
+                            const calendarEl = document.getElementById('calendarGlobal');
+                            if (calendarEl && !calendarGlobalInstance) {
+                                console.log('📅 [click fallback] Inicializando calendario');
+                                initializeGlobalCalendar();
+                            }
+                        }, 400);
+                        setTimeout(() => { calendarLoadAttempted = false; }, 1500);
+                    }
+                });
+            } else {
+                console.error('⚠️ Botón calendario global NO encontrado');
             }
         });
         
         // Función para inicializar el calendario global
         function initializeGlobalCalendar() {
             console.log('📅 Iniciando calendario global...');
-            var calendarEl = document.getElementById('calendarGlobal');
-            if (!calendarEl) {
-                console.error('❌ Elemento calendarGlobal no encontrado');
+            
+            // Verificar que FullCalendar esté disponible
+            if (typeof FullCalendar === 'undefined') {
+                console.error('❌ FullCalendar no está cargado');
+                alert('Error: Librería FullCalendar no cargada. Verifica tu conexión a internet.');
                 return;
             }
             
+            var calendarEl = document.getElementById('calendarGlobal');
+            if (!calendarEl) {
+                console.error('❌ Elemento calendarGlobal no encontrado en el DOM');
+                return;
+            }
+            
+            // Verificar que el contenedor sea visible
+            if (calendarEl.offsetParent === null) {
+                console.warn('⚠️ Contenedor del calendario no es visible, esperando 200ms...');
+                setTimeout(() => initializeGlobalCalendar(), 200);
+                return;
+            }
+            
+            console.log('✅ Contenedor del calendario visible, procediendo...');
+            
             var isMobile = window.innerWidth < 768;
 
-            calendarGlobalInstance = new FullCalendar.Calendar(calendarEl, {
-                initialView: isMobile ? 'listWeek' : 'dayGridMonth',
-                locale: 'es',
-                headerToolbar: {
-                    left: 'prev,next today',
-                    center: 'title',
-                    right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek'
-                },
-                buttonText: {
-                    today: 'Hoy',
-                    month: 'Mes',
-                    week: 'Semana',
-                    day: 'Día',
-                    list: 'Lista'
-                },
-                height: 'auto',
-                navLinks: true,
-                editable: false,
-                dayMaxEvents: true,
-                events: function(info, successCallback, failureCallback) {
-                    console.log('📅 Cargando eventos del calendario...');
-                    fetch('/api/admin/all_tasks')
-                        .then(res => {
-                            console.log('📅 Respuesta recibida:', res.status);
-                            if (!res.ok) {
-                                throw new Error('Error al cargar eventos: ' + res.status);
-                            }
-                            return res.json();
-                        })
-                        .then(data => {
-                            console.log('✅ Eventos cargados:', data.length);
-                            successCallback(data);
-                        })
-                        .catch(err => {
-                            console.error('❌ Error cargando eventos:', err);
-                            failureCallback(err);
-                        });
-                },
-                dateClick: handleAdminDateClickGlobal,
-                selectable: true,
-                eventDidMount: function (info) {
-                    const type = info.event.extendedProps.service_type;
-                    const activeTypes = getActiveFilters();
-
-                    if (!activeTypes.includes(type)) {
-                        info.el.style.display = 'none';
-                    } else {
-                        info.el.style.display = '';
-                        const serviceColors = {
-                            'Avería': 'rgba(253, 126, 20, 0.3)',
-                            'Revisión': 'rgba(13, 110, 253, 0.3)',
-                            'Instalación': 'rgba(111, 66, 193, 0.3)',
-                            'Mantenimiento': 'rgba(255, 193, 7, 0.3)',
-                            'Otros servicios': 'rgba(32, 201, 151, 0.3)'
-                        };
-                        const serviceBorderColors = {
-                            'Avería': '#fd7e14',
-                            'Revisión': '#0d6efd',
-                            'Instalación': '#6f42c1',
-                            'Mantenimiento': '#ffc107',
-                            'Otros servicios': '#20c997'
-                        };
-                        info.el.style.backgroundColor = serviceColors[type] || 'rgba(108, 117, 125, 0.3)';
-                        info.el.style.borderColor = serviceBorderColors[type] || '#6c757d';
-                        info.el.style.color = '#000';
-                        if (info.event.extendedProps.status === 'Completado') {
-                            info.el.style.opacity = '0.7';
-                            info.el.style.fontStyle = 'italic';
-                        }
-                    }
-                },
-                eventContent: function (arg) {
-                    let techName = arg.event.extendedProps.tech_name || '';
-                    let title = arg.event.title;
-                    let attachmentIcon = arg.event.extendedProps.has_attachments ? '<i class="bi bi-paperclip text-warning ms-1"></i>' : '';
-                    return { html: `<div class="fc-content overflow-hidden text-truncate"><span class="fw-bold badge bg-dark text-white me-1 border border-secondary">${techName}</span> ${title}${attachmentIcon}</div>` };
-                },
-                eventClick: handleEventClick
-            });
-            
             try {
+                calendarGlobalInstance = new FullCalendar.Calendar(calendarEl, {
+                    initialView: isMobile ? 'listWeek' : 'dayGridMonth',
+                    locale: 'es',
+                    headerToolbar: {
+                        left: 'prev,next today',
+                        center: 'title',
+                        right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek'
+                    },
+                    buttonText: {
+                        today: 'Hoy',
+                        month: 'Mes',
+                        week: 'Semana',
+                        day: 'Día',
+                        list: 'Lista'
+                    },
+                    height: 'auto',
+                    navLinks: true,
+                    editable: false,
+                    dayMaxEvents: true,
+                    events: function(info, successCallback, failureCallback) {
+                        console.log('📅 Cargando eventos del calendario...');
+                        fetch('/api/admin/all_tasks')
+                            .then(res => {
+                                console.log('📅 Respuesta recibida:', res.status);
+                                if (!res.ok) {
+                                    throw new Error('Error al cargar eventos: ' + res.status);
+                                }
+                                return res.json();
+                            })
+                            .then(data => {
+                                console.log('✅ Eventos cargados:', data.length, 'tareas');
+                                successCallback(data);
+                            })
+                            .catch(err => {
+                                console.error('❌ Error cargando eventos:', err);
+                                failureCallback(err);
+                            });
+                    },
+                    dateClick: handleAdminDateClickGlobal,
+                    selectable: true,
+                    eventDidMount: function (info) {
+                        const type = info.event.extendedProps.service_type;
+                        const activeTypes = getActiveFilters();
+
+                        if (!activeTypes.includes(type)) {
+                            info.el.style.display = 'none';
+                        } else {
+                            info.el.style.display = '';
+                            const serviceColors = {
+                                'Avería': 'rgba(253, 126, 20, 0.3)',
+                                'Revisión': 'rgba(13, 110, 253, 0.3)',
+                                'Instalación': 'rgba(111, 66, 193, 0.3)',
+                                'Mantenimiento': 'rgba(255, 193, 7, 0.3)',
+                                'Otros servicios': 'rgba(32, 201, 151, 0.3)'
+                            };
+                            const serviceBorderColors = {
+                                'Avería': '#fd7e14',
+                                'Revisión': '#0d6efd',
+                                'Instalación': '#6f42c1',
+                                'Mantenimiento': '#ffc107',
+                                'Otros servicios': '#20c997'
+                            };
+                            info.el.style.backgroundColor = serviceColors[type] || 'rgba(108, 117, 125, 0.3)';
+                            info.el.style.borderColor = serviceBorderColors[type] || '#6c757d';
+                            info.el.style.color = '#000';
+                            if (info.event.extendedProps.status === 'Completado') {
+                                info.el.style.opacity = '0.7';
+                                info.el.style.fontStyle = 'italic';
+                            }
+                        }
+                    },
+                    eventContent: function (arg) {
+                        let techName = arg.event.extendedProps.tech_name || '';
+                        let title = arg.event.title;
+                        let attachmentIcon = arg.event.extendedProps.has_attachments ? '<i class="bi bi-paperclip text-warning ms-1"></i>' : '';
+                        return { html: `<div class="fc-content overflow-hidden text-truncate"><span class="fw-bold badge bg-dark text-white me-1 border border-secondary">${techName}</span> ${title}${attachmentIcon}</div>` };
+                    },
+                    eventClick: handleEventClick
+                });
+                
+                console.log('📅 Renderizando calendario...');
                 calendarGlobalInstance.render();
                 console.log('✅ Calendario global renderizado correctamente');
+                
+                // Forzar actualización de tamaño después del render
+                setTimeout(() => {
+                    if (calendarGlobalInstance) {
+                        calendarGlobalInstance.updateSize();
+                        console.log('✅ Tamaño del calendario actualizado');
+                    }
+                }, 100);
+                
                 updateGlobalFilters();
             } catch (err) {
-                console.error('❌ Error renderizando calendario:', err);
+                console.error('❌ Error crítico renderizando calendario:', err);
+                alert('Error al inicializar el calendario: ' + err.message);
             }
         }
 
