@@ -196,6 +196,8 @@
         <span class="fw-bold fs-5 text-white">OSLA<span style="color:var(--osla-orange)">PRINT</span> <small
                 class="badge bg-secondary ms-1" style="font-size: 0.6em;">PACO</small></span>
         <div class="d-flex align-items-center gap-2">
+            <span id="sessionTimer" class="badge text-white border border-success me-2"
+                style="background-color: #000; color: #00ff00 !important; font-family: 'Courier New', monospace; font-size: 0.85rem; padding: 5px 10px;">00:00:00</span>
             <span class="text-white fw-bold me-2">Hola {{ current_user.username }}</span>
             <button class="btn btn-outline-light btn-sm" data-bs-toggle="modal" data-bs-target="#modalChangePassword"
                 title="Cambiar Contraseña">
@@ -207,8 +209,7 @@
 
     <div class="container mt-3 pb-5">
         {% with messages = get_flashed_messages() %}
-        {% if messages %}{% for m in messages %}<div class="alert alert-info py-2 small flash-message">{{ m }}</div>{%
-        endfor %}{%
+        {% if messages %}{% for m in messages %}<div class="alert alert-info py-2 small">{{ m }}</div>{% endfor %}{%
         endif %}
         {% endwith %}
 
@@ -511,6 +512,9 @@
                             data-bs-target="#modalAddClient">
                             <i class="bi bi-person-plus-fill me-1"></i> Nuevo Cliente
                         </button>
+                        <a href="/export_clients" class="btn btn-outline-success btn-sm">
+                            <i class="bi bi-download me-1"></i> Exportar
+                        </a>
                         <button class="btn btn-outline-info btn-sm" data-bs-toggle="modal"
                             data-bs-target="#modalImportClients">
                             <i class="bi bi-upload me-1"></i> Importar
@@ -577,7 +581,7 @@
                             <div class="card-footer bg-black border-secondary">
                                 <div class="d-flex gap-2">
                                     <button class="btn btn-sm btn-outline-warning flex-fill"
-                                        onclick="openEditClientModalFull({{ c.id }}, '{{ c.name }}', '{{ c.phone }}', '{{ c.email }}', '{{ c.address }}', '{{ c.link or '' }}', '{{ c.notes or '' }}', {{ c.has_support|lower }})">
+                                        onclick="openEditClientModalFull({{ c.id }}, '{{ c.name }}', '{{ c.phone }}', '{{ c.email }}', '{{ c.address }}', '{{ c.link or '' }}', '{{ c.notes or '' }}', {{ c.has_support|lower }}, {{ c.support_monday_friday|lower }}, {{ c.support_saturday|lower }}, {{ c.support_sunday|lower }})">
                                         <i class="bi bi-pencil-fill"></i> Editar
                                     </button>
                                     <form method="POST" action="/manage_clients" class="flex-fill">
@@ -1012,8 +1016,7 @@
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Enlace/URL (Opcional)</label>
-                                <input type="url" name="link" class="form-control"
-                                    placeholder="https://www.ejemplo.com">
+                                <input type="url" name="link" class="form-control" placeholder="https://ejemplo.com">
                                 <small class="text-muted">
                                     <i class="bi bi-info-circle me-1"></i>Portal web, sistema interno, etc.
                                 </small>
@@ -1096,7 +1099,7 @@
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Enlace/URL (Opcional)</label>
                                 <input type="url" name="link" id="editClientLink" class="form-control"
-                                    placeholder="https://www.ejemplo.com">
+                                    placeholder="https://ejemplo.com">
                             </div>
                         </div>
 
@@ -1177,48 +1180,18 @@
         <div class="modal-dialog">
             <div class="modal-content bg-dark text-white">
                 <div class="modal-header border-secondary">
-                    <h5 class="modal-title">
-                        <i class="bi bi-upload me-2"></i>Importar Clientes (JSON)
-                    </h5>
+                    <h5 class="modal-title">Importar Clientes (JSON)</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <form method="POST" action="/manage_clients" enctype="multipart/form-data">
-                    <input type="hidden" name="action" value="import_json">
+                <form method="POST" action="/import_clients" enctype="multipart/form-data">
                     <div class="modal-body">
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">
-                                <i class="bi bi-file-earmark-code"></i> Archivo JSON
-                            </label>
-                            <input type="file" name="json_file" class="form-control" accept=".json" required>
-                        </div>
-
-                        <div class="alert alert-info">
-                            <h6 class="alert-heading">Formato JSON Esperado:</h6>
-                            <pre class="mb-0"
-                                style="font-size: 0.75em; background: #000; padding: 10px; border-radius: 5px; overflow-x: auto;">
-[
-  {
-    "name": "Cliente 1",
-    "phone": "900123456",
-    "email": "<a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="40232c29252e34257100252d30322533216e232f2d">[email&#160;protected]</a>",
-    "address": "Calle Principal 123",
-    "link": "https://maps.google.com/?q=...",
-    "notes": "Notas opcionales",
-    "has_support": true
-  }
-]</pre>
-                        </div>
-
-                        <small class="text-muted">
-                            <i class="bi bi-info-circle"></i>
-                            Los clientes duplicados (mismo nombre) serán omitidos automáticamente.
-                        </small>
+                        <label class="form-label">Archivo JSON</label>
+                        <input type="file" name="file" class="form-control" accept=".json" required>
+                        <small class="text-muted">Formato esperado: [{"name": "Cliente1"}, {"name":
+                            "Cliente2"}]</small>
                     </div>
                     <div class="modal-footer border-secondary">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                        <button type="submit" class="btn btn-info">
-                            <i class="bi bi-upload"></i> Importar
-                        </button>
+                        <button type="submit" class="btn btn-info">Importar</button>
                     </div>
                 </form>
             </div>
@@ -1566,7 +1539,6 @@
 
 
     <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script>
-    <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <!-- Modal: Estadísticas del Técnico -->
@@ -1595,14 +1567,21 @@
     </div>
 
     <script>
-        console.log('🔍 VERSION: 2026-02-16-FINAL');
-        console.log('🌐 DOMAIN:', window.location.hostname);
-        console.log('📍 FULL URL:', window.location.href);
         var calendar = null;
         var calendarGlobalInstance = null;
-        var modalActionAdmin = null;
+        var modalActionAdmin = new bootstrap.Modal(document.getElementById('modalActionAdmin'));
         var currentEmployeeId = null;
 
+        // Aplicar colores dinámicos a los labels de filtros
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('label[data-color]').forEach(function (label) {
+                const color = label.dataset.color;
+                label.style.borderColor = color;
+                label.style.color = color;
+            });
+        });
+
+        setupAutocomplete('scheduleClientInput', 'scheduleClientList');
 
         function loadEmployeeCalendar(userId) {
             currentEmployeeId = userId;
@@ -1639,35 +1618,6 @@
                 eventClick: handleEventClick,
                 dateClick: handleAdminDateClick,
                 selectable: true,
-                eventDidMount: function (info) {
-                    const type = info.event.extendedProps.service_type;
-
-                    // Colores claros según tipo de servicio
-                    const serviceColors = {
-                        'Avería': 'rgba(253, 126, 20, 0.3)',
-                        'Revisión': 'rgba(13, 110, 253, 0.3)',
-                        'Instalación': 'rgba(111, 66, 193, 0.3)',
-                        'Mantenimiento': 'rgba(255, 193, 7, 0.3)',
-                        'Otros servicios': 'rgba(32, 201, 151, 0.3)'
-                    };
-
-                    const serviceBorderColors = {
-                        'Avería': '#fd7e14',
-                        'Revisión': '#0d6efd',
-                        'Instalación': '#6f42c1',
-                        'Mantenimiento': '#ffc107',
-                        'Otros servicios': '#20c997'
-                    };
-
-                    info.el.style.backgroundColor = serviceColors[type] || 'rgba(108, 117, 125, 0.3)';
-                    info.el.style.borderColor = serviceBorderColors[type] || '#6c757d';
-                    info.el.style.color = '#000';  // Texto negro
-
-                    if (info.event.extendedProps.status === 'Completado') {
-                        info.el.style.opacity = '0.7';
-                        info.el.style.fontStyle = 'italic';
-                    }
-                },
                 eventContent: function (arg) {
                     let statusIcon = arg.event.extendedProps.status === 'Completado' ? '✅' : '⏳';
                     return { html: `<div class="fc-content overflow-hidden text-truncate">${statusIcon} ${arg.event.title}</div>` };
@@ -1684,9 +1634,81 @@
             }
         }
 
+        function handleEventClick(info) {
+            document.getElementById('evtId').value = info.event.id;
+            document.getElementById('evtClient').innerText = info.event.extendedProps.client;
+            document.getElementById('evtTech').innerText = info.event.extendedProps.tech_name;
+            document.getElementById('evtService').innerText = info.event.extendedProps.service_type;
+            document.getElementById('evtStatus').innerText = info.event.extendedProps.status;
+            document.getElementById('evtDesc').innerText = info.event.extendedProps.desc || '(Sin descripción)';
+            modalActionAdmin.show();
+        }
 
-        // CALENDARIO GLOBAL - Ya manejado en DOMContentLoaded más abajo
-        // La inicialización se hace en initializeGlobalCalendar()
+        // CALENDARIO GLOBAL
+        document.getElementById('tabGlobalBtn').addEventListener('click', function () {
+            if (calendarGlobalInstance) {
+                calendarGlobalInstance.render();
+                updateGlobalFilters();
+                return;
+            }
+
+            var calendarEl = document.getElementById('calendarGlobal');
+            var isMobile = window.innerWidth < 768;
+
+            calendarGlobalInstance = new FullCalendar.Calendar(calendarEl, {
+                initialView: isMobile ? 'listWeek' : 'dayGridMonth',
+                locale: 'es',
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek'
+                },
+                buttonText: {
+                    today: 'Hoy',
+                    month: 'Mes',
+                    week: 'Semana',
+                    day: 'Día',
+                    list: 'Lista'
+                },
+                height: 'auto',
+                navLinks: true,
+                editable: false,
+                dayMaxEvents: true,
+                events: '/api/admin/all_tasks',
+                dateClick: handleAdminDateClickGlobal,
+                selectable: true,
+
+                // FILTRADO DINÁMICO
+                eventDidMount: function (info) {
+                    const type = info.event.extendedProps.service_type;
+                    const activeTypes = getActiveFilters();
+
+                    if (!activeTypes.includes(type)) {
+                        info.el.style.display = 'none';
+                    } else {
+                        info.el.style.display = '';
+                        // Usar el color del evento que viene desde backend
+                        if (info.backgroundColor) {
+                            info.el.style.backgroundColor = info.backgroundColor;
+                        }
+                        if (info.event.extendedProps.status === 'Completado') {
+                            info.el.style.opacity = '0.6';
+                            info.el.style.border = '2px solid white';
+                        }
+                    }
+                },
+
+                eventContent: function (arg) {
+                    let techName = arg.event.extendedProps.tech_name || '';
+                    let title = arg.event.title;
+                    let attachmentIcon = arg.event.extendedProps.has_attachments ? '<i class="bi bi-paperclip text-warning ms-1"></i>' : '';
+                    return { html: `<div class="fc-content overflow-hidden text-truncate"><span class="fw-bold badge bg-dark text-white me-1 border border-secondary">${techName}</span> ${title}${attachmentIcon}</div>` };
+                },
+
+                eventClick: handleEventClick
+            });
+            calendarGlobalInstance.render();
+        });
 
         // --- LÓGICA DE FILTRADO DINÁMICO ---
         function getActiveFilters() {
@@ -1802,7 +1824,7 @@
         }
 
         // Nueva función completa para editar clientes con todos los campos
-        function openEditClientModalFull(id, name, phone, email, address, link, notes, hasSupport) {
+        function openEditClientModalFull(id, name, phone, email, address, link, notes, hasSupport, supportMF, supportSat, supportSun) {
             document.getElementById('editClientId').value = id;
             document.getElementById('editClientName').value = name;
             document.getElementById('editClientPhone').value = phone;
@@ -1810,8 +1832,12 @@
             document.getElementById('editClientAddress').value = address;
             document.getElementById('editClientLink').value = link || '';
             document.getElementById('editClientNotes').value = notes || '';
-            document.getElementById('editClientSupport').checked = hasSupport;
+            document.getElementById('editHasSupport').checked = hasSupport;
+            document.getElementById('editSupportMF').checked = supportMF;
+            document.getElementById('editSupportSat').checked = supportSat;
+            document.getElementById('editSupportSun').checked = supportSun;
 
+            toggleEditSupportOptions();
             new bootstrap.Modal(document.getElementById('modalEditClient')).show();
         }
 
@@ -2067,26 +2093,14 @@
             // Mostrar indicador si hay archivos adjuntos
             if (info.event.extendedProps.has_attachments) {
                 const attachmentsSection = document.getElementById('attachmentsSection');
-                if (attachmentsSection) {
-                    attachmentsSection.style.display = 'block';
-                    const attachmentsList = document.getElementById('attachmentsList');
-                    if (attachmentsList) {
-                        attachmentsList.innerHTML = '<div class="alert alert-info small m-0"><i class="bi bi-paperclip me-1"></i> Esta tarea tiene archivos adjuntos. Haz clic en "Ver Detalles Completos" para acceder a ellos.</div>';
-                    }
-                }
+                attachmentsSection.style.display = 'block';
+                const attachmentsList = document.getElementById('attachmentsList');
+                attachmentsList.innerHTML = '<div class="alert alert-info small m-0"><i class="bi bi-paperclip me-1"></i> Esta tarea tiene archivos adjuntos. Haz clic en "Ver Detalles Completos" para acceder a ellos.</div>';
             } else {
-                const attachmentsSection = document.getElementById('attachmentsSection');
-                if (attachmentsSection) {
-                    attachmentsSection.style.display = 'none';
-                }
+                document.getElementById('attachmentsSection').style.display = 'none';
             }
 
-            if (modalActionAdmin) {
-                modalActionAdmin.show();
-            } else {
-                console.error('❌ modalActionAdmin no está inicializado');
-                alert('Error: Modal no disponible');
-            }
+            modalActionAdmin.show();
         }
 
         // ============================================================
@@ -2749,6 +2763,20 @@
 
         // ==================== INICIALIZACIÓN ====================
 
+        document.addEventListener('DOMContentLoaded', function () {
+            // Cargar categorías al inicio
+            loadCategoriesTree();
+
+            // Recargar cuando se abre el modal de añadir stock
+            const modalAddStock = document.getElementById('modalAddStock');
+            if (modalAddStock) {
+                modalAddStock.addEventListener('show.bs.modal', function () {
+                    loadCategoriesTree();
+                });
+            }
+        });
+
+
         // ==================== ANALÍTICAS POR TÉCNICO ====================
 
         function viewTechStats(techId) {
@@ -2848,113 +2876,40 @@
         // ==================== VISTA JERÁRQUICA DE STOCK ====================
 
         function loadStockTree() {
-            console.log('📦 === CARGANDO INVENTARIO ===');
             const container = document.getElementById('stockCategoriesTree');
-            if (!container) {
-                console.error('❌ Container stockCategoriesTree no encontrado');
-                return;
-            }
+            container.innerHTML = '<div class="text-center text-muted py-3"><i class="bi bi-hourglass-split"></i> Cargando...</div>';
 
-            console.log('✅ Container encontrado');
-            container.innerHTML = '<div class="text-center text-muted py-5"><i class="bi bi-hourglass-split fs-1 text-warning"></i><br><br><strong>Cargando inventario...</strong></div>';
-
-            console.log('📡 Haciendo fetch a /api/stock_categories');
             fetch('/api/stock_categories')
-                .then(res => {
-                    console.log('📥 Respuesta del servidor:', res.status, res.statusText);
-                    if (!res.ok) {
-                        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-                    }
-                    return res.json();
-                })
+                .then(res => res.json())
                 .then(data => {
-                    console.log('📊 Tipo de datos recibidos:', typeof data, Array.isArray(data) ? `Array[${data.length}]` : 'No es array');
-                    console.log('📦 Datos completos:', data);
-
-                    // VALIDACIÓN CRÍTICA: Verificar que data es un array
-                    if (!Array.isArray(data)) {
-                        console.error('❌ ERROR: Los datos recibidos no son un array válido');
-                        throw new Error(`Formato de datos incorrecto. Recibido: ${typeof data}`);
-                    }
-
-                    console.log(`✅ Datos validados: ${data.length} categorías`);
                     updateStockTreeView(data);
                 })
                 .catch(err => {
-                    console.error('❌ ERROR AL CARGAR INVENTARIO:', err);
-                    console.error('Tipo:', err.constructor.name);
-                    console.error('Mensaje:', err.message);
-                    console.error('Stack:', err.stack);
-
+                    console.error('Error:', err);
                     container.innerHTML = `
-                        <div class="alert alert-danger m-3">
-                            <h6><i class="bi bi-exclamation-triangle me-2"></i>Error al cargar inventario</h6>
-                            <p class="mb-2 small"><strong>Error:</strong> ${err.message}</p>
-                            <p class="mb-2 small"><strong>Tipo:</strong> ${err.constructor.name}</p>
-                            <p class="mb-0 small text-muted">Revisa la consola del navegador (F12) para más detalles</p>
-                            <button class="btn btn-sm btn-outline-danger mt-2" onclick="loadStockTree()">
-                                <i class="bi bi-arrow-clockwise"></i> Reintentar
-                            </button>
+                        <div class="text-center text-danger py-3">
+                            <i class="bi bi-exclamation-triangle me-2"></i>
+                            Error cargando inventario
                         </div>
                     `;
                 });
         }
 
         function updateStockTreeView(categories) {
-            console.log('📦 === RENDERIZANDO VISTA DE CATEGORÍAS ===');
-            console.log('Categorías recibidas:', categories);
             const container = document.getElementById('stockCategoriesTree');
 
-            // VALIDACIÓN CRÍTICA: Verificar el contenedor existe
-            if (!container) {
-                console.error('❌ Container stockCategoriesTree no encontrado en DOM');
-                return;
-            }
-
-            // VALIDACIÓN CRÍTICA: Verificar que categories es un array
-            if (!Array.isArray(categories)) {
-                console.error('❌ ERROR: categories no es un array. Tipo:', typeof categories);
-                container.innerHTML = `
-                    <div class="alert alert-warning m-3">
-                        <h6><i class="bi bi-exclamation-triangle me-2"></i>Error de formato</h6>
-                        <p class="mb-0 small">Los datos recibidos no tienen el formato esperado (Array)</p>
-                    </div>
-                `;
-                return;
-            }
-
             if (categories.length === 0) {
-                console.warn('⚠️ No hay categorías en el array');
                 container.innerHTML = '<div class="text-center text-muted py-3"><i class="bi bi-inbox me-2"></i>No hay categorías creadas</div>';
                 return;
             }
 
-            console.log(`✅ Procesando ${categories.length} categorías...`);
+            let html = '<div class="list-group">';
+            categories.forEach(cat => {
+                html += buildStockCategoryTreeHTML(cat, 0);
+            });
+            html += '</div>';
 
-            try {
-                let html = '<div class="list-group">';
-                categories.forEach((cat, index) => {
-                    console.log(`Procesando categoría ${index + 1}/${categories.length}:`, cat.name);
-                    html += buildStockCategoryTreeHTML(cat, 0);
-                });
-                html += '</div>';
-
-                console.log('Insertando HTML en el DOM...');
-                container.innerHTML = html;
-                console.log('✅ INVENTARIO RENDERIZADO EXITOSAMENTE');
-            } catch (error) {
-                console.error('❌ ERROR AL CONSTRUIR HTML:', error);
-                console.error('Stack:', error.stack);
-                container.innerHTML = `
-                    <div class="alert alert-danger m-3">
-                        <h6><i class="bi bi-exclamation-triangle me-2"></i>Error al renderizar inventario</h6>
-                        <p class="mb-2 small"><strong>Error:</strong> ${error.message}</p>
-                        <button class="btn btn-sm btn-outline-danger mt-2" onclick="loadStockTree()">
-                            <i class="bi bi-arrow-clockwise"></i> Reintentar
-                        </button>
-                    </div>
-                `;
-            }
+            container.innerHTML = html;
         }
 
         function buildStockCategoryTreeHTML(cat, level) {
@@ -3089,237 +3044,28 @@
                 });
         }
 
-        // Event listeners SIMPLIFICADOS - GARANTIZADO QUE FUNCIONA
-        // ===========================================
-        // SOLUCIÓN DEFINITIVA - Usando evento Bootstrap correcto
-        // ===========================================
+        // Event listeners para cargar stock tree y categories tree al abrir las pestañas
         document.addEventListener('DOMContentLoaded', function () {
-            console.log('🚀 DOM Cargado - Sistema Consolidado');
-
-            // ==================== AUTO-OCULTAR MENSAJES FLASH ====================
-            const flashMessages = document.querySelectorAll('.flash-message');
-            if (flashMessages.length > 0) {
-                console.log('📨 Mensajes flash detectados:', flashMessages.length);
-                flashMessages.forEach(function (message) {
-                    setTimeout(function () {
-                        message.style.transition = 'opacity 0.5s ease-out';
-                        message.style.opacity = '0';
-                        setTimeout(function () {
-                            message.remove();
-                            console.log('✅ Mensaje flash eliminado');
-                        }, 500);
-                    }, 2000); // 2 segundos
-                });
-            }
-
-            // ==================== INICIALIZACIÓN GLOBAL ====================
-
-            // Inicializar modal de acciones
-            const modalEl = document.getElementById('modalActionAdmin');
-            if (modalEl) {
-                modalActionAdmin = new bootstrap.Modal(modalEl);
-            } else {
-                console.warn('⚠️ Modal modalActionAdmin no encontrado');
-            }
-
-            // Aplicar colores dinámicos a los labels de filtros
-            document.querySelectorAll('label[data-color]').forEach(function (label) {
-                const color = label.dataset.color;
-                label.style.borderColor = color;
-                label.style.color = color;
-            });
-
-            // Configurar autocompletado
-            setupAutocomplete('scheduleClientInput', 'scheduleClientList');
-
-            // Cargar categorías para el tab de configuración
-            // (Se ejecutará solo cuando el usuario visite ese tab)
-
-            // Configurar evento para modal de añadir stock
-            const modalAddStock = document.getElementById('modalAddStock');
-            if (modalAddStock) {
-                // Cargar categorías al abrir el modal
-                modalAddStock.addEventListener('show.bs.modal', function () {
-                    loadCategoriesTree(); // Para el tab de configuración
-                    loadCategoriesForStockForm('addStock'); // Para el formulario de stock
-                });
-            }
-
-            // ========== CALENDARIO GLOBAL - SOLUCIÓN DEFINITIVA ==========
-            const globalTabButton = document.getElementById('tabGlobalBtn');
-            if (globalTabButton) {
-                console.log('✅ Botón calendario encontrado');
-
-                let calendarInitialized = false;
-
-                globalTabButton.addEventListener('shown.bs.tab', function (e) {
-                    if (!calendarInitialized) {
-                        console.log('🔥 INICIALIZANDO calendario');
-                        calendarInitialized = true;
-                        initializeGlobalCalendar();
-                    } else {
-                        if (calendarGlobalInstance) calendarGlobalInstance.destroy();
-                        initializeGlobalCalendar();
-                    }
-                });
-            } else {
-                console.error('❌ Botón NO encontrado');
-            }
-
-            // ========== INVENTARIO - SOLUCIÓN DEFINITIVA ==========
             const stockTabButton = document.querySelector('button[data-bs-target="#stock"]');
             if (stockTabButton) {
-                console.log('✅ Botón stock encontrado');
-
-                let stockInitialized = false;
-
-                stockTabButton.addEventListener('shown.bs.tab', function (e) {
-                    if (!stockInitialized) {
-                        console.log('🔥 CARGANDO inventario');
-                        stockInitialized = true;
-                        loadStockTree();
-                    } else {
-                        loadStockTree();
-                    }
+                stockTabButton.addEventListener('click', function () {
+                    setTimeout(() => loadStockTree(), 100);
                 });
-            } else {
-                console.error('❌ Botón NO encontrado');
             }
 
-            // ========== CONFIGURACIÓN - USANDO EVENTO BOOTSTRAP CORRECTO ==========
             const configTabButton = document.querySelector('button[data-bs-target="#config"]');
             if (configTabButton) {
-                console.log('✅ Botón config encontrado');
-
-                configTabButton.addEventListener('shown.bs.tab', function (e) {
-                    console.log('⚙️ Evento shown.bs.tab disparado - Tab config visible');
-                    loadCategoriesTree();
+                configTabButton.addEventListener('click', function () {
+                    setTimeout(() => loadCategoriesTree(), 100);
                 });
-            } else {
-                console.error('❌ Botón config NO encontrado');
             }
         });
 
-        // Función SIMPLE para inicializar el calendario global
-        function initializeGlobalCalendar() {
-            console.log('📅 === INICIANDO CALENDARIO GLOBAL ===');
-
-            var calendarEl = document.getElementById('calendarGlobal');
-            if (!calendarEl) {
-                console.error('❌ Elemento calendarGlobal no encontrado');
-                return;
-            }
-
-            console.log('✅ Elemento encontrado');
-            console.log('Dimensiones del contenedor:', calendarEl.offsetWidth, 'x', calendarEl.offsetHeight);
-
-            var isMobile = window.innerWidth < 768;
-
-            calendarGlobalInstance = new FullCalendar.Calendar(calendarEl, {
-                initialView: isMobile ? 'listWeek' : 'dayGridMonth',
-                locale: 'es',
-                headerToolbar: {
-                    left: 'prev,next today',
-                    center: 'title',
-                    right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek'
-                },
-                buttonText: {
-                    today: 'Hoy',
-                    month: 'Mes',
-                    week: 'Semana',
-                    day: 'Día',
-                    list: 'Lista'
-                },
-                height: 650, // CRÍTICO: Altura fija para evitar cálculo incorrecto cuando el tab está oculto
-                navLinks: true,
-                editable: false,
-                dayMaxEvents: true,
-                events: function (info, successCallback, failureCallback) {
-                    console.log('📅 Cargando eventos...');
-                    fetch('/api/admin/all_tasks')
-                        .then(res => res.json())
-                        .then(data => {
-                            console.log('✅ Eventos cargados:', data.length);
-                            successCallback(data);
-                        })
-                        .catch(err => {
-                            console.error('❌ Error:', err);
-                            failureCallback(err);
-                        });
-                },
-                dateClick: handleAdminDateClickGlobal,
-                selectable: true,
-                eventDidMount: function (info) {
-                    const type = info.event.extendedProps.service_type;
-                    const activeTypes = getActiveFilters();
-
-                    if (!activeTypes.includes(type)) {
-                        info.el.style.display = 'none';
-                    } else {
-                        info.el.style.display = '';
-                        const serviceColors = {
-                            'Avería': 'rgba(253, 126, 20, 0.3)',
-                            'Revisión': 'rgba(13, 110, 253, 0.3)',
-                            'Instalación': 'rgba(111, 66, 193, 0.3)',
-                            'Mantenimiento': 'rgba(255, 193, 7, 0.3)',
-                            'Otros servicios': 'rgba(32, 201, 151, 0.3)'
-                        };
-                        const serviceBorderColors = {
-                            'Avería': '#fd7e14',
-                            'Revisión': '#0d6efd',
-                            'Instalación': '#6f42c1',
-                            'Mantenimiento': '#ffc107',
-                            'Otros servicios': '#20c997'
-                        };
-                        info.el.style.backgroundColor = serviceColors[type] || 'rgba(108, 117, 125, 0.3)';
-                        info.el.style.borderColor = serviceBorderColors[type] || '#6c757d';
-                        info.el.style.color = '#000';
-                        if (info.event.extendedProps.status === 'Completado') {
-                            info.el.style.opacity = '0.7';
-                            info.el.style.fontStyle = 'italic';
-                        }
-                    }
-                },
-                eventContent: function (arg) {
-                    let techName = arg.event.extendedProps.tech_name || '';
-                    let title = arg.event.title;
-                    let attachmentIcon = arg.event.extendedProps.has_attachments ? '<i class="bi bi-paperclip text-warning ms-1"></i>' : '';
-                    return { html: `<div class="fc-content overflow-hidden text-truncate"><span class="fw-bold badge bg-dark text-white me-1 border border-secondary">${techName}</span> ${title}${attachmentIcon}</div>` };
-                },
-                eventClick: handleEventClick
-            });
-
-            console.log('📅 Renderizando calendario...');
-            calendarGlobalInstance.render();
-            console.log('✅ Calendario renderizado');
-
-            // CRÍTICO: Múltiples actualizaciones escalonadas para garantizar el ajuste correcto
-            // en diferentes navegadores y velocidades de renderizado
-            setTimeout(function () {
-                if (calendarGlobalInstance) {
-                    calendarGlobalInstance.updateSize();
-                    console.log('✅ Dimensiones actualizadas (50ms)');
-                }
-            }, 50);
-
-            setTimeout(function () {
-                if (calendarGlobalInstance) {
-                    calendarGlobalInstance.updateSize();
-                    console.log('✅ Dimensiones actualizadas (200ms)');
-                }
-            }, 200);
-
-            setTimeout(function () {
-                if (calendarGlobalInstance) {
-                    calendarGlobalInstance.updateSize();
-                    console.log('✅ Dimensiones actualizadas (500ms)');
-                }
-            }, 500);
-
-            updateGlobalFilters();
-        }
-
         // ==================== GESTIÓN DE STOCK MEJORADA ====================
+
+        document.getElementById('modalAddStock').addEventListener('show.bs.modal', function () {
+            loadCategoriesForStockForm('addStock');
+        });
 
         function loadCategoriesForStockForm(prefix) {
             const select = document.getElementById(prefix + 'Category');
@@ -3528,4 +3274,33 @@
 
                     new bootstrap.Modal(document.getElementById('modalAttachments')).show();
                 })
+                .catch(err => {
+                    console.error('Error cargando archivos:', err);
+                    alert('Error al cargar los archivos adjuntos');
+                });
         }
+
+        // CONTADOR DE SESIÓN ACTIVA
+        let sessionStartTime = Date.now();
+        let sessionTimerInterval;
+
+        function updateSessionTimer() {
+            const elapsed = Date.now() - sessionStartTime;
+            const hours = Math.floor(elapsed / 3600000);
+            const minutes = Math.floor((elapsed % 3600000) / 60000);
+            const seconds = Math.floor((elapsed % 60000) / 1000);
+
+            const timerText = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            document.getElementById('sessionTimer').innerText = timerText;
+        }
+
+        // Iniciar contador de sesión
+        document.addEventListener('DOMContentLoaded', function () {
+            sessionTimerInterval = setInterval(updateSessionTimer, 1000);
+            updateSessionTimer();
+        });
+
+    </script>
+</body>
+
+</html>

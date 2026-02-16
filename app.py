@@ -10,9 +10,6 @@ from werkzeug.utils import secure_filename
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 import io
 import re
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
@@ -50,15 +47,15 @@ class Client(db.Model):
     address = db.Column(db.String(250), nullable=False)
     link = db.Column(db.String(500), nullable=True)  # Google Maps o URL
     notes = db.Column(db.Text)
-    # MODIFICACIÓN #5: Solo has_support SI/NO (eliminados días de semana)
     has_support = db.Column(db.Boolean, default=False)
+    support_monday_friday = db.Column(db.Boolean, default=False)
+    support_saturday = db.Column(db.Boolean, default=False)
+    support_sunday = db.Column(db.Boolean, default=False)
 
 class ServiceType(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), unique=True, nullable=False)
     color = db.Column(db.String(7), default='#6c757d')
-    # MODIFICACIÓN #2: Permitir servicios personalizados
-    is_custom = db.Column(db.Boolean, default=False)
     
     def __repr__(self):
         return f"{self.name}"
@@ -90,12 +87,8 @@ class Task(db.Model):
     start_time = db.Column(db.String(10)) 
     end_time = db.Column(db.String(10))   
     
-    service_type_id = db.Column(db.Integer, db.ForeignKey('service_type.id'), nullable=True)
-    # MODIFICACIÓN #2: Campo para guardar servicio personalizado
-    custom_service_name = db.Column(db.String(100), nullable=True)
-    
-    # MODIFICACIÓN #8: parts_text guardará JSON con múltiples objetos
-    parts_text = db.Column(db.Text)  # JSON array de objetos
+    service_type_id = db.Column(db.Integer, db.ForeignKey('service_type.id'))
+    parts_text = db.Column(db.String(200))  
     
     stock_item_id = db.Column(db.Integer, db.ForeignKey('stock.id'), nullable=True)
     stock_quantity_used = db.Column(db.Integer, default=0)
@@ -111,10 +104,9 @@ class Task(db.Model):
     # Archivos adjuntos
     attachments = db.Column(db.Text)  # JSON
     
-    # MODIFICACIÓN #1: Tiempo real de trabajo
+    # Tiempo real de trabajo
     actual_start_time = db.Column(db.DateTime)
     actual_end_time = db.Column(db.DateTime)
-    work_duration_seconds = db.Column(db.Integer, default=0)
 
     tech = db.relationship('User', backref='tasks')
     client = db.relationship('Client', backref='tasks')
@@ -131,23 +123,6 @@ class Alarm(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.now)
     is_read = db.Column(db.Boolean, default=False)
     priority = db.Column(db.String(20), default='normal')
-
-class Incident(db.Model):
-    """Modelo para gestionar incidencias reportadas por técnicos"""
-    id = db.Column(db.Integer, primary_key=True)
-    tech_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    incident_type = db.Column(db.String(50), nullable=False)  # 'servicio' o 'aplicacion'
-    title = db.Column(db.String(200), nullable=False)
-    description = db.Column(db.Text, nullable=False)
-    service_id = db.Column(db.Integer, db.ForeignKey('task.id'), nullable=True)  # Si está relacionado con un servicio
-    status = db.Column(db.String(20), default='Abierta')  # Abierta, En proceso, Cerrada
-    priority = db.Column(db.String(20), default='normal')  # baja, normal, alta, urgente
-    created_at = db.Column(db.DateTime, default=datetime.now)
-    resolved_at = db.Column(db.DateTime, nullable=True)
-    notes = db.Column(db.Text, nullable=True)
-    
-    tech = db.relationship('User', backref='incidents')
-    service = db.relationship('Task', backref='incidents', foreign_keys=[service_id])
 
 @login_manager.user_loader
 def load_user(id):
@@ -200,196 +175,6 @@ def check_low_stock():
     except SQLAlchemyError as e:
         db.session.rollback()
         print(f"Error en check_low_stock: {str(e)}")
-
-def send_password_reset_email(to_email, username, reset_link):
-    """Enviar email de recuperación de contraseña"""
-    try:
-        # Configuración del servidor SMTP
-        smtp_server = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
-        smtp_port = int(os.getenv('SMTP_PORT', '587'))
-        smtp_user = os.getenv('SMTP_USER', 'oslaprint@gmail.com')
-        smtp_password = os.getenv('SMTP_PASSWORD', '')
-        
-        # Si no hay credenciales configuradas, solo registrar en consola
-        if not smtp_password:
-            print("\n" + "="*60)
-            print("📧 [SIMULADO] Email de recuperación de contraseña")
-            print("="*60)
-            print(f"   Para: {to_email}")
-            print(f"   Usuario: {username}")
-            print(f"   Enlace: {reset_link}")
-            print("="*60 + "\n")
-            return True
-        
-        # Crear mensaje
-        msg = MIMEMultipart('alternative')
-        msg['From'] = smtp_user
-        msg['To'] = to_email
-        msg['Subject'] = "[OSLAPRINT] Recuperación de Contraseña"
-        
-        # Cuerpo del email en HTML
-        html_body = f"""
-        <html>
-        <head>
-            <style>
-                body {{ font-family: Arial, sans-serif; color: #333; }}
-                .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-                .header {{ background-color: #f37021; color: white; padding: 20px; text-align: center; }}
-                .content {{ background-color: #f9f9f9; padding: 20px; }}
-                .footer {{ text-align: center; padding: 10px; font-size: 12px; color: #666; }}
-                .button {{ 
-                    display: inline-block; 
-                    background-color: #f37021; 
-                    color: white; 
-                    padding: 15px 30px; 
-                    text-decoration: none; 
-                    border-radius: 5px; 
-                    margin: 20px 0;
-                    font-weight: bold;
-                }}
-                .warning {{ 
-                    background-color: #fff3cd; 
-                    border-left: 4px solid #ffc107; 
-                    padding: 10px; 
-                    margin: 15px 0; 
-                }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <h1>🔐 OSLAPRINT</h1>
-                    <h2>Recuperación de Contraseña</h2>
-                </div>
-                <div class="content">
-                    <p>Hola <strong>{username}</strong>,</p>
-                    <p>Hemos recibido una solicitud para restablecer la contraseña de tu cuenta en OSLAPRINT.</p>
-                    <p>Haz clic en el siguiente botón para crear una nueva contraseña:</p>
-                    
-                    <div style="text-align: center;">
-                        <a href="{reset_link}" class="button">Restablecer Contraseña</a>
-                    </div>
-                    
-                    <p style="margin-top: 20px;">O copia y pega este enlace en tu navegador:</p>
-                    <p style="word-break: break-all; background: #eee; padding: 10px; font-size: 12px;">
-                        {reset_link}
-                    </p>
-                    
-                    <div class="warning">
-                        ⚠️ <strong>Importante:</strong> Este enlace expirará en 24 horas por seguridad.
-                    </div>
-                    
-                    <p style="margin-top: 20px; font-size: 13px; color: #666;">
-                        Si no solicitaste este cambio, puedes ignorar este correo. Tu contraseña no cambiará hasta que accedas al enlace y crees una nueva.
-                    </p>
-                </div>
-                <div class="footer">
-                    Este es un mensaje automático del sistema OSLAPRINT<br>
-                    Por favor no respondas a este correo
-                </div>
-            </div>
-        </body>
-        </html>
-        """
-        
-        msg.attach(MIMEText(html_body, 'html'))
-        
-        # Enviar email
-        with smtplib.SMTP(smtp_server, smtp_port) as server:
-            server.starttls()
-            server.login(smtp_user, smtp_password)
-            server.send_message(msg)
-        
-        return True
-    except Exception as e:
-        print(f"Error enviando email de recuperación: {str(e)}")
-        return False
-
-def send_incident_email(to_email, incident_data):
-    """Enviar email de notificación de incidencia"""
-    try:
-        # Configuración del servidor SMTP (usar variables de entorno en producción)
-        smtp_server = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
-        smtp_port = int(os.getenv('SMTP_PORT', '587'))
-        smtp_user = os.getenv('SMTP_USER', 'oslaprint@gmail.com')
-        smtp_password = os.getenv('SMTP_PASSWORD', '')
-        
-        # Si no hay credenciales configuradas, solo registrar en consola
-        if not smtp_password:
-            print(f"📧 [SIMULADO] Email de incidencia enviado a {to_email}")
-            print(f"   Tipo: {incident_data['type']}")
-            print(f"   Título: {incident_data['title']}")
-            print(f"   Descripción: {incident_data['description']}")
-            return True
-        
-        # Crear mensaje
-        msg = MIMEMultipart('alternative')
-        msg['From'] = smtp_user
-        msg['To'] = to_email
-        msg['Subject'] = f"[OSLAPRINT] Nueva Incidencia: {incident_data['title']}"
-        
-        # Cuerpo del email en HTML
-        html_body = f"""
-        <html>
-        <head>
-            <style>
-                body {{ font-family: Arial, sans-serif; color: #333; }}
-                .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-                .header {{ background-color: #f37021; color: white; padding: 20px; text-align: center; }}
-                .content {{ background-color: #f9f9f9; padding: 20px; }}
-                .footer {{ text-align: center; padding: 10px; font-size: 12px; color: #666; }}
-                .field {{ margin-bottom: 15px; }}
-                .label {{ font-weight: bold; color: #f37021; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <h1>OSLAPRINT - Nueva Incidencia</h1>
-                </div>
-                <div class="content">
-                    <div class="field">
-                        <span class="label">Tipo de Incidencia:</span> 
-                        {incident_data['type']}
-                    </div>
-                    <div class="field">
-                        <span class="label">Título:</span> 
-                        {incident_data['title']}
-                    </div>
-                    <div class="field">
-                        <span class="label">Descripción:</span><br>
-                        {incident_data['description']}
-                    </div>
-                    <div class="field">
-                        <span class="label">Reportado por:</span> 
-                        {incident_data['tech_name']}
-                    </div>
-                    <div class="field">
-                        <span class="label">Fecha:</span> 
-                        {incident_data['date']}
-                    </div>
-                    {f'<div class="field"><span class="label">Servicio relacionado:</span> {incident_data["service_info"]}</div>' if incident_data.get('service_info') else ''}
-                </div>
-                <div class="footer">
-                    Este es un mensaje automático del sistema OSLAPRINT
-                </div>
-            </div>
-        </body>
-        </html>
-        """
-        
-        msg.attach(MIMEText(html_body, 'html'))
-        
-        # Enviar email
-        with smtplib.SMTP(smtp_server, smtp_port) as server:
-            server.starttls()
-            server.login(smtp_user, smtp_password)
-            server.send_message(msg)
-        
-        return True
-    except Exception as e:
-        print(f"Error enviando email: {str(e)}")
-        return False
 
 # --- CONTEXT PROCESSOR ---
 @app.context_processor
@@ -461,7 +246,7 @@ def forgot_password():
             flash('Por favor ingresa tu correo electrónico', 'danger')
             return redirect(url_for('login'))
         
-        # Buscar TODOS los usuarios con este email (puede haber varios)
+        # ✅ MEJORADO: Buscar TODOS los usuarios con este email (puede haber varios)
         users = User.query.filter_by(email=email).all()
         
         if not users:
@@ -469,24 +254,30 @@ def forgot_password():
             flash('Si el correo existe en nuestro sistema, recibirás un enlace de recuperación', 'info')
             return redirect(url_for('login'))
         
-        # Generar token y enviar email para CADA usuario con este email
-        emails_sent = 0
+        # ✅ Generar token para CADA usuario con este email
         for user in users:
             reset_token = secrets.token_urlsafe(32)
             user.reset_token = reset_token
             user.reset_token_expiry = datetime.now() + timedelta(hours=24)
             
-            # Generar enlace de recuperación
+            # En producción, aquí se enviaría un email con el enlace
+            # Por ahora, mostramos el enlace en consola para desarrollo
             reset_link = url_for('reset_password', token=reset_token, _external=True)
-            
-            # Enviar email
-            if send_password_reset_email(user.email, user.username, reset_link):
-                emails_sent += 1
+            print("\n" + "="*60)
+            print("🔐 ENLACE DE RECUPERACIÓN DE CONTRASEÑA")
+            print("="*60)
+            print(f"Usuario: {user.username} ({user.role})")
+            print(f"Email: {user.email}")
+            print(f"Enlace: {reset_link}")
+            print("="*60 + "\n")
         
         db.session.commit()
         
-        # Mensaje genérico por seguridad
-        flash('Si el correo existe en nuestro sistema, recibirás un enlace de recuperación en tu bandeja de entrada', 'success')
+        num_accounts = len(users)
+        if num_accounts > 1:
+            flash(f'Se han generado {num_accounts} enlaces de recuperación para las cuentas asociadas a este email. Revisa la consola del servidor.', 'success')
+        else:
+            flash('Se ha generado un enlace de recuperación. Revisa la consola del servidor.', 'success')
         
         return redirect(url_for('login'))
         
@@ -718,12 +509,12 @@ def manage_clients():
         link = request.form.get('link', '')
         notes = request.form.get('notes', '')
         has_support = request.form.get('has_support') == 'on'
+        # Los días de soporte se establecen por defecto en False
         
         if Client.query.filter_by(name=name).first():
             flash('Ya existe un cliente con ese nombre', 'danger')
             return redirect(url_for('dashboard'))
         
-        # MODIFICACIÓN #5: Solo has_support, sin días específicos
         new_client = Client(
             name=name,
             phone=phone,
@@ -731,7 +522,10 @@ def manage_clients():
             address=address,
             link=link,
             notes=notes,
-            has_support=has_support
+            has_support=has_support,
+            support_monday_friday=False,
+            support_saturday=False,
+            support_sunday=False
         )
         db.session.add(new_client)
         db.session.commit()
@@ -749,8 +543,10 @@ def manage_clients():
             client.address = request.form.get('address')
             client.link = request.form.get('link', '')
             client.notes = request.form.get('notes', '')
-            # MODIFICACIÓN #5: Solo has_support (sin días)
             client.has_support = request.form.get('has_support') == 'on'
+            client.support_monday_friday = request.form.get('support_monday_friday') == 'on'
+            client.support_saturday = request.form.get('support_saturday') == 'on'
+            client.support_sunday = request.form.get('support_sunday') == 'on'
             
             db.session.commit()
             flash('Cliente actualizado correctamente', 'success')
@@ -763,56 +559,6 @@ def manage_clients():
             db.session.delete(client)
             db.session.commit()
             flash('Cliente eliminado correctamente', 'success')
-    
-    elif action == 'import_json':
-        # NUEVA FUNCIONALIDAD: Importar clientes desde JSON
-        try:
-            if 'json_file' not in request.files:
-                flash('No se seleccionó ningún archivo', 'danger')
-                return redirect(url_for('dashboard'))
-            
-            file = request.files['json_file']
-            if file.filename == '':
-                flash('No se seleccionó ningún archivo', 'danger')
-                return redirect(url_for('dashboard'))
-            
-            if file and file.filename.endswith('.json'):
-                content = file.read().decode('utf-8')
-                clients_data = json.loads(content)
-                
-                if not isinstance(clients_data, list):
-                    flash('El archivo JSON debe contener una lista de clientes', 'danger')
-                    return redirect(url_for('dashboard'))
-                
-                imported_count = 0
-                skipped_count = 0
-                
-                for client_data in clients_data:
-                    # Verificar que el cliente no exista
-                    if Client.query.filter_by(name=client_data.get('name', '')).first():
-                        skipped_count += 1
-                        continue
-                    
-                    new_client = Client(
-                        name=client_data.get('name', ''),
-                        phone=client_data.get('phone', ''),
-                        email=client_data.get('email', ''),
-                        address=client_data.get('address', ''),
-                        link=client_data.get('link', ''),
-                        notes=client_data.get('notes', ''),
-                        has_support=client_data.get('has_support', False)
-                    )
-                    db.session.add(new_client)
-                    imported_count += 1
-                
-                db.session.commit()
-                flash(f'✅ {imported_count} clientes importados correctamente. {skipped_count} omitidos (ya existían)', 'success')
-            else:
-                flash('El archivo debe ser un JSON válido', 'danger')
-        except json.JSONDecodeError:
-            flash('Error al leer el archivo JSON. Verifica el formato', 'danger')
-        except Exception as e:
-            flash(f'Error al importar clientes: {str(e)}', 'danger')
     
     return redirect(url_for('dashboard'))
 
@@ -974,23 +720,7 @@ def save_report():
         entry_time = request.form.get('entry_time')
         exit_time = request.form.get('exit_time')
         description = request.form.get('description')
-        
-        # MODIFICACIÓN #8: Soporte para múltiples objetos en JSON
-        parts_text_raw = request.form.get('parts_text', '')
-        # Si viene como JSON (lista de objetos), mantenerlo como JSON
-        # Si viene como texto plano, convertirlo a JSON con un único objeto
-        try:
-            parts_data = json.loads(parts_text_raw)
-            if isinstance(parts_data, list):
-                parts_text = json.dumps(parts_data)
-            else:
-                parts_text = json.dumps([{'item': parts_text_raw, 'quantity': 1}])
-        except:
-            # Si no es JSON válido, guardarlo como texto plano en un array
-            if parts_text_raw.strip():
-                parts_text = json.dumps([{'item': parts_text_raw, 'quantity': 1}])
-            else:
-                parts_text = '[]'
+        parts_text = request.form.get('parts_text', '')
         
         # Stock
         stock_item_id = request.form.get('stock_item')
@@ -1165,33 +895,18 @@ def get_all_tasks():
     else:
         tasks = Task.query.filter_by(tech_id=current_user.id).all()
     
-    # Mapeo de colores oscuros a colores claros con buen contraste
-    color_map = {
-        '#fd7e14': '#FFD580',  # Naranja claro
-        '#0d6efd': '#A8D8FF',  # Azul claro
-        '#6f42c1': '#D4A5FF',  # Púrpura claro
-        '#20c997': '#8FFFD6',  # Verde/turquesa claro
-        '#6c757d': '#D3D3D3',  # Gris claro
-        '#dc3545': '#FFB3BA',  # Rojo claro
-        '#ffc107': '#FFEB99',  # Amarillo claro
-        '#198754': '#A5F5C4',  # Verde claro
-    }
-    
     events = []
     for task in tasks:
         service_type = ServiceType.query.get(task.service_type_id) if task.service_type_id else None
-        original_color = service_type.color if service_type else '#6c757d'
-        # Usar color claro si existe en el mapa, sino usar un color claro por defecto
-        light_color = color_map.get(original_color, '#E0E0E0')
+        color = service_type.color if service_type else '#6c757d'
         
         events.append({
             'id': task.id,
             'title': f"{task.client_name} - {service_type.name if service_type else 'Sin tipo'}",
             'start': f"{task.date}T{task.start_time}:00" if task.start_time else str(task.date),
             'end': f"{task.date}T{task.end_time}:00" if task.end_time else str(task.date),
-            'backgroundColor': light_color,
-            'borderColor': original_color,  # Usar color original para el borde
-            'textColor': '#000000',  # Texto negro para mejor contraste
+            'backgroundColor': color,
+            'borderColor': color,
             'extendedProps': {
                 'client': task.client_name,
                 'client_id': task.client_id,  # Agregar client_id para poder obtener más información
@@ -1251,7 +966,7 @@ def get_task_full(task_id):
     
     service_type = ServiceType.query.get(task.service_type_id) if task.service_type_id else None
     
-    # INCLUIR INFORMACIÓN COMPLETA DEL CLIENTE
+    # ✅ INCLUIR INFORMACIÓN COMPLETA DEL CLIENTE
     client_info = None
     if task.client:
         client_info = {
@@ -1259,9 +974,12 @@ def get_task_full(task_id):
             'phone': task.client.phone,
             'email': task.client.email,
             'address': task.client.address,
-            'link': task.client.link or '',
-            'notes': task.client.notes or '',
-            'has_support': task.client.has_support
+            'link': task.client.link,
+            'notes': task.client.notes,
+            'has_support': task.client.has_support,
+            'support_monday_friday': task.client.support_monday_friday,
+            'support_saturday': task.client.support_saturday,
+            'support_sunday': task.client.support_sunday
         }
     
     return jsonify({
@@ -1269,12 +987,11 @@ def get_task_full(task_id):
         'data': {
             'id': task.id,
             'client_name': task.client_name,
-            'client_info': client_info,
+            'client_info': client_info,  # ✅ AÑADIDO
             'date': task.date.strftime('%Y-%m-%d'),
             'start_time': task.start_time or '',
             'end_time': task.end_time or '',
             'service_type': service_type.name if service_type else '',
-            'service_type_id': task.service_type_id,
             'description': task.description or ''
         }
     })
@@ -1296,7 +1013,7 @@ def get_task_details(task_id):
     
     service_type = ServiceType.query.get(task.service_type_id) if task.service_type_id else None
     
-    # INCLUIR INFORMACIÓN COMPLETA DEL CLIENTE
+    # ✅ INCLUIR INFORMACIÓN COMPLETA DEL CLIENTE
     client_info = None
     if task.client:
         client_info = {
@@ -1304,9 +1021,12 @@ def get_task_details(task_id):
             'phone': task.client.phone,
             'email': task.client.email,
             'address': task.client.address,
-            'link': task.client.link or '',
-            'notes': task.client.notes or '',
-            'has_support': task.client.has_support
+            'link': task.client.link,
+            'notes': task.client.notes,
+            'has_support': task.client.has_support,
+            'support_monday_friday': task.client.support_monday_friday,
+            'support_saturday': task.client.support_saturday,
+            'support_sunday': task.client.support_sunday
         }
     
     return jsonify({
@@ -1362,10 +1082,7 @@ def get_tech_analytics():
     
     # Calcular estadísticas
     total_services = len(tasks)
-    
-    # Contar mantenimientos dinámicamente usando el nombre del servicio
-    maint_service = ServiceType.query.filter_by(name='Mantenimiento').first()
-    total_maintenances = sum(1 for t in tasks if maint_service and t.service_type_id == maint_service.id)
+    total_maintenances = sum(1 for t in tasks if t.service_type and 'manten' in t.service_type.name.lower())
     
     # Tiempo promedio
     total_time = 0
@@ -1378,16 +1095,10 @@ def get_tech_analytics():
     
     avg_time = round(total_time / time_count, 1) if time_count > 0 else 0
     
-    # Distribución por tipo de servicio (incluye servicios personalizados)
+    # Distribución por tipo de servicio
     service_distribution = {}
     for task in tasks:
-        if task.service_type:
-            service_name = task.service_type.name
-        elif task.custom_service_name:
-            # MODIFICACIÓN #6: Los servicios personalizados se cuentan como "Otros servicios"
-            service_name = 'Otros servicios'
-        else:
-            service_name = 'Sin tipo'
+        service_name = task.service_type.name if task.service_type else 'Sin tipo'
         service_distribution[service_name] = service_distribution.get(service_name, 0) + 1
     
     # Timeline de los últimos meses
@@ -1501,17 +1212,8 @@ def get_admin_analytics():
     
     for task in completed_tasks:
         service_type = ServiceType.query.get(task.service_type_id) if task.service_type_id else None
-        if service_type:
-            service_name = service_type.name
-            service_color = service_type.color
-        elif task.custom_service_name:
-            # MODIFICACIÓN #6: Servicios personalizados como "Otros servicios"
-            service_name = 'Otros servicios'
-            otros_service = ServiceType.query.filter_by(name='Otros servicios').first()
-            service_color = otros_service.color if otros_service else '#20c997'
-        else:
-            service_name = 'Sin tipo'
-            service_color = '#6c757d'
+        service_name = service_type.name if service_type else 'Sin tipo'
+        service_color = service_type.color if service_type else '#6c757d'
         
         if service_name not in task_types:
             task_types[service_name] = {
@@ -1581,58 +1283,6 @@ def get_stock_categories():
         return result
     
     return jsonify(build_tree())
-
-@app.route('/api/stock_items_grouped')
-@login_required
-def get_stock_items_grouped():
-    """Obtener items de stock agrupados por categoría para selector de objetos"""
-    categories = StockCategory.query.filter_by(parent_id=None).all()
-    result = []
-    
-    for cat in categories:
-        cat_data = {
-            'id': cat.id,
-            'name': cat.name,
-            'items': [],
-            'subcategories': []
-        }
-        
-        # Añadir items directos de la categoría
-        for item in cat.items:
-            cat_data['items'].append({
-                'id': item.id,
-                'name': item.name,
-                'quantity': item.quantity
-            })
-        
-        # Añadir subcategorías e items
-        for subcat in cat.subcategories:
-            subcat_data = {
-                'id': subcat.id,
-                'name': subcat.name,
-                'items': []
-            }
-            for item in subcat.items:
-                subcat_data['items'].append({
-                    'id': item.id,
-                    'name': item.name,
-                    'quantity': item.quantity
-                })
-            cat_data['subcategories'].append(subcat_data)
-        
-        result.append(cat_data)
-    
-    # Añadir items sin categoría
-    uncategorized_items = Stock.query.filter_by(category_id=None).all()
-    if uncategorized_items:
-        result.append({
-            'id': None,
-            'name': 'Sin categoría',
-            'items': [{'id': item.id, 'name': item.name, 'quantity': item.quantity} for item in uncategorized_items],
-            'subcategories': []
-        })
-    
-    return jsonify(result)
 
 # ✅ NUEVA RUTA: Obtener info de un item de stock para editar
 @app.route('/api/stock_item/<int:item_id>')
@@ -1751,23 +1401,17 @@ def print_report(report_id):
         flash('Error al cargar el reporte', 'danger')
         return redirect(url_for('dashboard'))
 
-@app.route('/api/task_action/<int:task_id>/<action>', methods=['POST', 'OPTIONS'])
+@app.route('/api/task_action/<int:task_id>/<action>', methods=['POST'])
 @login_required
 def task_action(task_id, action):
     """Endpoint para acciones sobre tareas (completar, eliminar, cancelar)"""
-    # Manejar preflight CORS
-    if request.method == 'OPTIONS':
-        return jsonify({'success': True}), 200
+    task = Task.query.get_or_404(task_id)
+    
+    # Verificar permisos
+    if current_user.role != 'admin' and task.tech_id != current_user.id:
+        return jsonify({'success': False, 'msg': 'No autorizado'}), 403
     
     try:
-        task = Task.query.get(task_id)
-        if not task:
-            return jsonify({'success': False, 'msg': 'Tarea no encontrada'}), 404
-        
-        # Verificar permisos
-        if current_user.role != 'admin' and task.tech_id != current_user.id:
-            return jsonify({'success': False, 'msg': 'No autorizado'}), 403
-        
         if action == 'complete':
             task.status = 'Completado'
             if not task.actual_end_time:
@@ -1788,14 +1432,10 @@ def task_action(task_id, action):
         else:
             return jsonify({'success': False, 'msg': 'Acción no válida'}), 400
     
-    except SQLAlchemyError as e:
-        print(f"Database error in task_action: {e}")
-        db.session.rollback()
-        return jsonify({'success': False, 'msg': 'Error de base de datos'}), 500
     except Exception as e:
         print(f"Error in task_action: {e}")
         db.session.rollback()
-        return jsonify({'success': False, 'msg': str(e)}), 500
+        return jsonify({'success': False, 'msg': 'Error al procesar la acción'}), 500
 
 @app.route('/api/get_task/<int:task_id>')
 @login_required
@@ -1937,31 +1577,22 @@ def create_appointment():
             client_name = data.get('client_name')
             date_str = data.get('date')
             start_time = data.get('start_time')
-            end_time = data.get('end_time', '')
+            end_time = data.get('end_time', '')  # Opcional
             service_type_id = data.get('service_type_id')
-            custom_service = data.get('custom_service_name', '')  # MODIFICACIÓN #2
-            description = data.get('description', '')
+            description = data.get('description', '')  # Opcional
         else:
             client_name = request.form.get('client_name')
             date_str = request.form.get('date')
             start_time = request.form.get('start_time')
-            end_time = request.form.get('end_time', '')
+            end_time = request.form.get('end_time', '')  # Opcional
             service_type_id = request.form.get('service_type_id')
-            custom_service = request.form.get('custom_service_name', '')  # MODIFICACIÓN #2
-            description = request.form.get('description', '')
+            description = request.form.get('description', '')  # Opcional
         
-        # MODIFICACIÓN #2: Validación con soporte para servicio personalizado
-        if not client_name or not date_str or not start_time:
+        # Validación: SOLO estos 4 campos son obligatorios
+        if not client_name or not date_str or not start_time or not service_type_id:
             return jsonify({
                 'success': False, 
-                'msg': 'Faltan campos obligatorios: Cliente, Fecha y Hora de inicio son requeridos'
-            }), 400
-        
-        # MODIFICACIÓN #2: Servicio personalizado o de catálogo
-        if not service_type_id and not custom_service:
-            return jsonify({
-                'success': False, 
-                'msg': 'Debe seleccionar un tipo de servicio o escribir uno personalizado'
+                'msg': 'Faltan campos obligatorios: Cliente, Fecha, Hora de inicio y Tipo de servicio son requeridos'
             }), 400
         
         # Buscar o crear cliente
@@ -1980,8 +1611,7 @@ def create_appointment():
             date=task_date,
             start_time=start_time,
             end_time=end_time if end_time else None,
-            service_type_id=int(service_type_id) if service_type_id else None,
-            custom_service_name=custom_service if custom_service else None,  # MODIFICACIÓN #2
+            service_type_id=int(service_type_id),
             status='Pendiente'
         )
         
@@ -2032,46 +1662,6 @@ def edit_appointment(task_id):
         db.session.rollback()
         flash('Error al editar la cita', 'danger')
         return redirect(url_for('dashboard'))
-
-@app.route('/api/edit_task/<int:task_id>', methods=['POST', 'PUT'])
-@login_required
-def api_edit_task(task_id):
-    """API endpoint para editar una tarea (JSON)"""
-    try:
-        task = Task.query.get(task_id)
-        if not task:
-            return jsonify({'success': False, 'msg': 'Tarea no encontrada'}), 404
-        
-        # Verificar permisos
-        if current_user.role != 'admin' and task.tech_id != current_user.id:
-            return jsonify({'success': False, 'msg': 'No autorizado'}), 403
-        
-        # Obtener datos del request
-        data = request.get_json() if request.is_json else request.form
-        
-        # Actualizar campos si se proporcionan
-        if 'client_name' in data:
-            task.client_name = data['client_name']
-        if 'date' in data:
-            task.date = datetime.strptime(data['date'], '%Y-%m-%d').date()
-        if 'start_time' in data:
-            task.start_time = data['start_time']
-        if 'end_time' in data:
-            task.end_time = data['end_time']
-        if 'description' in data:
-            task.description = data['description']
-        if 'service_type' in data:
-            service_type = ServiceType.query.filter_by(name=data['service_type']).first()
-            if service_type:
-                task.service_type_id = service_type.id
-        
-        db.session.commit()
-        return jsonify({'success': True, 'msg': 'Tarea actualizada correctamente'})
-        
-    except Exception as e:
-        print(f"Error in api_edit_task: {str(e)}")
-        db.session.rollback()
-        return jsonify({'success': False, 'msg': str(e)}), 500
 
 @app.route('/schedule_appointment', methods=['POST'])
 @login_required
@@ -2262,72 +1852,6 @@ def api_get_stock_category(category_id):
     except Exception as e:
         return jsonify({'success': False, 'msg': str(e)}), 500
 
-@app.route('/api/start_timer/<int:task_id>', methods=['POST'])
-@login_required
-def start_timer(task_id):
-    """Iniciar cronómetro de una tarea"""
-    try:
-        task = Task.query.get_or_404(task_id)
-        
-        # Verificar permisos
-        if current_user.role != 'admin' and task.tech_id != current_user.id:
-            return jsonify({'success': False, 'msg': 'No autorizado'}), 403
-        
-        # Iniciar cronómetro
-        task.actual_start_time = datetime.now()
-        db.session.commit()
-        
-        return jsonify({
-            'success': True,
-            'msg': 'Cronómetro iniciado',
-            'start_time': task.actual_start_time.strftime('%H:%M:%S')
-        })
-    except Exception as e:
-        print(f"Error starting timer: {str(e)}")
-        db.session.rollback()
-        return jsonify({'success': False, 'msg': str(e)}), 500
-
-@app.route('/api/stop_timer/<int:task_id>', methods=['POST'])
-@login_required
-def stop_timer(task_id):
-    """Finalizar cronómetro de una tarea"""
-    try:
-        task = Task.query.get_or_404(task_id)
-        
-        # Verificar permisos
-        if current_user.role != 'admin' and task.tech_id != current_user.id:
-            return jsonify({'success': False, 'msg': 'No autorizado'}), 403
-        
-        # Verificar que el cronómetro haya sido iniciado
-        if not task.actual_start_time:
-            return jsonify({'success': False, 'msg': 'El cronómetro no ha sido iniciado'}), 400
-        
-        # Finalizar cronómetro
-        task.actual_end_time = datetime.now()
-        
-        # Calcular duración en segundos
-        duration = (task.actual_end_time - task.actual_start_time).total_seconds()
-        task.work_duration_seconds = int(duration)
-        
-        db.session.commit()
-        
-        # Formatear duración para mostrar
-        hours = int(duration // 3600)
-        minutes = int((duration % 3600) // 60)
-        seconds = int(duration % 60)
-        
-        return jsonify({
-            'success': True,
-            'msg': 'Cronómetro finalizado',
-            'end_time': task.actual_end_time.strftime('%H:%M:%S'),
-            'duration': f"{hours:02d}:{minutes:02d}:{seconds:02d}",
-            'duration_seconds': task.work_duration_seconds
-        })
-    except Exception as e:
-        print(f"Error stopping timer: {str(e)}")
-        db.session.rollback()
-        return jsonify({'success': False, 'msg': str(e)}), 500
-
 @app.route('/api/task/<int:task_id>/attachments')
 @login_required
 def api_get_task_attachments(task_id):
@@ -2365,120 +1889,14 @@ def api_get_client(client_id):
                 'phone': client.phone,
                 'email': client.email,
                 'address': client.address,
-                'link': client.link or '',
-                'notes': client.notes or '',
-                'has_support': client.has_support
+                'link': client.link,
+                'notes': client.notes,
+                'has_support': client.has_support,
+                'support_monday_friday': client.support_monday_friday,
+                'support_saturday': client.support_saturday,
+                'support_sunday': client.support_sunday
             }
         })
-    except Exception as e:
-        return jsonify({'success': False, 'msg': str(e)}), 500
-
-# --- GESTIÓN DE INCIDENCIAS ---
-@app.route('/submit_incident', methods=['POST'])
-@login_required
-def submit_incident():
-    """Crear nueva incidencia y enviar email correspondiente"""
-    try:
-        incident_type = request.form.get('incident_type')  # 'servicio' o 'aplicacion'
-        title = request.form.get('title')
-        description = request.form.get('description')
-        service_id = request.form.get('service_id')
-        priority = request.form.get('priority', 'normal')
-        
-        # Validar campos obligatorios
-        if not all([incident_type, title, description]):
-            return jsonify({'success': False, 'msg': 'Todos los campos son obligatorios'}), 400
-        
-        # Crear incidencia
-        incident = Incident(
-            tech_id=current_user.id,
-            incident_type=incident_type,
-            title=title,
-            description=description,
-            service_id=int(service_id) if service_id and service_id != '' else None,
-            priority=priority,
-            status='Abierta'
-        )
-        
-        db.session.add(incident)
-        db.session.commit()
-        
-        # Determinar email de destino
-        if incident_type == 'aplicacion':
-            to_email = 'nintecdeveloper@gmail.com'
-            type_label = 'Incidencia de Aplicación'
-        else:  # servicio
-            to_email = 'paco@oslaprint.com'
-            type_label = 'Incidencia de Servicio'
-        
-        # Preparar datos para el email
-        service_info = ''
-        if incident.service_id:
-            task = Task.query.get(incident.service_id)
-            if task:
-                service_info = f"Tarea #{task.id} - {task.client_name} ({task.date.strftime('%d/%m/%Y')})"
-        
-        email_data = {
-            'type': type_label,
-            'title': title,
-            'description': description,
-            'tech_name': current_user.username,
-            'date': datetime.now().strftime('%d/%m/%Y %H:%M'),
-            'service_info': service_info if service_info else None
-        }
-        
-        # Enviar email
-        send_incident_email(to_email, email_data)
-        
-        flash(f'Incidencia registrada correctamente. Se ha enviado notificación a {to_email}', 'success')
-        return jsonify({
-            'success': True,
-            'msg': 'Incidencia creada y notificación enviada',
-            'incident_id': incident.id
-        })
-        
-    except Exception as e:
-        db.session.rollback()
-        print(f"Error creando incidencia: {str(e)}")
-        return jsonify({'success': False, 'msg': f'Error al crear incidencia: {str(e)}'}), 500
-
-@app.route('/api/incidents')
-@login_required
-def get_incidents():
-    """Obtener listado de incidencias"""
-    try:
-        if current_user.role == 'admin':
-            # Admin ve todas las incidencias
-            incidents = Incident.query.order_by(Incident.created_at.desc()).all()
-        else:
-            # Técnico solo ve sus incidencias
-            incidents = Incident.query.filter_by(tech_id=current_user.id).order_by(Incident.created_at.desc()).all()
-        
-        incidents_list = []
-        for inc in incidents:
-            service_info = None
-            if inc.service_id:
-                task = Task.query.get(inc.service_id)
-                if task:
-                    service_info = {
-                        'id': task.id,
-                        'client_name': task.client_name,
-                        'date': task.date.strftime('%d/%m/%Y')
-                    }
-            
-            incidents_list.append({
-                'id': inc.id,
-                'type': inc.incident_type,
-                'title': inc.title,
-                'description': inc.description,
-                'status': inc.status,
-                'priority': inc.priority,
-                'tech_name': inc.tech.username,
-                'created_at': inc.created_at.strftime('%d/%m/%Y %H:%M'),
-                'service_info': service_info
-            })
-        
-        return jsonify({'success': True, 'incidents': incidents_list})
     except Exception as e:
         return jsonify({'success': False, 'msg': str(e)}), 500
 
@@ -2548,7 +1966,6 @@ with app.app_context():
             {'name': 'Avería', 'color': '#fd7e14'},
             {'name': 'Revisión', 'color': '#0d6efd'},
             {'name': 'Instalación', 'color': '#6f42c1'},
-            {'name': 'Mantenimiento', 'color': '#ffc107'},  # MODIFICACIÓN #2: Servicio fijo
             {'name': 'Otros servicios', 'color': '#20c997'}
         ]
         for s in servicios:
@@ -2607,30 +2024,9 @@ with app.app_context():
             phone='900123456',
             email='ejemplo@cliente.com',
             address='Calle Ejemplo 1, Madrid',
-            has_support=True  # MODIFICACIÓN #5: Solo has_support
+            has_support=True,
+            support_monday_friday=True
         ))
-    
-    # MODIFICACIÓN #2: Migración - Agregar "Mantenimiento" si no existe
-    try:
-        if not ServiceType.query.filter_by(name='Mantenimiento').first():
-            db.session.add(ServiceType(name='Mantenimiento', color='#ffc107', is_custom=False))
-            print("✅ Servicio 'Mantenimiento' agregado")
-    except Exception as e:
-        print(f"Nota: Migración de 'Mantenimiento': {e}")
-    
-    # MODIFICACIÓN #5: Migración - Eliminar columnas de días de clientes existentes
-    try:
-        from sqlalchemy import inspect
-        inspector = inspect(db.engine)
-        client_columns = [col['name'] for col in inspector.get_columns('client')]
-        
-        # Si existen las columnas antiguas, no podemos eliminarlas automáticamente en SQLite
-        # Pero los nuevos clientes no las usarán
-        if 'support_monday_friday' in client_columns:
-            print("⚠️  Nota: Columnas de días de soporte detectadas en BD existente")
-            print("    Los nuevos registros solo usarán 'has_support'")
-    except Exception as e:
-        print(f"Nota: Migración de columnas Client: {e}")
         
     db.session.commit()
 
