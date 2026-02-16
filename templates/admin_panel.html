@@ -207,7 +207,8 @@
 
     <div class="container mt-3 pb-5">
         {% with messages = get_flashed_messages() %}
-        {% if messages %}{% for m in messages %}<div class="alert alert-info py-2 small flash-message">{{ m }}</div>{% endfor %}{%
+        {% if messages %}{% for m in messages %}<div class="alert alert-info py-2 small flash-message">{{ m }}</div>{%
+        endfor %}{%
         endif %}
         {% endwith %}
 
@@ -3099,11 +3100,11 @@
             const flashMessages = document.querySelectorAll('.flash-message');
             if (flashMessages.length > 0) {
                 console.log('📨 Mensajes flash detectados:', flashMessages.length);
-                flashMessages.forEach(function(message) {
-                    setTimeout(function() {
+                flashMessages.forEach(function (message) {
+                    setTimeout(function () {
                         message.style.transition = 'opacity 0.5s ease-out';
                         message.style.opacity = '0';
-                        setTimeout(function() {
+                        setTimeout(function () {
                             message.remove();
                             console.log('✅ Mensaje flash eliminado');
                         }, 500);
@@ -3144,57 +3145,45 @@
                 });
             }
 
-            // ========== CALENDARIO GLOBAL - USANDO EVENTO BOOTSTRAP CORRECTO ==========
+            // ========== CALENDARIO GLOBAL - SOLUCIÓN DEFINITIVA ==========
             const globalTabButton = document.getElementById('tabGlobalBtn');
             if (globalTabButton) {
                 console.log('✅ Botón calendario encontrado');
 
-                // USAR shown.bs.tab - Evento que Bootstrap dispara DESPUÉS de mostrar el tab
+                let calendarInitialized = false;
+
                 globalTabButton.addEventListener('shown.bs.tab', function (e) {
-                    console.log('📅 Evento shown.bs.tab disparado - Tab completamente visible');
-
-                    // SOLUCIÓN DEFINITIVA: SIEMPRE destruir y recrear el calendario
-                    // Esto garantiza que se renderice con las dimensiones correctas del contenedor visible
-                    if (calendarGlobalInstance) {
-                        console.log('Destruyendo calendario existente...');
-                        calendarGlobalInstance.destroy();
-                        calendarGlobalInstance = null;
-                    }
-
-                    console.log('Creando calendario...');
-                    initializeGlobalCalendar();
-                });
-                
-                // 🔥 SOLUCIÓN URGENTE: Si el tab de AGENDA GLOBAL está activo al cargar la página, inicializar inmediatamente
-                setTimeout(function() {
-                    if (globalTabButton.classList.contains('active')) {
-                        console.log('🔥 Tab AGENDA GLOBAL activo al inicio - Inicializando calendario...');
+                    if (!calendarInitialized) {
+                        console.log('🔥 INICIALIZANDO calendario');
+                        calendarInitialized = true;
+                        initializeGlobalCalendar();
+                    } else {
+                        if (calendarGlobalInstance) calendarGlobalInstance.destroy();
                         initializeGlobalCalendar();
                     }
-                }, 500);
+                });
             } else {
-                console.error('❌ Botón tabGlobalBtn NO encontrado');
+                console.error('❌ Botón NO encontrado');
             }
 
-            // ========== INVENTARIO - USANDO EVENTO BOOTSTRAP CORRECTO ==========
+            // ========== INVENTARIO - SOLUCIÓN DEFINITIVA ==========
             const stockTabButton = document.querySelector('button[data-bs-target="#stock"]');
             if (stockTabButton) {
                 console.log('✅ Botón stock encontrado');
 
+                let stockInitialized = false;
+
                 stockTabButton.addEventListener('shown.bs.tab', function (e) {
-                    console.log('📦 Evento shown.bs.tab disparado - Tab stock visible');
-                    loadStockTree();
-                });
-                
-                // 🔥 SOLUCIÓN URGENTE: Si el tab de STOCK está activo al cargar la página, cargar inmediatamente
-                setTimeout(function() {
-                    if (stockTabButton.classList.contains('active')) {
-                        console.log('🔥 Tab STOCK activo al inicio - Cargando inventario...');
+                    if (!stockInitialized) {
+                        console.log('🔥 CARGANDO inventario');
+                        stockInitialized = true;
+                        loadStockTree();
+                    } else {
                         loadStockTree();
                     }
-                }, 500);
+                });
             } else {
-                console.error('❌ Botón stock NO encontrado');
+                console.error('❌ Botón NO encontrado');
             }
 
             // ========== CONFIGURACIÓN - USANDO EVENTO BOOTSTRAP CORRECTO ==========
