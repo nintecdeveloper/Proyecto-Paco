@@ -390,18 +390,26 @@
                             <label class="form-check-label small" for="radioRemoved">Retirado</label>
                         </div>
                     </div>
-                    <div class="row g-2">
-                        <div class="col-8">
-                            <select name="stock_item" class="form-select">
-                                <option value="">Sin artículo de stock</option>
-                                {% for item in stock_items %}
-                                <option value="{{ item.id }}">{{ item.name }} ({{ item.quantity }} disponibles)</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-4">
-                            <input type="number" name="stock_qty" class="form-control" min="0" value="0"
-                                placeholder="Cant.">
+                    <div id="stockItemsContainer">
+                        <div class="row g-2 mb-2 stock-item-row">
+                            <div class="col-7">
+                                <select name="stock_item[]" class="form-select">
+                                    <option value="">Sin artículo de stock</option>
+                                    {% for item in stock_items %}
+                                    <option value="{{ item.id }}">{{ item.name }} ({{ item.quantity }} disponibles)
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-3">
+                                <input type="number" name="stock_qty[]" class="form-control" min="0" value="0"
+                                    placeholder="Cant.">
+                            </div>
+                            <div class="col-2">
+                                <button type="button" class="btn btn-success btn-sm w-100" onclick="addStockItem()">
+                                    <i class="bi bi-plus-lg"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
                     <div class="mt-2">
@@ -438,7 +446,8 @@
                     </label>
                     <small class="text-muted d-block mb-3">
                         <i class="bi bi-info-circle me-1"></i>
-                        Solicite al cliente que firme en el recuadro blanco para confirmar la asistencia y conformidad con el
+                        Solicite al cliente que firme en el recuadro blanco para confirmar la asistencia y conformidad
+                        con el
                         trabajo realizado.
                     </small>
 
@@ -627,16 +636,16 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <!-- Estado del trabajo -->
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <span id="evtStatus" class="badge p-2"></span>
                     </div>
-                    
+
                     <!-- Descripción del trabajo -->
                     <h6 class="text-warning fw-bold mb-2">Descripción del Trabajo:</h6>
                     <p class="small text-muted bg-black p-3 rounded border border-secondary" id="evtDesc"></p>
-                    
+
                     <input type="hidden" id="evtId">
                     <input type="hidden" id="evtClientId">
                 </div>
@@ -963,7 +972,7 @@
                 }
             });
             calendar.render();
-            
+
             // Agregar listener al checkbox de completadas
             const toggleCheckbox = document.getElementById('toggleCompleted');
             if (toggleCheckbox && !toggleCheckbox.hasAttribute('data-listener-added')) {
@@ -994,7 +1003,7 @@
             // CARGAR INFORMACIÓN DEL CLIENTE
             const clientInfoContainer = document.getElementById('evtClientInfo');
             const clientId = evt.extendedProps.client_id;
-            
+
             if (clientId) {
                 // Hacer petición al servidor para obtener información del cliente
                 fetch(`/api/client/${clientId}`)
@@ -1030,10 +1039,18 @@
                                             <i class="bi bi-geo-alt-fill text-warning me-2" style="font-size: 1.1rem;"></i>
                                             <strong class="text-white">Dirección:</strong>
                                         </div>
-                                        <span class="text-white fw-bold d-block" style="font-size: 1.05rem;">${client.address}</span>
+                                        <span class="text-white fw-bold d-block" style="font-size: 1.05rem;" id="clientAddress">${client.address}</span>
+                                        <div class="d-flex gap-2 mt-2">
+                                            <button class="btn btn-sm btn-outline-info flex-fill" onclick="copyAddress('${client.address.replace(/'/g, "\\'")}')">
+                                                <i class="bi bi-clipboard me-1"></i>Copiar
+                                            </button>
+                                            <a href="https://www.google.com/maps" target="_blank" class="btn btn-sm btn-outline-warning flex-fill">
+                                                <i class="bi bi-map me-1"></i>Abrir Maps
+                                            </a>
+                                        </div>
                                     </div>
                             `;
-                            
+
                             if (client.link) {
                                 html += `
                                     <div class="col-md-12 mt-2">
@@ -1043,7 +1060,7 @@
                                     </div>
                                 `;
                             }
-                            
+
                             if (client.has_support) {
                                 html += `
                                     <div class="col-md-12 mt-2">
@@ -1057,7 +1074,7 @@
                                     </div>
                                 `;
                             }
-                            
+
                             if (client.notes) {
                                 html += `
                                     <div class="col-md-12 mt-3 pt-2 border-top border-secondary">
@@ -1069,7 +1086,7 @@
                                     </div>
                                 `;
                             }
-                            
+
                             html += `</div>`;
                             clientInfoContainer.innerHTML = html;
                         } else {
@@ -1229,7 +1246,7 @@
 
         function deleteFromList(id) {
             if (!confirm('¿Eliminar esta tarea terminada?')) return;
-            
+
             fetch(`/api/task_action/${id}/delete`, { method: 'POST' })
                 .then(res => {
                     if (!res.ok) {
@@ -1280,7 +1297,7 @@
                 'cancel': 'cancelar'
             };
             const actionName = actionNames[action] || action;
-            
+
             if (!confirm(`¿Confirmar ${actionName} esta tarea?`)) return;
 
             fetch(`/api/task_action/${id}/${action}`, { method: 'POST' })
@@ -1294,7 +1311,7 @@
                     if (data.success) {
                         calendar.refetchEvents();
                         modalAction.hide();
-                        
+
                         // Mostrar mensaje de éxito
                         setTimeout(() => {
                             const successMsg = action === 'delete' ? 'Tarea eliminada correctamente' : 'Acción completada correctamente';
@@ -1667,7 +1684,7 @@
             lastX: 0,
             lastY: 0,
 
-            init: function() {
+            init: function () {
                 this.canvas = document.getElementById('signaturePadMain');
                 if (!this.canvas) return;
 
@@ -1700,14 +1717,14 @@
                 this.canvas.addEventListener('touchend', () => this.stopDrawing());
             },
 
-            startDrawing: function(e) {
+            startDrawing: function (e) {
                 this.isDrawing = true;
                 const rect = this.canvas.getBoundingClientRect();
                 this.lastX = e.clientX - rect.left;
                 this.lastY = e.clientY - rect.top;
             },
 
-            draw: function(e) {
+            draw: function (e) {
                 if (!this.isDrawing) return;
 
                 const rect = this.canvas.getBoundingClientRect();
@@ -1723,11 +1740,11 @@
                 this.lastY = currentY;
             },
 
-            stopDrawing: function() {
+            stopDrawing: function () {
                 this.isDrawing = false;
             },
 
-            handleTouch: function(e) {
+            handleTouch: function (e) {
                 e.preventDefault();
                 const touch = e.touches[0];
                 if (!touch) return;
@@ -1744,19 +1761,19 @@
                 this.canvas.dispatchEvent(mouseEvent);
             },
 
-            clear: function() {
+            clear: function () {
                 if (!this.canvas || !this.ctx) return;
                 this.ctx.fillStyle = '#fff';
                 this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
                 document.getElementById('mainSignaturePreview').style.display = 'none';
             },
 
-            toDataURL: function() {
+            toDataURL: function () {
                 if (!this.canvas) return null;
                 return this.canvas.toDataURL('image/png');
             },
 
-            isEmpty: function() {
+            isEmpty: function () {
                 if (!this.canvas) return true;
 
                 const pixelData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height).data;
@@ -1771,7 +1788,7 @@
                 return true;
             },
 
-            preview: function() {
+            preview: function () {
                 if (this.isEmpty()) {
                     alert('La firma está vacía. Por favor, firme en el recuadro.');
                     return;
@@ -1797,10 +1814,10 @@
 
         // Inicializar firma cuando se muestra la sección de parte
         // VALIDACIÓN DEL FORMULARIO ANTES DE ENVIAR
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             const reportForm = document.querySelector('form[action="/save_report"]');
             if (reportForm) {
-                reportForm.addEventListener('submit', function(e) {
+                reportForm.addEventListener('submit', function (e) {
                     // Validar nombre del firmante
                     const signatureName = document.getElementById('signatureName').value.trim();
                     if (!signatureName) {
@@ -2100,10 +2117,10 @@
 
 
         // ==================== INFORMACIÓN DEL CLIENTE ====================
-        
+
         function fillFromTask(selectElement) {
             const selected = selectElement.options[selectElement.selectedIndex];
-            
+
             if (selected.value === 'none') {
                 document.getElementById('fieldClient').value = '';
                 document.getElementById('fieldDate').value = document.querySelector('[name="date"]').value;
@@ -2113,19 +2130,19 @@
                 hideClientInfo();
                 return;
             }
-            
+
             const taskId = selected.value;
-            
+
             fetch(`/api/get_task_full/${taskId}`)
                 .then(res => res.json())
                 .then(response => {
                     if (response.success) {
                         const task = response.data;
-                        
+
                         document.getElementById('fieldClient').value = task.client_name;
                         document.getElementById('fieldDate').value = task.date;
                         document.getElementById('fieldEntryTime').value = task.start_time;
-                        
+
                         // Seleccionar tipo de servicio
                         const serviceSelect = document.getElementById('fieldService');
                         for (let opt of serviceSelect.options) {
@@ -2134,9 +2151,9 @@
                                 break;
                             }
                         }
-                        
+
                         document.getElementById('fieldDescription').value = task.description;
-                        
+
                         // Mostrar información del cliente
                         if (task.client_info) {
                             showClientInfo(task.client_info);
@@ -2145,10 +2162,10 @@
                 })
                 .catch(err => console.error('Error:', err));
         }
-        
+
         function showClientInfo(clientInfo) {
             let infoDiv = document.getElementById('clientInfoDisplay');
-            
+
             if (!infoDiv) {
                 infoDiv = document.createElement('div');
                 infoDiv.id = 'clientInfoDisplay';
@@ -2158,7 +2175,7 @@
                 infoDiv.style.color = 'white';
                 document.querySelector('#fieldClient').parentElement.appendChild(infoDiv);
             }
-            
+
             let html = `
                 <div class="d-flex justify-content-between align-items-start">
                     <div class="flex-grow-1">
@@ -2208,42 +2225,101 @@
                     <button type="button" class="btn-close btn-close-white" onclick="hideClientInfo()"></button>
                 </div>
             `;
-            
+
             infoDiv.innerHTML = html;
             infoDiv.style.display = 'block';
         }
-        
+
         function hideClientInfo() {
             const infoDiv = document.getElementById('clientInfoDisplay');
             if (infoDiv) {
                 infoDiv.style.display = 'none';
             }
         }
-        
+
         // Actualizar calendario después de crear cita
         const formNewAppt = document.querySelector('#modalNewAppointmentTech form');
         if (formNewAppt && !formNewAppt.hasAttribute('data-enhanced')) {
             formNewAppt.setAttribute('data-enhanced', 'true');
-            formNewAppt.addEventListener('submit', function(e) {
+            formNewAppt.addEventListener('submit', function (e) {
                 e.preventDefault();
                 const formData = new FormData(this);
                 fetch('/create_appointment', {
                     method: 'POST',
                     body: formData
                 })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success) {
-                        bootstrap.Modal.getInstance(document.getElementById('modalNewAppointmentTech')).hide();
-                        if (window.techCalendar) window.techCalendar.refetchEvents();
-                        alert('✓ Cita creada');
-                        this.reset();
-                        location.reload();
-                    } else {
-                        alert('Error: ' + data.msg);
-                    }
-                });
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success) {
+                            bootstrap.Modal.getInstance(document.getElementById('modalNewAppointmentTech')).hide();
+                            if (window.techCalendar) window.techCalendar.refetchEvents();
+                            alert('✓ Cita creada');
+                            this.reset();
+                            location.reload();
+                        } else {
+                            alert('Error: ' + data.msg);
+                        }
+                    })
+                    .catch(err => {
+                        console.error('Error:', err);
+                        alert('Error al crear cita');
+                    });
             });
+        }
+
+        // Función para copiar dirección al portapapeles
+        function copyAddress(address) {
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(address)
+                    .then(() => {
+                        alert('✓ Dirección copiada al portapapeles');
+                    })
+                    .catch(err => {
+                        console.error('Error al copiar:', err);
+                        alert('No se pudo copiar la dirección');
+                    });
+            } else {
+                // Fallback para navegadores antiguos
+                const textarea = document.createElement('textarea');
+                textarea.value = address;
+                textarea.style.position = 'fixed';
+                textarea.style.opacity = '0';
+                document.body.appendChild(textarea);
+                textarea.select();
+                try {
+                    document.execCommand('copy');
+                    alert('✓ Dirección copiada al portapapeles');
+                } catch (err) {
+                    console.error('Error al copiar:', err);
+                    alert('No se pudo copiar la dirección');
+                }
+                document.body.removeChild(textarea);
+            }
+        }
+
+        // Función para añadir más items de stock
+        function addStockItem() {
+            const container = document.getElementById('stockItemsContainer');
+            const firstRow = container.querySelector('.stock-item-row');
+            const newRow = firstRow.cloneNode(true);
+
+            // Limpiar valores
+            newRow.querySelector('select').selectedIndex = 0;
+            newRow.querySelector('input[type="number"]').value = 0;
+
+            // Cambiar botón de + a -
+            const button = newRow.querySelector('button');
+            button.className = 'btn btn-danger btn-sm w-100';
+            button.innerHTML = '<i class="bi bi-dash-lg"></i>';
+            button.setAttribute('onclick', 'removeStockItem(this)');
+
+            container.appendChild(newRow);
+        }
+
+        // Función para eliminar item de stock
+        function removeStockItem(button) {
+            const row = button.closest('.stock-item-row');
+            row.remove();
         }
 
     </script>

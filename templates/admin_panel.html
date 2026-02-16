@@ -458,21 +458,6 @@
                             </div>
                         </div>
                     </div>
-
-                    <!-- Gráfico de Línea de Tareas Mensuales -->
-                    <div class="col-md-6">
-                        <div class="card bg-dark border-secondary">
-                            <div class="card-header bg-black border-secondary">
-                                <h6 class="text-white fw-bold mb-0">
-                                    <i class="bi bi-graph-up me-2 text-info"></i>
-                                    Evolución Mensual de Tareas
-                                </h6>
-                            </div>
-                            <div class="card-body">
-                                <canvas id="monthlyTasksChart" style="max-height: 300px;"></canvas>
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </div>
 
@@ -1456,7 +1441,7 @@
                     <h5 class="modal-title">Nueva Categoría/Subcategoría</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <form method="POST" action="/manage_stock_categories" onsubmit="return validateCategoryForm()">
+                <form id="categoryForm">
                     <div class="modal-body">
                         <input type="hidden" name="action" value="add">
 
@@ -2303,16 +2288,41 @@
             }
         }
 
-        function validateCategoryForm() {
+        // Manejar envío del formulario de categorías con AJAX
+        document.getElementById('categoryForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
             const type = document.getElementById('categoryType').value;
             const parentId = document.getElementById('parentCategorySelect').value;
 
             if (type === 'sub' && !parentId) {
                 alert('Por favor, selecciona una categoría padre para la subcategoría');
-                return false;
+                return;
             }
-            return true;
-        }
+
+            const formData = new FormData(this);
+            
+            fetch('/manage_stock_categories', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.msg || 'Categoría creada correctamente');
+                    loadCategoriesTree();
+                    bootstrap.Modal.getInstance(document.getElementById('modalAddCategory')).hide();
+                    this.reset();
+                    document.getElementById('parentCategoryDiv').style.display = 'none';
+                } else {
+                    alert('Error: ' + (data.msg || 'Error desconocido'));
+                }
+            })
+            .catch(err => {
+                console.error('Error:', err);
+                alert('Error al crear la categoría');
+            });
+        });
 
         function loadMainCategoriesForParent() {
             fetch('/api/stock_categories')
@@ -2527,7 +2537,6 @@
         // ==================== ESTADÍSTICAS GLOBALES ====================
 
         let taskTypesPieChart = null;
-        let monthlyTasksChart = null;
 
         function loadAdminStatistics() {
             const techId = document.getElementById('statsFilterTech').value;
@@ -2551,9 +2560,6 @@
 
                         // Crear gráfico circular de tipos de tareas
                         createTaskTypesPieChart(data.task_types);
-
-                        // Crear gráfico de línea de tareas mensuales
-                        createMonthlyTasksChart(data.monthly_tasks);
                     } else {
                         alert('Error al cargar estadísticas: ' + response.msg);
                     }
@@ -2636,68 +2642,6 @@
             });
         }
 
-        function createMonthlyTasksChart(monthlyData) {
-            const canvas = document.getElementById('monthlyTasksChart');
-
-            if (!monthlyData || monthlyData.length === 0) {
-                return;
-            }
-
-            const labels = monthlyData.map(m => m.month);
-            const counts = monthlyData.map(m => m.count);
-
-            // Destruir gráfico anterior si existe
-            if (monthlyTasksChart) {
-                monthlyTasksChart.destroy();
-            }
-
-            // Crear nuevo gráfico
-            const ctx = canvas.getContext('2d');
-            monthlyTasksChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Tareas Completadas',
-                        data: counts,
-                        borderColor: '#0d6efd',
-                        backgroundColor: 'rgba(13, 110, 253, 0.1)',
-                        borderWidth: 3,
-                        fill: true,
-                        tension: 0.4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: true,
-                    plugins: {
-                        legend: {
-                            display: false
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                color: '#fff',
-                                stepSize: 1
-                            },
-                            grid: {
-                                color: '#333'
-                            }
-                        },
-                        x: {
-                            ticks: {
-                                color: '#fff'
-                            },
-                            grid: {
-                                color: '#333'
-                            }
-                        }
-                    }
-                }
-            });
-        }
 
         // ==================== INICIALIZACIÓN ====================
 

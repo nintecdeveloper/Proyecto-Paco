@@ -721,7 +721,6 @@ def manage_stock_categories():
         print(f"Error inesperado en manage_stock_categories: {str(e)}")
         return jsonify({'success': False, 'msg': f'Error: {str(e)}'})
 
-# --- GESTIÓN DE TAREAS Y CITAS ---
 @app.route('/save_report', methods=['POST'])
 @login_required
 def save_report():
@@ -736,9 +735,9 @@ def save_report():
         description = request.form.get('description')
         parts_text = request.form.get('parts_text', '')
         
-        # Stock
-        stock_item_id = request.form.get('stock_item')
-        stock_qty = request.form.get('stock_qty', 0)
+        # Stock - Ahora soporta múltiples items
+        stock_item_ids = request.form.getlist('stock_item[]')
+        stock_qtys = request.form.getlist('stock_qty[]')
         stock_action = request.form.get('stock_action', 'used')
         
         # Firma digital
@@ -758,6 +757,27 @@ def save_report():
             flash('Tipo de servicio no válido', 'danger')
             return redirect(url_for('dashboard'))
         
+        # Procesar items de stock
+        stock_items_used = []
+        for i, item_id in enumerate(stock_item_ids):
+            if item_id and item_id != '' and int(item_id) > 0:
+                qty = int(stock_qtys[i]) if i < len(stock_qtys) and stock_qtys[i] else 0
+                if qty > 0:
+                    stock_item = Stock.query.get(int(item_id))
+                    if stock_item:
+                        # Actualizar cantidad en stock
+                        if stock_action == 'used' or stock_action == 'removed':
+                            stock_item.quantity -= qty
+                        elif stock_action == 'added':
+                            stock_item.quantity += qty
+                        
+                        stock_items_used.append({
+                            'id': stock_item.id,
+                            'name': stock_item.name,
+                            'quantity': qty,
+                            'action': stock_action
+                        })
+        
         # Si hay una cita vinculada, actualizar esa tarea
         if linked_task_id and linked_task_id != 'none':
             task = Task.query.get(int(linked_task_id))
@@ -769,21 +789,17 @@ def save_report():
                 task.signature_client_name = signature_name
                 task.signature_timestamp = datetime.now()
                 task.status = 'Completado'
-                task.actual_end_time = datetime.now()
+                task.work_end_time = datetime.now()
                 
-                # Manejar stock si aplica
-                if stock_item_id and int(stock_item_id) > 0:
-                    stock_item = Stock.query.get(int(stock_item_id))
-                    if stock_item:
-                        quantity = int(stock_qty)
-                        task.stock_item_id = stock_item.id
-                        task.stock_quantity_used = quantity
-                        task.stock_action = stock_action
-                        
-                        if stock_action == 'used' or stock_action == 'removed':
-                            stock_item.quantity -= quantity
-                        elif stock_action == 'added':
-                            stock_item.quantity += quantity
+                # Guardar items de stock como JSON (usamos el campo parts_text ampliado)
+                if stock_items_used:
+                    task.stock_item_id = stock_items_used[0]['id']  # Primer item para compatibilidad
+                    task.stock_quantity_used = stock_items_used[0]['quantity']
+                    task.stock_action = stock_action
+                    # Guardar todos los items en parts_text si hay más de uno
+                    if len(stock_items_used) > 1:
+                        stock_details = ', '.join([f"{item['name']} ({item['quantity']})" for item in stock_items_used])
+                        task.parts_text = f"{parts_text}\n[Stock: {stock_details}]" if parts_text else f"[Stock: {stock_details}]"
                 
                 db.session.commit()
                 check_low_stock()
@@ -806,22 +822,17 @@ def save_report():
             signature_client_name=signature_name,
             signature_timestamp=datetime.now(),
             status='Completado',
-            actual_end_time=datetime.now()
+            work_end_time=datetime.now()
         )
         
-        # Manejar stock
-        if stock_item_id and int(stock_item_id) > 0:
-            stock_item = Stock.query.get(int(stock_item_id))
-            if stock_item:
-                quantity = int(stock_qty)
-                new_task.stock_item_id = stock_item.id
-                new_task.stock_quantity_used = quantity
-                new_task.stock_action = stock_action
-                
-                if stock_action == 'used' or stock_action == 'removed':
-                    stock_item.quantity -= quantity
-                elif stock_action == 'added':
-                    stock_item.quantity += quantity
+        # Guardar items de stock
+        if stock_items_used:
+            new_task.stock_item_id = stock_items_used[0]['id']
+            new_task.stock_quantity_used = stock_items_used[0]['quantity']
+            new_task.stock_action = stock_action
+            if len(stock_items_used) > 1:
+                stock_details = ', '.join([f"{item['name']} ({item['quantity']})" for item in stock_items_used])
+                new_task.parts_text = f"{parts_text}\n[Stock: {stock_details}]" if parts_text else f"[Stock: {stock_details}]"
         
         db.session.add(new_task)
         db.session.commit()
