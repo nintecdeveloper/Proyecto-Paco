@@ -1301,7 +1301,10 @@ def get_tech_analytics():
     
     # Calcular estadísticas
     total_services = len(tasks)
-    total_maintenances = sum(1 for t in tasks if t.service_type and 'manten' in t.service_type.name.lower())
+    
+    # Contar mantenimientos dinámicamente usando el nombre del servicio
+    maint_service = ServiceType.query.filter_by(name='Mantenimiento').first()
+    total_maintenances = sum(1 for t in tasks if maint_service and t.service_type_id == maint_service.id)
     
     # Tiempo promedio
     total_time = 0
@@ -1314,10 +1317,15 @@ def get_tech_analytics():
     
     avg_time = round(total_time / time_count, 1) if time_count > 0 else 0
     
-    # Distribución por tipo de servicio
+    # Distribución por tipo de servicio (incluye servicios personalizados)
     service_distribution = {}
     for task in tasks:
-        service_name = task.service_type.name if task.service_type else 'Sin tipo'
+        if task.service_type:
+            service_name = task.service_type.name
+        elif task.custom_service_name:
+            service_name = task.custom_service_name
+        else:
+            service_name = 'Sin tipo'
         service_distribution[service_name] = service_distribution.get(service_name, 0) + 1
     
     # Timeline de los últimos meses
