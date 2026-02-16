@@ -2886,26 +2886,40 @@
             console.log('✅ Container encontrado');
             container.innerHTML = '<div class="text-center text-muted py-5"><i class="bi bi-hourglass-split fs-1 text-warning"></i><br><br><strong>Cargando inventario...</strong></div>';
 
-            console.log('Haciendo fetch a /api/stock_categories');
+            console.log('📡 Haciendo fetch a /api/stock_categories');
             fetch('/api/stock_categories')
                 .then(res => {
-                    console.log('Respuesta del servidor:', res.status, res.statusText);
+                    console.log('📥 Respuesta del servidor:', res.status, res.statusText);
                     if (!res.ok) {
                         throw new Error(`HTTP ${res.status}: ${res.statusText}`);
                     }
                     return res.json();
                 })
                 .then(data => {
-                    console.log('✅ Datos recibidos:', data.length, 'categorías');
-                    console.log('Datos:', data);
+                    console.log('📊 Tipo de datos recibidos:', typeof data, Array.isArray(data) ? `Array[${data.length}]` : 'No es array');
+                    console.log('📦 Datos completos:', data);
+                    
+                    // VALIDACIÓN CRÍTICA: Verificar que data es un array
+                    if (!Array.isArray(data)) {
+                        console.error('❌ ERROR: Los datos recibidos no son un array válido');
+                        throw new Error(`Formato de datos incorrecto. Recibido: ${typeof data}`);
+                    }
+                    
+                    console.log(`✅ Datos validados: ${data.length} categorías`);
                     updateStockTreeView(data);
                 })
                 .catch(err => {
-                    console.error('❌ ERROR:', err);
+                    console.error('❌ ERROR AL CARGAR INVENTARIO:', err);
+                    console.error('Tipo:', err.constructor.name);
+                    console.error('Mensaje:', err.message);
+                    console.error('Stack:', err.stack);
+                    
                     container.innerHTML = `
                         <div class="alert alert-danger m-3">
                             <h6><i class="bi bi-exclamation-triangle me-2"></i>Error al cargar inventario</h6>
-                            <p class="mb-2 small">${err.message}</p>
+                            <p class="mb-2 small"><strong>Error:</strong> ${err.message}</p>
+                            <p class="mb-2 small"><strong>Tipo:</strong> ${err.constructor.name}</p>
+                            <p class="mb-0 small text-muted">Revisa la consola del navegador (F12) para más detalles</p>
                             <button class="btn btn-sm btn-outline-danger mt-2" onclick="loadStockTree()">
                                 <i class="bi bi-arrow-clockwise"></i> Reintentar
                             </button>
@@ -2915,26 +2929,60 @@
         }
 
         function updateStockTreeView(categories) {
-            console.log('📦 Renderizando vista de categorías...');
+            console.log('📦 === RENDERIZANDO VISTA DE CATEGORÍAS ===');
             console.log('Categorías recibidas:', categories);
             const container = document.getElementById('stockCategoriesTree');
 
-            if (!categories || categories.length === 0) {
-                console.warn('⚠️ No hay categorías');
+            // VALIDACIÓN CRÍTICA: Verificar el contenedor existe
+            if (!container) {
+                console.error('❌ Container stockCategoriesTree no encontrado en DOM');
+                return;
+            }
+
+            // VALIDACIÓN CRÍTICA: Verificar que categories es un array
+            if (!Array.isArray(categories)) {
+                console.error('❌ ERROR: categories no es un array. Tipo:', typeof categories);
+                container.innerHTML = `
+                    <div class="alert alert-warning m-3">
+                        <h6><i class="bi bi-exclamation-triangle me-2"></i>Error de formato</h6>
+                        <p class="mb-0 small">Los datos recibidos no tienen el formato esperado (Array)</p>
+                    </div>
+                `;
+                return;
+            }
+
+            if (categories.length === 0) {
+                console.warn('⚠️ No hay categorías en el array');
                 container.innerHTML = '<div class="text-center text-muted py-3"><i class="bi bi-inbox me-2"></i>No hay categorías creadas</div>';
                 return;
             }
 
-            console.log('Construyendo HTML...');
-            let html = '<div class="list-group">';
-            categories.forEach(cat => {
-                html += buildStockCategoryTreeHTML(cat, 0);
-            });
-            html += '</div>';
+            console.log(`✅ Procesando ${categories.length} categorías...`);
+            
+            try {
+                let html = '<div class="list-group">';
+                categories.forEach((cat, index) => {
+                    console.log(`Procesando categoría ${index + 1}/${categories.length}:`, cat.name);
+                    html += buildStockCategoryTreeHTML(cat, 0);
+                });
+                html += '</div>';
 
-            console.log('Insertando HTML en el DOM...');
-            container.innerHTML = html;
-            console.log('✅ INVENTARIO RENDERIZADO EXITOSAMENTE');
+                console.log('Insertando HTML en el DOM...');
+                container.innerHTML = html;
+                console.log('✅ INVENTARIO RENDERIZADO EXITOSAMENTE');
+            } catch (error) {
+                console.error('❌ ERROR AL CONSTRUIR HTML:', error);
+                console.error('Stack:', error.stack);
+                container.innerHTML = `
+                    <div class="alert alert-danger m-3">
+                        <h6><i class="bi bi-exclamation-triangle me-2"></i>Error al renderizar inventario</h6>
+                        <p class="mb-2 small"><strong>Error:</strong> ${error.message}</p>
+                        <button class="btn btn-sm btn-outline-danger mt-2" onclick="loadStockTree()">
+                            <i class="bi bi-arrow-clockwise"></i> Reintentar
+                        </button>
+                    </div>
+                `;
+            }
         }
 
         function buildStockCategoryTreeHTML(cat, level) {
@@ -3085,15 +3133,16 @@
                 globalTabButton.addEventListener('shown.bs.tab', function (e) {
                     console.log('📅 Evento shown.bs.tab disparado - Tab completamente visible');
                     
-                    if (!calendarGlobalInstance) {
-                        console.log('Creando calendario por primera vez...');
-                        initializeGlobalCalendar();
-                    } else {
-                        console.log('Re-renderizando calendario existente...');
-                        calendarGlobalInstance.render();
-                        calendarGlobalInstance.updateSize();
-                        updateGlobalFilters();
+                    // SOLUCIÓN DEFINITIVA: SIEMPRE destruir y recrear el calendario
+                    // Esto garantiza que se renderice con las dimensiones correctas del contenedor visible
+                    if (calendarGlobalInstance) {
+                        console.log('Destruyendo calendario existente...');
+                        calendarGlobalInstance.destroy();
+                        calendarGlobalInstance = null;
                     }
+                    
+                    console.log('Creando calendario...');
+                    initializeGlobalCalendar();
                 });
             } else {
                 console.error('❌ Botón tabGlobalBtn NO encontrado');
@@ -3156,7 +3205,7 @@
                     day: 'Día',
                     list: 'Lista'
                 },
-                contentHeight: 'auto', // Forzar altura automática
+                height: 650, // CRÍTICO: Altura fija para evitar cálculo incorrecto cuando el tab está oculto
                 navLinks: true,
                 editable: false,
                 dayMaxEvents: true,
@@ -3219,13 +3268,28 @@
             calendarGlobalInstance.render();
             console.log('✅ Calendario renderizado');
             
-            // CRÍTICO: Forzar actualización de dimensiones después del render
+            // CRÍTICO: Múltiples actualizaciones escalonadas para garantizar el ajuste correcto
+            // en diferentes navegadores y velocidades de renderizado
             setTimeout(function() {
                 if (calendarGlobalInstance) {
                     calendarGlobalInstance.updateSize();
-                    console.log('✅ Dimensiones actualizadas');
+                    console.log('✅ Dimensiones actualizadas (50ms)');
                 }
-            }, 100);
+            }, 50);
+            
+            setTimeout(function() {
+                if (calendarGlobalInstance) {
+                    calendarGlobalInstance.updateSize();
+                    console.log('✅ Dimensiones actualizadas (200ms)');
+                }
+            }, 200);
+            
+            setTimeout(function() {
+                if (calendarGlobalInstance) {
+                    calendarGlobalInstance.updateSize();
+                    console.log('✅ Dimensiones actualizadas (500ms)');
+                }
+            }, 500);
             
             updateGlobalFilters();
         }
