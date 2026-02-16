@@ -3056,44 +3056,41 @@
             
             const stockTabButton = document.querySelector('button[data-bs-target="#stock"]');
             if (stockTabButton) {
-                stockTabButton.addEventListener('click', function () {
-                    setTimeout(() => {
-                        console.log('📦 Cargando stock tree...');
-                        loadStockTree();
-                    }, 100);
+                console.log('📦 Botón de stock encontrado');
+                stockTabButton.addEventListener('shown.bs.tab', function () {
+                    console.log('📦 Pestaña de stock mostrada - cargando inventario');
+                    loadStockTree();
                 });
-                
-                // Cargar stock inmediatamente si la pestaña está activa
-                if (stockTabButton.classList.contains('active')) {
-                    console.log('📦 Stock tab activa - cargando inmediatamente');
-                    setTimeout(() => loadStockTree(), 500);
-                }
+            } else {
+                console.warn('⚠️ Botón de stock NO encontrado');
             }
 
             const configTabButton = document.querySelector('button[data-bs-target="#config"]');
             if (configTabButton) {
-                configTabButton.addEventListener('click', function () {
-                    setTimeout(() => {
-                        console.log('⚙️ Cargando categories tree...');
-                        loadCategoriesTree();
-                    }, 100);
+                console.log('⚙️ Botón de configuración encontrado');
+                configTabButton.addEventListener('shown.bs.tab', function () {
+                    console.log('⚙️ Pestaña de configuración mostrada - cargando categorías');
+                    loadCategoriesTree();
                 });
+            } else {
+                console.warn('⚠️ Botón de configuración NO encontrado');
             }
             
-            // Inicializar calendario global si el botón existe
+            // Inicializar calendario global usando el evento shown.bs.tab de Bootstrap
             const globalTabButton = document.getElementById('tabGlobalBtn');
             if (globalTabButton) {
                 console.log('📅 Botón calendario global encontrado');
-                globalTabButton.addEventListener('click', function () {
-                    setTimeout(() => {
-                        console.log('📅 Click en calendario global');
-                        if (!calendarGlobalInstance) {
-                            initializeGlobalCalendar();
-                        } else {
-                            calendarGlobalInstance.render();
-                            updateGlobalFilters();
-                        }
-                    }, 100);
+                globalTabButton.addEventListener('shown.bs.tab', function () {
+                    console.log('📅 Pestaña calendario global mostrada');
+                    if (!calendarGlobalInstance) {
+                        console.log('📅 Inicializando calendario global por primera vez');
+                        initializeGlobalCalendar();
+                    } else {
+                        console.log('📅 Re-renderizando calendario global existente');
+                        calendarGlobalInstance.render();
+                        calendarGlobalInstance.updateSize();
+                        updateGlobalFilters();
+                    }
                 });
             } else {
                 console.warn('⚠️ Botón calendario global NO encontrado');
