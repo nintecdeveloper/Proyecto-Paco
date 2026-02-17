@@ -687,8 +687,6 @@
                 <div class="modal-footer border-0 pt-0">
                     <button type="button" class="btn btn-outline-danger flex-grow-1"
                         onclick="performTaskAction('delete')">Eliminar</button>
-                    <button type="button" class="btn btn-success flex-grow-1" id="btnComplete"
-                        onclick="performTaskAction('complete')">Marcar Hecha</button>
                     <button type="button" class="btn btn-outline-warning flex-grow-1"
                         onclick="openEditTechModal()">Editar</button>
                 </div>
@@ -1032,13 +1030,6 @@
             const status = evt.extendedProps.status;
             badge.innerText = status;
             badge.className = 'badge p-2 ' + (status === 'Completado' ? 'bg-success' : 'bg-warning text-dark');
-
-            const btnComplete = document.getElementById('btnComplete');
-            if (status === 'Completado') {
-                btnComplete.style.display = 'none';
-            } else {
-                btnComplete.style.display = '';
-            }
 
             // CARGAR INFORMACIÓN DEL CLIENTE
             const clientInfoContainer = document.getElementById('evtClientInfo');
@@ -1657,7 +1648,15 @@
                     document.getElementById('totalServices').textContent = '0';
                     document.getElementById('totalMaintenances').textContent = '0';
                     document.getElementById('avgTime').textContent = '0h';
-                    alert('Error al cargar las analíticas. Por favor, intenta de nuevo.');
+                    // Mostrar mensaje en la UI en lugar de alert
+                    const container = document.querySelector('#section-analytics .row');
+                    if (container) {
+                        const errorDiv = document.createElement('div');
+                        errorDiv.className = 'col-12 alert alert-warning mt-3';
+                        errorDiv.innerHTML = '<i class="bi bi-exclamation-triangle me-2"></i>No se pudieron cargar las analíticas. Asegúrate de tener partes completados.';
+                        container.insertBefore(errorDiv, container.firstChild);
+                        setTimeout(() => errorDiv.remove(), 5000);
+                    }
                 });
         }
 

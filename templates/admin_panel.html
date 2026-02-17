@@ -3129,26 +3129,44 @@
             document.getElementById('attachModalClient').innerText = clientName;
 
             fetch(`/api/task/${taskId}/attachments`)
-                .then(res => res.json())
+                .then(res => {
+                    if (!res.ok) {
+                        throw new Error(`HTTP error! status: ${res.status}`);
+                    }
+                    return res.json();
+                })
                 .then(data => {
+                    console.log('Attachments data:', data); // Debug
                     const container = document.getElementById('attachmentsListContainer');
 
                     if (data.success && data.attachments && data.attachments.length > 0) {
                         let html = '<div class="list-group">';
                         data.attachments.forEach(att => {
-                            const sizeKB = (att.size / 1024).toFixed(1);
+                            // Asegurar que att tiene los campos necesarios
+                            const filename = att.filename || att;
+                            const originalName = att.original_name || filename;
+                            const size = att.size || 0;
+                            const sizeKB = (size / 1024).toFixed(1);
+                            
+                            console.log('Processing attachment:', { filename, originalName, size }); // Debug
+                            
                             html += `
                                 <div class="list-group-item bg-dark text-white border-secondary mb-2">
                                     <div class="d-flex justify-content-between align-items-center">
                                         <div>
                                             <i class="bi bi-file-earmark text-info me-2"></i>
-                                            <strong>${att.original_name}</strong>
+                                            <strong>${originalName}</strong>
                                             <br>
                                             <small class="text-muted">${sizeKB} KB</small>
                                         </div>
-                                        <a href="/uploads/${att.filename}" target="_blank" class="btn btn-sm btn-success" download>
-                                            <i class="bi bi-download"></i> Descargar
-                                        </a>
+                                        <div class="d-flex gap-2">
+                                            <a href="/uploads/${filename}" target="_blank" class="btn btn-sm btn-info">
+                                                <i class="bi bi-eye"></i> Ver
+                                            </a>
+                                            <a href="/uploads/${filename}" download="${originalName}" class="btn btn-sm btn-success">
+                                                <i class="bi bi-download"></i> Descargar
+                                            </a>
+                                        </div>
                                     </div>
                                 </div>
                             `;
@@ -3163,7 +3181,7 @@
                 })
                 .catch(err => {
                     console.error('Error cargando archivos:', err);
-                    alert('Error al cargar los archivos adjuntos');
+                    alert('Error al cargar los archivos adjuntos: ' + err.message);
                 });
         }
 

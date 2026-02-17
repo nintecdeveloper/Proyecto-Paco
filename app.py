@@ -1117,8 +1117,8 @@ def get_task_details(task_id):
             'has_signature': bool(task.signature_data),
             'signature_client_name': task.signature_client_name,
             'signature_timestamp': task.signature_timestamp.strftime('%d/%m/%Y %H:%M') if task.signature_timestamp else None,
-            'actual_start_time': task.actual_start_time.strftime('%H:%M') if task.actual_start_time else None,
-            'actual_end_time': task.actual_end_time.strftime('%H:%M') if task.actual_end_time else None,
+            'work_start_time': task.work_start_time.strftime('%H:%M') if task.work_start_time else None,
+            'work_end_time': task.work_end_time.strftime('%H:%M') if task.work_end_time else None,
             'stock_info': {
                 'item_name': task.stock_item.name if task.stock_item else None,
                 'quantity': task.stock_quantity_used,
@@ -1156,8 +1156,8 @@ def get_tech_analytics():
     total_time = 0
     time_count = 0
     for task in tasks:
-        if task.actual_start_time and task.actual_end_time:
-            duration = (task.actual_end_time - task.actual_start_time).total_seconds() / 3600
+        if task.work_start_time and task.work_end_time:
+            duration = (task.work_end_time - task.work_start_time).total_seconds() / 3600
             total_time += duration
             time_count += 1
     
@@ -1235,8 +1235,8 @@ def get_tech_stats(tech_id):
             'has_signature': bool(task.signature_data)
         })
         
-        if task.actual_start_time and task.actual_end_time:
-            duration = (task.actual_end_time - task.actual_start_time).total_seconds() / 3600
+        if task.work_start_time and task.work_end_time:
+            duration = (task.work_end_time - task.work_start_time).total_seconds() / 3600
             total_time += duration
     
     return jsonify({
@@ -1963,29 +1963,40 @@ def api_get_task_attachments(task_id):
                     for item in attachments_data:
                         if isinstance(item, dict):
                             # Formato nuevo: ya tiene metadata
-                            attachments_list.append(item)
+                            # Asegurar que tiene todos los campos necesarios
+                            attachments_list.append({
+                                'filename': item.get('filename', ''),
+                                'original_name': item.get('original_name', item.get('filename', 'archivo')),
+                                'size': item.get('size', 0)
+                            })
                         else:
-                            # Formato antiguo: solo nombre de archivo
-                            filepath = os.path.join(app.config['UPLOAD_FOLDER'], item)
+                            # Formato antiguo: solo nombre de archivo (string)
+                            filename = str(item)
+                            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                            
+                            # Extraer nombre original del filename
+                            # Formato: task_X_TIMESTAMP_originalname.ext
+                            parts = filename.split('_', 3)
+                            original_name = parts[-1] if len(parts) >= 4 else filename
+                            
+                            # Obtener tamaño del archivo si existe
+                            file_size = 0
                             if os.path.exists(filepath):
-                                # Extraer nombre original
-                                parts = item.split('_', 3)
-                                original_name = parts[-1] if len(parts) >= 4 else item
-                                
-                                attachments_list.append({
-                                    'filename': item,
-                                    'original_name': original_name,
-                                    'size': os.path.getsize(filepath)
-                                })
-                            else:
-                                # Archivo no encontrado, pero lo incluimos de todos modos
-                                attachments_list.append({
-                                    'filename': item,
-                                    'original_name': item,
-                                    'size': 0
-                                })
+                                try:
+                                    file_size = os.path.getsize(filepath)
+                                except:
+                                    file_size = 0
+                            
+                            attachments_list.append({
+                                'filename': filename,
+                                'original_name': original_name,
+                                'size': file_size
+                            })
+            except json.JSONDecodeError as e:
+                print(f"Error parsing attachments JSON: {e}")
+                attachments_list = []
             except Exception as e:
-                print(f"Error parsing attachments: {e}")
+                print(f"Error processing attachments: {e}")
                 attachments_list = []
         
         return jsonify({
@@ -1993,6 +2004,7 @@ def api_get_task_attachments(task_id):
             'attachments': attachments_list
         })
     except Exception as e:
+        print(f"Error in api_get_task_attachments: {e}")
         return jsonify({'success': False, 'msg': str(e)}), 500
 
 @app.route('/api/client/<int:client_id>')
