@@ -1682,20 +1682,23 @@ def create_appointment():
         # Convertir fecha
         task_date = datetime.strptime(date_str, '%Y-%m-%d').date()
         
-        # Verificar si ya existe una cita para este técnico en la misma fecha y hora
-        existing_task = Task.query.filter_by(
-            tech_id=current_user.id,
-            client_name=client_name,
-            date=task_date,
-            start_time=start_time,
-            status='Pendiente'
-        ).first()
-        
-        if existing_task:
-            return jsonify({
-                'success': False,
-                'msg': 'Ya existe una cita para este cliente en la misma fecha y hora'
-            }), 400
+        # ✅ MEJORADO: Solo verificar conflicto de horario para el técnico (no importa el cliente)
+        # Esto permite múltiples citas a la misma hora si son clientes diferentes
+        # Solo alertar si es exactamente el mismo cliente en la misma fecha/hora
+        if client_name:  # Solo verificar si hay nombre de cliente
+            existing_task = Task.query.filter_by(
+                tech_id=current_user.id,
+                client_name=client_name,
+                date=task_date,
+                start_time=start_time,
+                status='Pendiente'
+            ).first()
+            
+            if existing_task:
+                return jsonify({
+                    'success': False,
+                    'msg': f'Ya existe una cita pendiente para {client_name} en esta fecha y hora'
+                }), 400
         
         # Crear tarea
         new_task = Task(
@@ -2116,6 +2119,7 @@ with app.app_context():
             {'name': 'Avería', 'color': '#fd7e14'},
             {'name': 'Revisión', 'color': '#0d6efd'},
             {'name': 'Instalación', 'color': '#6f42c1'},
+            {'name': 'Mantenimiento', 'color': '#ffc107'},
             {'name': 'Otros servicios', 'color': '#20c997'}
         ]
         for s in servicios:
