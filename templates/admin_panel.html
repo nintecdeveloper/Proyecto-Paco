@@ -187,6 +187,35 @@
                 font-size: 0.8em;
             }
         }
+
+        /* Task List Styles */
+        .task-list-container {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .task-item {
+            background: #1f1f1f;
+            border-left: 4px solid #444;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .task-item:hover {
+            background: #2a2a2a;
+        }
+
+        .task-item.status-Completado {
+            border-left-color: #198754;
+            opacity: 0.7;
+        }
+
+        .task-item.status-Pendiente {
+            border-left-color: var(--osla-orange);
+        }
     </style>
 </head>
 
@@ -269,7 +298,23 @@
                             <i class="bi bi-x-circle me-1"></i> Cerrar
                         </button>
                     </div>
-                    <div id="calendarAdmin"></div>
+                    <div class="row">
+                        <div class="col-lg-8">
+                            <div id="calendarAdmin"></div>
+                        </div>
+                        <div class="col-lg-4">
+                            <div class="card bg-dark border-secondary mt-3 mt-lg-0">
+                                <div class="card-header bg-secondary text-white">
+                                    <h6 class="mb-0"><i class="bi bi-list-task me-2"></i>Lista de Tareas</h6>
+                                </div>
+                                <div class="card-body p-2">
+                                    <div id="adminTaskListContainer" class="task-list-container" style="max-height: 500px; overflow-y: auto;">
+                                        <div class="text-center text-muted py-3">Cargando...</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -308,7 +353,27 @@
                     </div>
                 </div>
 
-                <div id="calendarGlobal"></div>
+                <div class="row">
+                    <div class="col-lg-8">
+                        <div id="calendarGlobal"></div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="card bg-dark border-secondary mt-3 mt-lg-0">
+                            <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+                                <h6 class="mb-0"><i class="bi bi-list-task me-2"></i>Lista de Tareas</h6>
+                                <div class="form-check form-switch mb-0">
+                                    <input class="form-check-input" type="checkbox" id="toggleCompletedGlobal" onchange="renderGlobalTaskList()">
+                                    <label class="form-check-label small" for="toggleCompletedGlobal">Completadas</label>
+                                </div>
+                            </div>
+                            <div class="card-body p-2">
+                                <div id="globalTaskListContainer" class="task-list-container" style="max-height: 500px; overflow-y: auto;">
+                                    <div class="text-center text-muted py-3">Cargando...</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div class="tab-pane fade" id="data">
@@ -1516,6 +1581,8 @@
         var calendarGlobalInstance = null;
         var modalActionAdmin = new bootstrap.Modal(document.getElementById('modalActionAdmin'));
         var currentEmployeeId = null;
+        var cachedAdminTasks = []; // ✅ NUEVO: Caché de tareas del empleado
+        var cachedGlobalTasks = []; // ✅ NUEVO: Caché de tareas globales
 
         // Aplicar colores dinámicos a los labels de filtros
         document.addEventListener('DOMContentLoaded', function () {
@@ -1566,6 +1633,12 @@
                 eventContent: function (arg) {
                     let statusIcon = arg.event.extendedProps.status === 'Completado' ? '✅' : '⏳';
                     return { html: `<div class="fc-content overflow-hidden text-truncate">${statusIcon} ${arg.event.title}</div>` };
+                },
+                eventsSet: function (events) {
+                    // ✅ Cachear eventos y renderizar lista
+                    cachedAdminTasks = events;
+                    console.log('📅 [Admin Individual] Eventos actualizados:', events.length, 'tareas');
+                    renderAdminTaskList();
                 }
             });
             calendar.render();
@@ -1655,7 +1728,14 @@
                     return { html: `<div class="fc-content overflow-hidden text-truncate"><span class="fw-bold badge bg-dark text-white me-1 border border-secondary">${techName}</span> ${title}${attachmentIcon}</div>` };
                 },
 
-                eventClick: handleEventClick
+                eventClick: handleEventClick,
+                
+                eventsSet: function (events) {
+                    // ✅ Cachear eventos y renderizar lista
+                    cachedGlobalTasks = events;
+                    console.log('📅 [Global] Eventos actualizados:', events.length, 'tareas');
+                    renderGlobalTaskList();
+                }
             });
             calendarGlobalInstance.render();
         });
@@ -1701,6 +1781,105 @@
                 btn.innerHTML = originalHTML;
                 btn.disabled = false;
             }, 1000);
+        }
+
+        // ✅ NUEVO: Renderizar lista de tareas del empleado
+        function renderAdminTaskList() {
+            const container = document.getElementById('adminTaskListContainer');
+            if (!container) return;
+
+            if (cachedAdminTasks.length === 0) {
+                container.innerHTML = '<div class="text-center text-muted py-3">No hay tareas</div>';
+                return;
+            }
+
+            // Ordenar por fecha
+            const sorted = [...cachedAdminTasks].sort((a, b) => new Date(a.start) - new Date(b.start));
+
+            container.innerHTML = '';
+            sorted.forEach(t => {
+                const isDone = t.extendedProps.status === 'Completado';
+                const dateStr = t.start.split('T')[0];
+                const timeStr = t.start.includes('T') ? t.start.split('T')[1].substring(0, 5) : '';
+                const typeColor = t.color || '#6c757d';
+
+                const div = document.createElement('div');
+                div.className = `task-item status-${t.extendedProps.status}`;
+                div.style.borderLeftColor = typeColor;
+                if (isDone) div.style.opacity = '0.6';
+
+                div.innerHTML = `
+                    <div class="fw-bold text-white">${t.extendedProps.client || 'Sin cliente'}</div>
+                    <div class="small text-secondary">
+                        <i class="bi bi-calendar-event me-1"></i>${dateStr} ${timeStr ? '| ' + timeStr : ''}
+                        <br>
+                        <span class="badge ${isDone ? 'bg-success' : 'bg-warning text-dark'}">${t.extendedProps.status}</span>
+                        <span class="badge" style="background:${typeColor}">${t.extendedProps.service_type || 'Sin tipo'}</span>
+                    </div>
+                `;
+                
+                div.onclick = () => {
+                    const evt = calendar.getEventById(t.id);
+                    if (evt) handleEventClick({ event: evt });
+                };
+
+                container.appendChild(div);
+            });
+        }
+
+        // ✅ NUEVO: Renderizar lista de tareas globales
+        function renderGlobalTaskList() {
+            const container = document.getElementById('globalTaskListContainer');
+            if (!container) return;
+
+            const showCompleted = document.getElementById('toggleCompletedGlobal')?.checked || false;
+
+            // Filtrar
+            let filtered = cachedGlobalTasks.filter(t => {
+                if (showCompleted) return true;
+                return t.extendedProps.status !== 'Completado';
+            });
+
+            if (filtered.length === 0) {
+                container.innerHTML = '<div class="text-center text-muted py-3">No hay tareas</div>';
+                return;
+            }
+
+            // Ordenar por fecha
+            const sorted = [...filtered].sort((a, b) => new Date(a.start) - new Date(b.start));
+
+            container.innerHTML = '';
+            sorted.forEach(t => {
+                const isDone = t.extendedProps.status === 'Completado';
+                const dateStr = t.start.split('T')[0];
+                const timeStr = t.start.includes('T') ? t.start.split('T')[1].substring(0, 5) : '';
+                const typeColor = t.color || '#6c757d';
+
+                const div = document.createElement('div');
+                div.className = `task-item status-${t.extendedProps.status}`;
+                div.style.borderLeftColor = typeColor;
+                if (isDone) div.style.opacity = '0.6';
+
+                div.innerHTML = `
+                    <div class="fw-bold text-white">${t.extendedProps.client || 'Sin cliente'}</div>
+                    <div class="small">
+                        <span class="badge bg-secondary">${t.extendedProps.tech_name || 'Sin técnico'}</span>
+                    </div>
+                    <div class="small text-secondary">
+                        <i class="bi bi-calendar-event me-1"></i>${dateStr} ${timeStr ? '| ' + timeStr : ''}
+                        <br>
+                        <span class="badge ${isDone ? 'bg-success' : 'bg-warning text-dark'}">${t.extendedProps.status}</span>
+                        <span class="badge" style="background:${typeColor}">${t.extendedProps.service_type || 'Sin tipo'}</span>
+                    </div>
+                `;
+                
+                div.onclick = () => {
+                    const evt = calendarGlobalInstance.getEventById(t.id);
+                    if (evt) handleEventClick({ event: evt });
+                };
+
+                container.appendChild(div);
+            });
         }
 
         // --- GESTIÓN DE ACCIONES ---

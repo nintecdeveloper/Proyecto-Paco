@@ -1682,23 +1682,26 @@ def create_appointment():
         # Convertir fecha
         task_date = datetime.strptime(date_str, '%Y-%m-%d').date()
         
-        # ✅ MEJORADO: Solo verificar conflicto de horario para el técnico (no importa el cliente)
-        # Esto permite múltiples citas a la misma hora si son clientes diferentes
-        # Solo alertar si es exactamente el mismo cliente en la misma fecha/hora
-        if client_name:  # Solo verificar si hay nombre de cliente
-            existing_task = Task.query.filter_by(
-                tech_id=current_user.id,
-                client_name=client_name,
-                date=task_date,
-                start_time=start_time,
-                status='Pendiente'
-            ).first()
-            
-            if existing_task:
-                return jsonify({
-                    'success': False,
-                    'msg': f'Ya existe una cita pendiente para {client_name} en esta fecha y hora'
-                }), 400
+        # ✅ MEJORADO: Validación de duplicados con logging
+        # Solo verifica si existe EXACTAMENTE la misma cita (mismo cliente, fecha, hora)
+        print(f"🔍 Validando duplicados para: {client_name} | {task_date} | {start_time} | Tech: {current_user.id}")
+        
+        existing_task = Task.query.filter_by(
+            tech_id=current_user.id,
+            client_name=client_name,
+            date=task_date,
+            start_time=start_time,
+            status='Pendiente'
+        ).first()
+        
+        if existing_task:
+            print(f"⚠️ Duplicado encontrado: Task ID {existing_task.id}")
+            return jsonify({
+                'success': False,
+                'msg': f'Ya existe una cita pendiente para {client_name} el {task_date.strftime("%d/%m/%Y")} a las {start_time}'
+            }), 400
+        
+        print(f"✅ No hay duplicados, creando cita...")
         
         # Crear tarea
         new_task = Task(
@@ -1715,6 +1718,8 @@ def create_appointment():
         
         db.session.add(new_task)
         db.session.commit()
+        
+        print(f"✅ Cita creada exitosamente: ID {new_task.id} | {client_name} | {task_date} | {start_time}")
         
         return jsonify({
             'success': True,

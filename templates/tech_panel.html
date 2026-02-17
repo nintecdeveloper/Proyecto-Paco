@@ -1005,7 +1005,9 @@
                     }
                 },
                 eventsSet: function (events) {
+                    // ✅ Cachear eventos y actualizar lista
                     cachedTasks = events;
+                    console.log('📅 Eventos actualizados:', events.length, 'tareas');
                     renderTaskList();
                 }
             });
@@ -1169,9 +1171,9 @@
             const form = event.target;
             const formData = new FormData(form);
 
-            // Preparar datos para enviar a /create_task
+            // Preparar datos para enviar
             const data = {
-                tech_id: '{{ current_user.id }}',  // ID del técnico actual
+                tech_id: '{{ current_user.id }}',
                 client_name: formData.get('client_name'),
                 date: formData.get('date'),
                 start_time: formData.get('start_time'),
@@ -1179,6 +1181,14 @@
                 service_type_id: formData.get('service_type_id'),
                 description: formData.get('description') || ''
             };
+
+            // Desactivar botón submit para evitar doble click
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const originalBtnText = submitBtn ? submitBtn.innerHTML : '';
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Agendando...';
+            }
 
             fetch('/create_appointment', {
                 method: 'POST',
@@ -1189,29 +1199,46 @@
             })
                 .then(response => response.json())
                 .then(result => {
+                    // Re-habilitar botón
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = originalBtnText;
+                    }
+
                     if (result.success) {
-                        // Cerrar modal
-                        bootstrap.Modal.getInstance(document.getElementById('modalNewAppointmentTech')).hide();
-
-                        // Limpiar formulario
+                        // ✅ Limpiar formulario ANTES de cerrar modal
                         form.reset();
-
-                        // Recargar calendario y esperar a que se complete
-                        if (calendar) {
-                            calendar.refetchEvents();
-                            // Dar tiempo para que se actualicen los eventos y se llame a eventsSet
-                            setTimeout(() => {
-                                // Forzar renderizado de la lista de tareas
-                                renderTaskList();
-                            }, 500);
+                        
+                        // Limpiar campos explícitamente
+                        document.getElementById('modalFieldClient').value = '';
+                        document.getElementById('modalDateInput').value = '';
+                        document.getElementById('modalStartTime').value = '';
+                        document.getElementById('modalEndTime').value = '';
+                        
+                        // Cerrar modal
+                        const modalEl = document.getElementById('modalNewAppointmentTech');
+                        const modal = bootstrap.Modal.getInstance(modalEl);
+                        if (modal) {
+                            modal.hide();
                         }
 
+                        // ✅ Actualizar calendario (eventsSet se ejecuta automáticamente)
+                        if (calendar) {
+                            calendar.refetchEvents();
+                        }
+
+                        // Mostrar confirmación
                         alert('✓ Cita agendada correctamente');
                     } else {
                         alert('Error al agendar cita: ' + (result.msg || 'Error desconocido'));
                     }
                 })
                 .catch(error => {
+                    // Re-habilitar botón en caso de error
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = originalBtnText;
+                    }
                     console.error('Error:', error);
                     alert('Error al conectar con el servidor');
                 });
@@ -1284,21 +1311,17 @@
             });
         }
         
-        // ✅ NUEVA FUNCIÓN: Toggle estado de tarea completada/pendiente
+        // ✅ FUNCIÓN: Toggle estado de tarea completada/pendiente
         function toggleTaskComplete(taskId) {
             fetch(`/api/task_action/${taskId}/toggle`, { method: 'POST' })
                 .then(res => res.json())
                 .then(data => {
                     if (data.success) {
-                        // Recargar eventos del calendario y esperar a que se complete
+                        // Recargar eventos del calendario (eventsSet se ejecuta automáticamente)
                         if (calendar) {
                             calendar.refetchEvents();
-                            // Dar tiempo para que se actualicen los eventos
-                            setTimeout(() => {
-                                renderTaskList();
-                            }, 300);
                         }
-                        // Mostrar mensaje breve
+                        // Mensaje en consola
                         const msg = data.status === 'Completado' ? '✓ Tarea completada' : '↻ Tarea marcada como pendiente';
                         console.log(msg);
                     } else {
@@ -1317,7 +1340,7 @@
         }
 
         function deleteFromList(id) {
-            if (!confirm('¿Eliminar esta tarea terminada?')) return;
+            if (!confirm('¿Eliminar esta tarea?')) return;
 
             fetch(`/api/task_action/${id}/delete`, { method: 'POST' })
                 .then(res => {
@@ -1328,12 +1351,9 @@
                 })
                 .then(data => {
                     if (data.success) {
-                        // Recargar calendario y lista
+                        // Recargar calendario (eventsSet se ejecuta automáticamente)
                         if (calendar) {
                             calendar.refetchEvents();
-                            setTimeout(() => {
-                                renderTaskList();
-                            }, 300);
                         }
                         alert('✓ Tarea eliminada correctamente');
                     } else {
@@ -1910,6 +1930,27 @@
                     return true;
                 });
             }
+
+            // ✅ CORRECCIÓN: Limpiar formulario cuando se cierre el modal
+            const modalNewAppt = document.getElementById('modalNewAppointmentTech');
+            if (modalNewAppt) {
+                modalNewAppt.addEventListener('hidden.bs.modal', function () {
+                    const form = this.querySelector('form');
+                    if (form) {
+                        form.reset();
+                        // Limpiar campos explícitamente para mayor seguridad
+                        const clientInput = document.getElementById('modalFieldClient');
+                        const dateInput = document.getElementById('modalDateInput');
+                        const startTimeInput = document.getElementById('modalStartTime');
+                        const endTimeInput = document.getElementById('modalEndTime');
+                        
+                        if (clientInput) clientInput.value = '';
+                        if (dateInput) dateInput.value = '';
+                        if (startTimeInput) startTimeInput.value = '';
+                        if (endTimeInput) endTimeInput.value = '';
+                    }
+                });
+            }
         });
 
         // Firma para el MODAL de completar tarea (mantener código original)
@@ -2301,35 +2342,11 @@
             }
         }
 
-        // Actualizar calendario después de crear cita
-        const formNewAppt = document.querySelector('#modalNewAppointmentTech form');
-        if (formNewAppt && !formNewAppt.hasAttribute('data-enhanced')) {
-            formNewAppt.setAttribute('data-enhanced', 'true');
-            formNewAppt.addEventListener('submit', function (e) {
-                e.preventDefault();
-                const formData = new FormData(this);
-                fetch('/create_appointment', {
-                    method: 'POST',
-                    body: formData
-                })
-                    .then(res => res.json())
-                    .then(data => {
-                        if (data.success) {
-                            bootstrap.Modal.getInstance(document.getElementById('modalNewAppointmentTech')).hide();
-                            if (window.techCalendar) window.techCalendar.refetchEvents();
-                            alert('✓ Cita creada');
-                            this.reset();
-                            location.reload();
-                        } else {
-                            alert('Error: ' + data.msg);
-                        }
-                    })
-                    .catch(err => {
-                        console.error('Error:', err);
-                        alert('Error al crear cita');
-                    });
-            });
-        }
+
+        // ⚠️ CORRECCIÓN: Listener duplicado eliminado.
+        // El formulario ya tiene onsubmit="submitNewAppointment(event)" en el HTML (línea 743).
+        // Este listener duplicado causaba que se enviaran DOS requests simultáneos,
+        // haciendo que el segundo fallara con "ya existe la cita".
 
         // Función para copiar dirección al portapapeles
         function copyAddress(address) {
