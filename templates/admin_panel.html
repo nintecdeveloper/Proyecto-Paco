@@ -1759,8 +1759,17 @@
         function updateGlobalFilters() {
             if (!calendarGlobalInstance) return;
 
-            // Refrescamos los eventos para que se vuelva a ejecutar eventDidMount
-            calendarGlobalInstance.refetchEvents();
+            const activeTypes = getActiveFilters();
+
+            // Usar la API de FullCalendar para mostrar/ocultar eventos ya cargados
+            calendarGlobalInstance.getEvents().forEach(function(event) {
+                const type = event.extendedProps.service_type;
+                const visible = activeTypes.includes(type);
+                event.setProp('display', visible ? 'auto' : 'none');
+            });
+
+            // También filtrar la lista lateral
+            renderGlobalTaskList();
         }
 
         function refreshGlobalCalendar() {
@@ -1799,11 +1808,9 @@
             container.innerHTML = '';
             sorted.forEach(t => {
                 const isDone = t.extendedProps.status === 'Completado';
-                // ✅ FIX: eventsSet entrega EventApi donde .start es Date, no string
-                const startIso = t.startStr || (t.start instanceof Date ? t.start.toISOString() : String(t.start || ''));
-                const dateStr = startIso.split('T')[0] || '';
-                const timeStr = startIso.includes('T') ? startIso.split('T')[1].substring(0, 5) : '';
-                const typeColor = t.backgroundColor || '#6c757d';
+                const dateStr = t.start.split('T')[0];
+                const timeStr = t.start.includes('T') ? t.start.split('T')[1].substring(0, 5) : '';
+                const typeColor = t.color || '#6c757d';
 
                 const div = document.createElement('div');
                 div.className = `task-item status-${t.extendedProps.status}`;
@@ -1835,11 +1842,13 @@
             if (!container) return;
 
             const showCompleted = document.getElementById('toggleCompletedGlobal')?.checked || false;
+            const activeTypes = getActiveFilters();
 
-            // Filtrar
+            // Filtrar por estado Y por tipo de servicio activo
             let filtered = cachedGlobalTasks.filter(t => {
-                if (showCompleted) return true;
-                return t.extendedProps.status !== 'Completado';
+                const statusOk = showCompleted ? true : t.extendedProps.status !== 'Completado';
+                const typeOk = activeTypes.includes(t.extendedProps.service_type);
+                return statusOk && typeOk;
             });
 
             if (filtered.length === 0) {
@@ -1853,11 +1862,9 @@
             container.innerHTML = '';
             sorted.forEach(t => {
                 const isDone = t.extendedProps.status === 'Completado';
-                // ✅ FIX: eventsSet entrega EventApi donde .start es Date, no string
-                const startIso = t.startStr || (t.start instanceof Date ? t.start.toISOString() : String(t.start || ''));
-                const dateStr = startIso.split('T')[0] || '';
-                const timeStr = startIso.includes('T') ? startIso.split('T')[1].substring(0, 5) : '';
-                const typeColor = t.backgroundColor || '#6c757d';
+                const dateStr = t.start.split('T')[0];
+                const timeStr = t.start.includes('T') ? t.start.split('T')[1].substring(0, 5) : '';
+                const typeColor = t.color || '#6c757d';
 
                 const div = document.createElement('div');
                 div.className = `task-item status-${t.extendedProps.status}`;
@@ -2158,17 +2165,28 @@
                             const attachmentsList = document.getElementById('detailAttachmentsList');
                             attachmentsList.innerHTML = '';
 
-                            task.attachments.forEach(filename => {
-                                const item = document.createElement('a');
-                                item.href = `/uploads/${filename}`;
-                                item.target = '_blank';
-                                item.className = 'list-group-item list-group-item-action bg-black text-white border-secondary d-flex justify-content-between align-items-center';
+                            task.attachments.forEach(att => {
+                                // Soportar formato antiguo (string) y nuevo (objeto)
+                                const filename = typeof att === 'object' ? att.filename : att;
+                                const originalName = typeof att === 'object' ? (att.original_name || filename) : filename;
+                                const sizeKB = (att.size ? (att.size / 1024).toFixed(1) + ' KB' : '');
+
+                                const item = document.createElement('div');
+                                item.className = 'list-group-item bg-black text-white border-secondary d-flex justify-content-between align-items-center mb-1 rounded';
                                 item.innerHTML = `
                                     <span>
-                                        <i class="bi bi-file-earmark-arrow-down me-2"></i>
-                                        ${filename}
+                                        <i class="bi bi-file-earmark me-2 text-info"></i>
+                                        <strong>${originalName}</strong>
+                                        ${sizeKB ? '<br><small class="text-muted ms-4">' + sizeKB + '</small>' : ''}
                                     </span>
-                                    <i class="bi bi-download text-warning"></i>
+                                    <div class="d-flex gap-2">
+                                        <button onclick="viewFile('/uploads/${filename}', '${originalName}', event)" class="btn btn-sm btn-info">
+                                            <i class="bi bi-eye"></i> Ver
+                                        </button>
+                                        <button onclick="downloadFile('/uploads/${filename}', '${originalName}', event)" class="btn btn-sm btn-success">
+                                            <i class="bi bi-download"></i>
+                                        </button>
+                                    </div>
                                 `;
                                 attachmentsList.appendChild(item);
                             });
@@ -3343,7 +3361,7 @@
                                             <small class="text-muted">${sizeKB} KB</small>
                                         </div>
                                         <div class="d-flex gap-2">
-                                            <button onclick="downloadFile('/uploads/${filename}', '${originalName}', event)" class="btn btn-sm btn-info">
+                                            <button onclick="viewFile('/uploads/${filename}', '${originalName}', event)" class="btn btn-sm btn-info">
                                                 <i class="bi bi-eye"></i> Ver
                                             </button>
                                             <button onclick="downloadFile('/uploads/${filename}', '${originalName}', event)" class="btn btn-sm btn-success">
@@ -3368,32 +3386,23 @@
                 });
         }
 
-        // Nueva función para manejar la descarga de archivos con mejor manejo de errores
+        // Función para manejar visualización y descarga de archivos adjuntos
         function downloadFile(url, filename, event) {
             if (event) event.preventDefault();
             
-            // Crear un elemento temporal para la descarga
             const link = document.createElement('a');
             link.href = url;
             link.download = filename;
             link.target = '_blank';
-            
-            // Verificar si el archivo existe antes de intentar descargarlo
-            fetch(url, { method: 'HEAD' })
-                .then(response => {
-                    if (response.ok) {
-                        // El archivo existe, proceder con la descarga
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                    } else {
-                        throw new Error('Archivo no encontrado en el servidor');
-                    }
-                })
-                .catch(err => {
-                    console.error('Error al verificar archivo:', err);
-                    alert('⚠️ Error: No se pudo acceder al archivo. El archivo puede no existir o puede haber un problema de permisos.');
-                });
+            link.rel = 'noopener noreferrer';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function viewFile(url, filename, event) {
+            if (event) event.preventDefault();
+            window.open(url, '_blank', 'noopener,noreferrer');
         }
 
     </script>

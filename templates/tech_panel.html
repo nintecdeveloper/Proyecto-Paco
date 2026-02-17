@@ -261,6 +261,39 @@
             border-color: var(--osla-orange);
             background-color: rgba(243, 112, 33, 0.1);
         }
+
+        /* Filtros Calendario */
+        .btn-check:checked + .btn-outline-custom {
+            color: white !important;
+            background-color: var(--osla-orange) !important;
+            border-color: var(--osla-orange) !important;
+            border-width: 2px;
+            opacity: 1;
+            font-weight: 700;
+            box-shadow: 0 0 10px rgba(243, 112, 33, 0.5);
+        }
+
+        .btn-outline-custom {
+            color: #bbb;
+            border-color: #555;
+            background-color: transparent;
+            opacity: 0.7;
+            transition: all 0.3s ease;
+        }
+
+        .btn-outline-custom:hover {
+            opacity: 1;
+            filter: brightness(1.2);
+            background-color: rgba(243, 112, 33, 0.2);
+            border-color: var(--osla-orange);
+        }
+
+        .filter-group {
+            background: #1f1f1f;
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid #333;
+        }
     </style>
 </head>
 
@@ -508,6 +541,26 @@
                 </div>
             </div>
 
+            <!-- FILTROS POR TIPO DE SERVICIO -->
+            <div class="filter-group mb-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <small class="text-muted fw-bold">FILTRAR POR TIPO</small>
+                    <button class="btn btn-outline-light btn-sm" onclick="checkAllTechFilters()">
+                        <i class="bi bi-check-all me-1"></i> Todos
+                    </button>
+                </div>
+                <div class="btn-group-sm d-flex flex-wrap gap-2" role="group">
+                    {% for svc in all_service_types %}
+                    <input type="checkbox" class="btn-check tech-filter-cb" id="tech-filter-{{ svc.id }}"
+                        value="{{ svc.name }}" checked onchange="updateTechFilters()">
+                    <label class="btn btn-outline-custom flex-grow-1" for="tech-filter-{{ svc.id }}"
+                        style="border-color: {{ svc.color }}; color: {{ svc.color }};">
+                        {{ svc.name }}
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+
             <div class="row g-3">
                 <div class="col-12 col-lg-8">
                     <div id="calendarSection">
@@ -599,7 +652,6 @@
 
 
         </div>
-    </div>
 
 
         <!-- SECCIÓN INCIDENCIAS -->
@@ -648,6 +700,8 @@
             </div>
         </div>
 
+    </div><!-- /container-fluid -->
+
     <!-- MODALES -->
     <div class="modal fade" id="modalEventAction" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered modal-lg">
@@ -689,6 +743,10 @@
                         onclick="performTaskAction('delete')">Eliminar</button>
                     <button type="button" class="btn btn-outline-warning flex-grow-1"
                         onclick="openEditTechModal()">Editar</button>
+                    <button type="button" class="btn btn-success flex-grow-1"
+                        onclick="performTaskAction('complete')">
+                        <i class="bi bi-check-circle-fill me-1"></i>Completar
+                    </button>
                 </div>
             </div>
         </div>
@@ -879,15 +937,15 @@
                     <!-- Archivos adjuntos -->
                     <div class="mb-4">
                         <label class="form-label fw-bold">Fotos y Documentos</label>
-                        <div id="fileUploadArea" class="border border-secondary rounded p-3 text-center bg-black"
-                            onclick="document.getElementById('fileInput').click()" style="cursor: pointer;">
+                        <div id="modalFileUploadArea" class="border border-secondary rounded p-3 text-center bg-black"
+                            onclick="document.getElementById('modalFileInput').click()" style="cursor: pointer;">
                             <i class="bi bi-cloud-upload fs-1 text-warning"></i>
                             <p class="mb-0 mt-2">Haz clic o arrastra archivos aquí</p>
                             <small class="text-muted">PNG, JPG, PDF, DOC - Máximo 16MB</small>
                         </div>
-                        <input type="file" id="fileInput" multiple accept=".png,.jpg,.jpeg,.pdf,.doc,.docx"
-                            style="display: none;" onchange="handleFileSelect(event)">
-                        <div id="fileList" class="mt-2"></div>
+                        <input type="file" id="modalFileInput" multiple accept=".png,.jpg,.jpeg,.pdf,.doc,.docx"
+                            style="display: none;" onchange="handleModalFileSelect(event)">
+                        <div id="modalFileList" class="mt-2"></div>
                     </div>
 
                     <hr class="border-secondary">
@@ -1019,6 +1077,38 @@
                 toggleCheckbox.addEventListener('change', renderTaskList);
                 toggleCheckbox.setAttribute('data-listener-added', 'true');
             }
+        }
+
+        // --- FILTROS POR TIPO DE SERVICIO ---
+        function getTechActiveFilters() {
+            const activeTypes = [];
+            document.querySelectorAll('.tech-filter-cb:checked').forEach(cb => {
+                activeTypes.push(cb.value);
+            });
+            return activeTypes;
+        }
+
+        function checkAllTechFilters() {
+            document.querySelectorAll('.tech-filter-cb').forEach(cb => {
+                cb.checked = true;
+            });
+            updateTechFilters();
+        }
+
+        function updateTechFilters() {
+            if (!calendar) return;
+
+            const activeTypes = getTechActiveFilters();
+
+            // Mostrar/ocultar eventos ya cargados usando la API de FullCalendar
+            calendar.getEvents().forEach(function(event) {
+                const type = event.extendedProps.service_type;
+                const visible = activeTypes.includes(type);
+                event.setProp('display', visible ? 'auto' : 'none');
+            });
+
+            // Sincronizar también la lista lateral
+            renderTaskList();
         }
 
         function handleEventClick(info) {
@@ -1247,11 +1337,13 @@
         function renderTaskList() {
             const container = document.getElementById('taskListContainer');
             const showCompleted = document.getElementById('toggleCompleted')?.checked || false;
+            const activeTypes = getTechActiveFilters();
 
-            // 1. Filtrar
+            // 1. Filtrar por estado Y por tipo activo
             let filtered = cachedTasks.filter(t => {
-                if (showCompleted) return true;
-                return t.extendedProps.status !== 'Completado';
+                const statusOk = showCompleted ? true : t.extendedProps.status !== 'Completado';
+                const typeOk = activeTypes.length === 0 || activeTypes.includes(t.extendedProps.service_type);
+                return statusOk && typeOk;
             });
 
             // 2. Ordenar
@@ -1272,13 +1364,11 @@
 
             filtered.forEach(t => {
                 const isDone = t.extendedProps.status === 'Completado';
-                // ✅ FIX: eventsSet entrega EventApi donde .start es un Date, no string
-                const startIso = t.startStr || (t.start instanceof Date ? t.start.toISOString() : String(t.start || ''));
-                const dateStr = startIso.split('T')[0] || '';
-                const timeStr = startIso.includes('T') ? startIso.split('T')[1].substring(0, 5) : '';
+                const dateStr = t.start.split('T')[0];
+                const timeStr = t.start.includes('T') ? t.start.split('T')[1].substring(0, 5) : '';
 
-                // ✅ FIX: color en EventApi es .backgroundColor, no .color
-                const typeColor = t.backgroundColor || '#6c757d';
+                // Usar el color del tipo también aquí
+                const typeColor = t.color;
 
                 const div = document.createElement('div');
                 div.className = `task-item d-flex justify-content-between align-items-center`;
@@ -1404,6 +1494,12 @@
         }
 
         function focusCalendarEvent(id) {
+            if (!calendar) {
+                // Si el calendario no está inicializado, ir a la sección y esperar
+                showSection('section-agenda');
+                setTimeout(() => focusCalendarEvent(id), 400);
+                return;
+            }
             const task = cachedTasks.find(t => t.id == id);
             if (task) {
                 // Navegar al día en el calendario
@@ -1464,33 +1560,7 @@
         }
 
         // --- SINCRONIZACIÓN DE DATOS AL SELECCIONAR TAREA ---
-        function fillFromTask(select) {
-            const option = select.options[select.selectedIndex];
-            if (select.value === 'none') {
-                // Resetear formulario
-                document.getElementById('fieldClient').value = '';
-                document.getElementById('fieldDate').value = "{{ today_date }}";
-                document.getElementById('fieldEntryTime').value = '';
-                document.getElementById('fieldService').selectedIndex = 0;
-                document.getElementById('fieldDescription').value = '';
-                return;
-            }
-
-            // Obtener datos completos de la tarea desde la API
-            const taskId = select.value;
-            fetch(`/api/get_task_full/${taskId}`)
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success) {
-                        // Sincronizar todos los campos
-                        document.getElementById('fieldClient').value = data.data.client_name;
-                        document.getElementById('fieldDate').value = data.data.date;
-                        document.getElementById('fieldEntryTime').value = data.data.start_time;
-                        document.getElementById('fieldService').value = data.data.service_type;
-                        document.getElementById('fieldDescription').value = data.data.description;
-                    }
-                });
-        }
+        // fillFromTask definida más abajo con lógica completa incluyendo showClientInfo
 
         // --- AUTOCOMPLETE LOGIC ---
         function setupAutocomplete(inputId, listId) {
@@ -1561,10 +1631,31 @@
                 });
         }
 
-        // --- MANEJO DE ARCHIVOS ---
+        // --- MANEJO DE ARCHIVOS (formulario principal de parte) ---
         const fileUploadArea = document.getElementById('fileUploadArea');
         const fileInput = document.getElementById('fileInput');
         const fileListContainer = document.getElementById('fileList');
+
+        // Manejo de archivos del MODAL de completar tarea
+        const modalFileUploadArea = document.getElementById('modalFileUploadArea');
+        if (modalFileUploadArea) {
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(ev => {
+                modalFileUploadArea.addEventListener(ev, preventDefaults, false);
+            });
+            ['dragenter', 'dragover'].forEach(ev => {
+                modalFileUploadArea.addEventListener(ev, () => modalFileUploadArea.classList.add('drag-over'), false);
+            });
+            ['dragleave', 'drop'].forEach(ev => {
+                modalFileUploadArea.addEventListener(ev, () => modalFileUploadArea.classList.remove('drag-over'), false);
+            });
+            modalFileUploadArea.addEventListener('drop', (e) => {
+                handleFiles(e.dataTransfer.files);
+            }, false);
+        }
+
+        function handleModalFileSelect(event) {
+            handleFiles(event.target.files);
+        }
 
         // Prevenir comportamiento por defecto de drag and drop
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
@@ -1625,27 +1716,37 @@
         }
 
         function renderFileList() {
-            fileListContainer.innerHTML = '';
-            selectedFiles.forEach((file, index) => {
-                const fileItem = document.createElement('div');
-                fileItem.className = 'file-item';
-                fileItem.innerHTML = `
-                <div>
-                    <i class="bi bi-file-earmark me-2"></i>
-                    <span>${file.name}</span>
-                    <small class="text-muted ms-2">(${(file.size / 1024).toFixed(1)} KB)</small>
-                </div>
-                <span class="remove-file" onclick="removeFile(${index})">
-                    <i class="bi bi-x-circle-fill"></i>
-                </span>
-            `;
-                fileListContainer.appendChild(fileItem);
+            // Actualizar ambos contenedores si existen
+            const containers = [
+                document.getElementById('fileList'),
+                document.getElementById('modalFileList')
+            ].filter(Boolean);
+
+            containers.forEach(container => {
+                container.innerHTML = '';
+                selectedFiles.forEach((file, index) => {
+                    const fileItem = document.createElement('div');
+                    fileItem.className = 'file-item';
+                    fileItem.innerHTML = `
+                    <div>
+                        <i class="bi bi-file-earmark me-2"></i>
+                        <span>${file.name}</span>
+                        <small class="text-muted ms-2">(${(file.size / 1024).toFixed(1)} KB)</small>
+                    </div>
+                    <span class="remove-file" onclick="removeFile(${index})">
+                        <i class="bi bi-x-circle-fill"></i>
+                    </span>
+                `;
+                    container.appendChild(fileItem);
+                });
             });
 
-            // Actualizar el input de archivos
-            const dt = new DataTransfer();
-            selectedFiles.forEach(file => dt.items.add(file));
-            fileInput.files = dt.files;
+            // Actualizar el input del form de parte si existe
+            if (fileInput) {
+                const dt = new DataTransfer();
+                selectedFiles.forEach(file => dt.items.add(file));
+                fileInput.files = dt.files;
+            }
         }
 
         function removeFile(index) {
@@ -1966,12 +2067,16 @@
             const canvas = document.getElementById('signaturePad');
             if (!canvas) return;
 
-            const ctx = canvas.getContext('2d');
+            // Clonar el canvas para eliminar todos los event listeners previos
+            const newCanvas = canvas.cloneNode(true);
+            canvas.parentNode.replaceChild(newCanvas, canvas);
+
+            const ctx = newCanvas.getContext('2d');
 
             // Ajustar tamaño del canvas
-            const container = canvas.parentElement;
-            canvas.width = container.clientWidth - 20;
-            canvas.height = 200;
+            const container = newCanvas.parentElement;
+            newCanvas.width = container.clientWidth - 20;
+            newCanvas.height = 200;
 
             // Configurar estilo de dibujo
             ctx.strokeStyle = '#000';
@@ -1981,18 +2086,18 @@
 
             // Limpiar canvas
             ctx.fillStyle = '#fff';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillRect(0, 0, newCanvas.width, newCanvas.height);
 
             // Eventos de mouse
-            canvas.addEventListener('mousedown', startDrawing);
-            canvas.addEventListener('mousemove', draw);
-            canvas.addEventListener('mouseup', stopDrawing);
-            canvas.addEventListener('mouseout', stopDrawing);
+            newCanvas.addEventListener('mousedown', startDrawing);
+            newCanvas.addEventListener('mousemove', draw);
+            newCanvas.addEventListener('mouseup', stopDrawing);
+            newCanvas.addEventListener('mouseout', stopDrawing);
 
             // Eventos táctiles
-            canvas.addEventListener('touchstart', handleTouch);
-            canvas.addEventListener('touchmove', handleTouch);
-            canvas.addEventListener('touchend', stopDrawing);
+            newCanvas.addEventListener('touchstart', handleTouch);
+            newCanvas.addEventListener('touchmove', handleTouch);
+            newCanvas.addEventListener('touchend', stopDrawing);
         }
 
         function startDrawing(e) {
@@ -2064,17 +2169,18 @@
 
         function isSignatureEmpty() {
             const canvas = document.getElementById('signaturePad');
+            if (!canvas) return true;
             const ctx = canvas.getContext('2d');
             const pixelData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
 
-            // Verificar si hay algún píxel no blanco
+            // Un canvas con fondo blanco tiene R=255, G=255, B=255, A=255
+            // Si algún pixel tiene un color distinto al blanco puro, hay firma
             for (let i = 0; i < pixelData.length; i += 4) {
-                // Verificar si hay algún píxel que no sea blanco puro
-                if (pixelData[i] !== 255 || pixelData[i + 1] !== 255 || pixelData[i + 2] !== 255 || pixelData[i + 3] !== 0) {
-                    return false;
+                if (pixelData[i] !== 255 || pixelData[i + 1] !== 255 || pixelData[i + 2] !== 255) {
+                    return false; // hay trazos
                 }
             }
-            return true;
+            return true; // todo blanco = vacío
         }
 
         function getSignatureData() {
