@@ -1799,9 +1799,11 @@
             container.innerHTML = '';
             sorted.forEach(t => {
                 const isDone = t.extendedProps.status === 'Completado';
-                const dateStr = t.start.split('T')[0];
-                const timeStr = t.start.includes('T') ? t.start.split('T')[1].substring(0, 5) : '';
-                const typeColor = t.color || '#6c757d';
+                // ✅ FIX: eventsSet entrega EventApi donde .start es Date, no string
+                const startIso = t.startStr || (t.start instanceof Date ? t.start.toISOString() : String(t.start || ''));
+                const dateStr = startIso.split('T')[0] || '';
+                const timeStr = startIso.includes('T') ? startIso.split('T')[1].substring(0, 5) : '';
+                const typeColor = t.backgroundColor || '#6c757d';
 
                 const div = document.createElement('div');
                 div.className = `task-item status-${t.extendedProps.status}`;
@@ -1851,9 +1853,11 @@
             container.innerHTML = '';
             sorted.forEach(t => {
                 const isDone = t.extendedProps.status === 'Completado';
-                const dateStr = t.start.split('T')[0];
-                const timeStr = t.start.includes('T') ? t.start.split('T')[1].substring(0, 5) : '';
-                const typeColor = t.color || '#6c757d';
+                // ✅ FIX: eventsSet entrega EventApi donde .start es Date, no string
+                const startIso = t.startStr || (t.start instanceof Date ? t.start.toISOString() : String(t.start || ''));
+                const dateStr = startIso.split('T')[0] || '';
+                const timeStr = startIso.includes('T') ? startIso.split('T')[1].substring(0, 5) : '';
+                const typeColor = t.backgroundColor || '#6c757d';
 
                 const div = document.createElement('div');
                 div.className = `task-item status-${t.extendedProps.status}`;
