@@ -216,10 +216,40 @@
         .task-item.status-Pendiente {
             border-left-color: var(--osla-orange);
         }
+
+        /* Toast notificaciones */
+        #toastContainer {
+            position: fixed;
+            top: 75px;
+            right: 20px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .osla-toast {
+            background: #1f1f1f;
+            border-left: 4px solid var(--osla-orange);
+            color: #fff;
+            padding: 12px 18px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            font-size: 0.95rem;
+            min-width: 260px;
+            animation: toastIn 0.25s ease;
+        }
+        .osla-toast.success { border-left-color: #198754; }
+        .osla-toast.error   { border-left-color: #dc3545; }
+        .osla-toast.info    { border-left-color: #0dcaf0; }
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateX(30px); }
+            to   { opacity: 1; transform: translateX(0); }
+        }
     </style>
 </head>
 
 <body>
+<div id="toastContainer"></div>
 
     <nav class="navbar d-flex justify-content-between sticky-top">
         <span class="fw-bold fs-5 text-white">OSLA<span style="color:var(--osla-orange)">PRINT</span> <small
@@ -236,7 +266,7 @@
 
     <div class="container mt-3 pb-5">
         {% with messages = get_flashed_messages() %}
-        {% if messages %}{% for m in messages %}<div class="alert alert-info py-2 small">{{ m }}</div>{% endfor %}{%
+        {% if messages %}{% for m in messages %}<div class="alert alert-info py-2 small osla-flash">{{ m }}</div>{% endfor %}{%
         endif %}
         {% endwith %}
 
@@ -387,7 +417,6 @@
                                 <th>Servicio</th>
                                 <th>Fecha</th>
                                 <th>Técnico</th>
-                                <th><i class="bi bi-stopwatch me-1"></i>Tiempo</th>
                                 <th>Archivos</th>
                                 <th>Acción</th>
                             </tr>
@@ -400,15 +429,6 @@
                                 <td>{{ r.service_type.name if r.service_type is not string else r.service_type }}</td>
                                 <td>{{ r.date.strftime('%d/%m/%Y') }}</td>
                                 <td>{{ r.tech.username if r.tech else 'Sin técnico' }}</td>
-                                <td>
-                                    {% if r.work_duration %}
-                                        <span class="badge" style="background: #1f1f1f; color: #f37021; border: 1px solid #f37021; font-family: 'Courier New', monospace; font-size: 0.85rem; letter-spacing: 1px;">
-                                            <i class="bi bi-stopwatch me-1"></i>{{ r.work_duration }}
-                                        </span>
-                                    {% else %}
-                                        <span class="text-muted small">—</span>
-                                    {% endif %}
-                                </td>
                                 <td>
                                     {% if r.attachments %}
                                     {% set att_list = r.attachments|from_json %}
@@ -1584,12 +1604,67 @@
     </div>
 
     <script>
+        // ====== TOAST NOTIFICATIONS ======
+        function showToast(msg, type, duration) {
+            type = type || 'success';
+            duration = duration || 1200;
+            var container = document.getElementById('toastContainer');
+            var toast = document.createElement('div');
+            toast.className = 'osla-toast ' + type;
+            var icon = type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ';
+            toast.innerHTML = '<span style="margin-right:8px;font-weight:bold;">' + icon + '</span>' + msg;
+            container.appendChild(toast);
+            setTimeout(function() {
+                toast.style.transition = 'opacity 0.3s';
+                toast.style.opacity = '0';
+                setTimeout(function() { toast.remove(); }, 320);
+            }, duration);
+        }
+
+        // Auto-dismiss flash messages de Flask (1 segundo)
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.osla-flash').forEach(function(el) {
+                setTimeout(function() {
+                    el.style.transition = 'opacity 0.4s';
+                    el.style.opacity = '0';
+                    setTimeout(function() { el.remove(); }, 420);
+                }, 1000);
+            });
+        });
+
         var calendar = null;
         var calendarGlobalInstance = null;
         var modalActionAdmin = new bootstrap.Modal(document.getElementById('modalActionAdmin'));
         var currentEmployeeId = null;
-        var cachedAdminTasks = []; // ✅ NUEVO: Caché de tareas del empleado
-        var cachedGlobalTasks = []; // ✅ NUEVO: Caché de tareas globales
+        var cachedAdminTasks = [];
+        var cachedGlobalTasks = [];
+        var allAdminTasksCache = []; // TODOS los eventos (para lista, incluye completadas fuera del rango visible)
+
+        // Carga TODOS los eventos del admin sin restricción de rango de fechas
+        function loadAllAdminTasksForList() {
+            fetch('/api/admin/all_tasks')
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    allAdminTasksCache = data.map(function(e) {
+                        return {
+                            id: String(e.id || e._id || ''),
+                            title: e.title || '',
+                            start: e.start || '',
+                            color: e.backgroundColor || e.color || '#6c757d',
+                            extendedProps: {
+                                status: e.extendedProps ? e.extendedProps.status : 'Pendiente',
+                                client: e.extendedProps ? e.extendedProps.client : '',
+                                tech_name: e.extendedProps ? e.extendedProps.tech_name : '',
+                                service_type: e.extendedProps ? e.extendedProps.service_type : '',
+                                desc: e.extendedProps ? e.extendedProps.desc : '',
+                                has_attachments: e.extendedProps ? e.extendedProps.has_attachments : false
+                            }
+                        };
+                    });
+                    renderGlobalTaskList();
+                })
+                .catch(function(err) { console.error('Error cargando tareas admin:', err); });
+        }
 
         // Aplicar colores dinámicos a los labels de filtros
         document.addEventListener('DOMContentLoaded', function () {
@@ -1768,7 +1843,8 @@
                             }
                         };
                     });
-                    renderGlobalTaskList();
+                    // Cargar TODOS los eventos para la lista (incluye completadas fuera del rango visible)
+                    loadAllAdminTasksForList();
                 }
             });
             calendarGlobalInstance.render();
@@ -1869,8 +1945,11 @@
             const showCompleted = document.getElementById('toggleCompletedGlobal')?.checked || false;
             const activeTypes = getActiveFilters();
 
+            // Usar allAdminTasksCache (todos los eventos) para incluir completadas fuera del rango visible
+            const source = allAdminTasksCache.length > 0 ? allAdminTasksCache : cachedGlobalTasks;
+
             // Filtrar por estado Y por tipo activo
-            let filtered = cachedGlobalTasks.filter(t => {
+            let filtered = source.filter(t => {
                 const statusOk = showCompleted ? true : t.extendedProps.status !== 'Completado';
                 const typeOk = activeTypes.length === 0 || activeTypes.includes(t.extendedProps.service_type);
                 return statusOk && typeOk;
@@ -3331,9 +3410,9 @@
                             bootstrap.Modal.getInstance(document.getElementById('modalScheduleAppointment')).hide();
                             if (window.calendarGlobalInstance) window.calendarGlobalInstance.refetchEvents();
                             if (window.calendar) window.calendar.refetchEvents();
-                            alert('✓ Cita agendada');
+                            showToast('✓ Cita agendada correctamente', 'success');
                             this.reset();
-                            location.reload();
+                            setTimeout(() => location.reload(), 1300);
                         }
                     });
             });
