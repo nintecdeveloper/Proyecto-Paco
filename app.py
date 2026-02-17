@@ -14,7 +14,7 @@ import re
 basedir = os.path.abspath(os.path.dirname(__file__))
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'oslaprint_pro_2026_secure_key'
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'oslaprint_pro_2026_secure_key')
 database_url = os.environ.get('DATABASE_URL', 'sqlite:///' + os.path.join(basedir, 'oslaprint.db'))
 if database_url.startswith('postgres://'):
     database_url = database_url.replace('postgres://', 'postgresql://', 1)
@@ -37,7 +37,7 @@ class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), unique=True, nullable=False, index=True)
     email = db.Column(db.String(100), unique=True, nullable=False, index=True)  # ✅ CORREGIDO: unique=True
-    password_hash = db.Column(db.String(128))
+    password_hash = db.Column(db.String(512))
     role = db.Column(db.String(20))  # 'admin' o 'tech'
     reset_token = db.Column(db.String(100), unique=True, nullable=True)
     reset_token_expiry = db.Column(db.DateTime, nullable=True)
@@ -2076,6 +2076,22 @@ def uploaded_file(filename):
 with app.app_context():
     db.create_all()
     
+    # ✅ MIGRACIÓN: Ampliar columna 'password_hash' a VARCHAR(512) si es PostgreSQL
+    try:
+        from sqlalchemy import inspect, text as sa_text
+        inspector = inspect(db.engine)
+        if db.engine.dialect.name == 'postgresql':
+            user_columns = {col['name']: col for col in inspector.get_columns('user')}
+            ph_col = user_columns.get('password_hash')
+            current_length = getattr(ph_col['type'], 'length', None) if ph_col else None
+            if current_length is not None and current_length < 512:
+                with db.engine.connect() as conn:
+                    conn.execute(sa_text('ALTER TABLE "user" ALTER COLUMN password_hash TYPE VARCHAR(512)'))
+                    conn.commit()
+                    print("✓ Columna 'password_hash' ampliada a VARCHAR(512)")
+    except Exception as e:
+        print(f"Nota: Migración 'password_hash': {e}")
+
     # ✅ MIGRACIÓN: Añadir columna 'supplier' a Stock
     try:
         from sqlalchemy import inspect
