@@ -406,6 +406,49 @@
                     </select>
                 </div>
 
+                <!-- ===== CRONÓMETRO DE TRABAJO ===== -->
+                <div class="mb-3 p-3 rounded" id="workTimerBlock" style="background: #0d0d0d; border: 2px solid #333; border-radius: 10px;">
+                    <label class="form-label fw-bold mb-2 small d-flex align-items-center gap-2" style="color: #aaa;">
+                        <i class="bi bi-stopwatch"></i> CRONÓMETRO DE TRABAJO
+                    </label>
+                    <div class="d-flex align-items-center gap-3">
+                        <div id="timerDisplay" style="
+                            font-family: 'Courier New', monospace;
+                            font-size: 2.2rem;
+                            font-weight: bold;
+                            color: #fff;
+                            letter-spacing: 3px;
+                            min-width: 140px;
+                            text-align: center;
+                            background: #000;
+                            border-radius: 8px;
+                            padding: 6px 16px;
+                            border: 1px solid #333;
+                        ">00:00:00</div>
+                        <button type="button" id="timerBtn" onclick="toggleTimer()" class="btn fw-bold px-4" style="
+                            background: var(--osla-orange);
+                            color: #fff;
+                            border: none;
+                            border-radius: 8px;
+                            font-size: 1rem;
+                            min-width: 140px;
+                            padding: 10px 0;
+                            transition: background 0.2s;
+                        ">
+                            <i class="bi bi-play-fill me-1" id="timerIcon"></i>
+                            <span id="timerBtnText">Iniciar trabajo</span>
+                        </button>
+                        <div id="timerStatus" class="small" style="color: #888;">Cronómetro detenido</div>
+                    </div>
+                    <div id="timerSummary" class="mt-2 small" style="color: #aaa; display: none;">
+                        <i class="bi bi-check-circle-fill text-success me-1"></i>
+                        Tiempo registrado: <strong id="timerSummaryText" style="color: #fff;"></strong>
+                    </div>
+                    <!-- Campo oculto para enviar el tiempo al servidor -->
+                    <input type="hidden" name="work_duration" id="workDurationInput" value="">
+                </div>
+                <!-- ===== FIN CRONÓMETRO ===== -->
+
                 <div class="row g-3 mb-3">
                     <div class="col-12 col-md-8 position-relative">
                         <label class="form-label">CLIENTE</label>
@@ -2610,6 +2653,88 @@
             row.remove();
         }
 
+
+        // ==================== CRONÓMETRO DE TRABAJO ====================
+        let timerInterval = null;
+        let timerRunning = false;
+        let timerStartTime = null;
+        let timerElapsedSeconds = 0;
+
+        function toggleTimer() {
+            if (!timerRunning) {
+                // INICIAR
+                timerRunning = true;
+                timerStartTime = Date.now() - (timerElapsedSeconds * 1000);
+                timerInterval = setInterval(updateTimerDisplay, 1000);
+
+                // UI: estado activo
+                document.getElementById('timerBtn').style.background = '#dc3545';
+                document.getElementById('timerIcon').className = 'bi bi-stop-fill me-1';
+                document.getElementById('timerBtnText').textContent = 'Finalizar trabajo';
+                document.getElementById('timerStatus').textContent = 'Cronómetro en marcha...';
+                document.getElementById('timerStatus').style.color = '#28a745';
+                document.getElementById('timerDisplay').style.color = '#f37021';
+                document.getElementById('timerDisplay').style.borderColor = '#f37021';
+                document.getElementById('timerSummary').style.display = 'none';
+                document.getElementById('workTimerBlock').style.borderColor = '#f37021';
+            } else {
+                // DETENER
+                clearInterval(timerInterval);
+                timerRunning = false;
+                timerElapsedSeconds = Math.floor((Date.now() - timerStartTime) / 1000);
+
+                // Calcular horas, minutos, segundos
+                const h = Math.floor(timerElapsedSeconds / 3600);
+                const m = Math.floor((timerElapsedSeconds % 3600) / 60);
+                const s = timerElapsedSeconds % 60;
+                const formatted = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+
+                // Guardar en campo oculto (formato HH:MM:SS)
+                document.getElementById('workDurationInput').value = formatted;
+
+                // Texto legible para el resumen
+                let readableTime = '';
+                if (h > 0) readableTime += `${h}h `;
+                if (m > 0 || h > 0) readableTime += `${m}min `;
+                readableTime += `${s}s`;
+
+                // UI: estado detenido con resultado
+                document.getElementById('timerBtn').style.background = '#198754';
+                document.getElementById('timerIcon').className = 'bi bi-arrow-counterclockwise me-1';
+                document.getElementById('timerBtnText').textContent = 'Reiniciar';
+                document.getElementById('timerStatus').textContent = '¡Trabajo finalizado!';
+                document.getElementById('timerStatus').style.color = '#28a745';
+                document.getElementById('timerDisplay').style.color = '#28a745';
+                document.getElementById('timerDisplay').style.borderColor = '#28a745';
+                document.getElementById('timerSummary').style.display = 'block';
+                document.getElementById('timerSummaryText').textContent = readableTime.trim();
+                document.getElementById('workTimerBlock').style.borderColor = '#198754';
+
+                // Rellenar automáticamente hora de entrada y salida si están vacíos
+                try {
+                    const startDt = new Date(timerStartTime);
+                    const endDt   = new Date(timerStartTime + timerElapsedSeconds * 1000);
+                    const toHHMM  = dt => `${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
+                    const entryField = document.getElementById('fieldEntryTime');
+                    const exitField  = document.querySelector('input[name="exit_time"]');
+                    if (entryField && !entryField.value) entryField.value = toHHMM(startDt);
+                    if (exitField  && !exitField.value)  exitField.value  = toHHMM(endDt);
+                } catch(e) {}
+
+                // Si se pulsa de nuevo = reiniciar
+                timerElapsedSeconds = 0;
+                timerStartTime = null;
+            }
+        }
+
+        function updateTimerDisplay() {
+            timerElapsedSeconds = Math.floor((Date.now() - timerStartTime) / 1000);
+            const h = Math.floor(timerElapsedSeconds / 3600);
+            const m = Math.floor((timerElapsedSeconds % 3600) / 60);
+            const s = timerElapsedSeconds % 60;
+            document.getElementById('timerDisplay').textContent =
+                `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+        }
 
         // ==================== INCIDENCIAS ====================
         function updateIncidenciaEmail() {

@@ -387,6 +387,7 @@
                                 <th>Servicio</th>
                                 <th>Fecha</th>
                                 <th>Técnico</th>
+                                <th><i class="bi bi-stopwatch me-1"></i>Tiempo</th>
                                 <th>Archivos</th>
                                 <th>Acción</th>
                             </tr>
@@ -399,6 +400,15 @@
                                 <td>{{ r.service_type.name if r.service_type is not string else r.service_type }}</td>
                                 <td>{{ r.date.strftime('%d/%m/%Y') }}</td>
                                 <td>{{ r.tech.username if r.tech else 'Sin técnico' }}</td>
+                                <td>
+                                    {% if r.work_duration %}
+                                        <span class="badge" style="background: #1f1f1f; color: #f37021; border: 1px solid #f37021; font-family: 'Courier New', monospace; font-size: 0.85rem; letter-spacing: 1px;">
+                                            <i class="bi bi-stopwatch me-1"></i>{{ r.work_duration }}
+                                        </span>
+                                    {% else %}
+                                        <span class="text-muted small">—</span>
+                                    {% endif %}
+                                </td>
                                 <td>
                                     {% if r.attachments %}
                                     {% set att_list = r.attachments|from_json %}
