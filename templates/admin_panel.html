@@ -1239,34 +1239,6 @@
                 <div class="modal-header border-secondary">
                     <h5 class="modal-title">Editar Tipo de Servicio</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-
-                    <!-- Modal: Archivos Adjuntos del Informe -->
-                    <div class="modal fade" id="modalAttachments" tabindex="-1">
-                        <div class="modal-dialog modal-lg">
-                            <div class="modal-content bg-dark text-white">
-                                <div class="modal-header border-secondary">
-                                    <h5 class="modal-title">
-                                        <i class="bi bi-paperclip me-2"></i>
-                                        Archivos Adjuntos - <span id="attachModalClient"></span>
-                                    </h5>
-                                    <button type="button" class="btn-close btn-close-white"
-                                        data-bs-dismiss="modal"></button>
-                                </div>
-                                <div class="modal-body">
-                                    <div id="attachmentsListContainer">
-                                        <div class="text-center text-muted py-3">
-                                            <i class="bi bi-hourglass-split"></i> Cargando archivos...
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="modal-footer border-secondary">
-                                    <button type="button" class="btn btn-secondary"
-                                        data-bs-dismiss="modal">Cerrar</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
                 </div>
                 <form method="POST" action="/manage_services">
                     <div class="modal-body">
@@ -1548,6 +1520,31 @@
     </div>
 
 
+    <!-- Modal: Archivos Adjuntos del Informe -->
+    <div class="modal fade" id="modalAttachments" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">
+                        <i class="bi bi-paperclip me-2"></i>
+                        Archivos Adjuntos — <span id="attachModalClient"></span>
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="attachmentsListContainer">
+                        <div class="text-center text-muted py-3">
+                            <i class="bi bi-hourglass-split"></i> Cargando archivos...
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
@@ -1635,9 +1632,22 @@
                     return { html: `<div class="fc-content overflow-hidden text-truncate">${statusIcon} ${arg.event.title}</div>` };
                 },
                 eventsSet: function (events) {
-                    // ✅ Cachear eventos y renderizar lista
-                    cachedAdminTasks = events;
-                    console.log('📅 [Admin Individual] Eventos actualizados:', events.length, 'tareas');
+                    // Serializar EventApi a objetos planos (.start es Date en FullCalendar, necesitamos string)
+                    cachedAdminTasks = events.map(function(e) {
+                        return {
+                            id: e.id,
+                            title: e.title,
+                            start: e.start ? e.start.toISOString() : '',
+                            color: e.backgroundColor || '#6c757d',
+                            extendedProps: {
+                                status: e.extendedProps.status,
+                                client: e.extendedProps.client,
+                                tech_name: e.extendedProps.tech_name,
+                                service_type: e.extendedProps.service_type,
+                                desc: e.extendedProps.desc
+                            }
+                        };
+                    });
                     renderAdminTaskList();
                 }
             });
@@ -1692,31 +1702,31 @@
                 navLinks: true,
                 editable: false,
                 dayMaxEvents: true,
-                events: '/api/admin/all_tasks',
+                // Source como función para poder filtrar sin refetch completo
+                events: function(fetchInfo, successCallback, failureCallback) {
+                    fetch('/api/admin/all_tasks')
+                        .then(function(res) { return res.json(); })
+                        .then(function(data) {
+                            var activeTypes = getActiveFilters();
+                            var filtered = data.filter(function(ev) {
+                                var stype = ev.extendedProps ? ev.extendedProps.service_type : ev.service_type;
+                                return activeTypes.length === 0 || activeTypes.includes(stype);
+                            });
+                            successCallback(filtered);
+                        })
+                        .catch(failureCallback);
+                },
                 dateClick: handleAdminDateClickGlobal,
                 selectable: true,
 
-                // FILTRADO DINÁMICO
+                // Estilo de eventos completados
                 eventDidMount: function (info) {
-                    const type = info.event.extendedProps.service_type;
-                    const activeTypes = getActiveFilters();
-
-                    if (!activeTypes.includes(type)) {
-                        info.el.style.display = 'none';
-                    } else {
-                        info.el.style.display = '';
-                        // Usar el color del evento que viene desde backend
-                        if (info.backgroundColor) {
-                            info.el.style.backgroundColor = info.backgroundColor;
-                        }
-                        if (info.event.extendedProps.status === 'Completado') {
-                            info.el.style.opacity = '0.7';
-                            info.el.style.border = '2px solid #198754';
-                            // Añadir icono de check
-                            const title = info.el.querySelector('.fc-event-title');
-                            if (title) {
-                                title.innerHTML = '✓ ' + title.innerHTML;
-                            }
+                    if (info.event.extendedProps.status === 'Completado') {
+                        info.el.style.opacity = '0.7';
+                        info.el.style.border = '2px solid #198754';
+                        const title = info.el.querySelector('.fc-event-title');
+                        if (title && !title.innerHTML.startsWith('✓')) {
+                            title.innerHTML = '✓ ' + title.innerHTML;
                         }
                     }
                 },
@@ -1731,9 +1741,23 @@
                 eventClick: handleEventClick,
                 
                 eventsSet: function (events) {
-                    // ✅ Cachear eventos y renderizar lista
-                    cachedGlobalTasks = events;
-                    console.log('📅 [Global] Eventos actualizados:', events.length, 'tareas');
+                    // Serializar EventApi a objetos planos (.start es Date en FullCalendar, necesitamos string)
+                    cachedGlobalTasks = events.map(function(e) {
+                        return {
+                            id: e.id,
+                            title: e.title,
+                            start: e.start ? e.start.toISOString() : '',
+                            color: e.backgroundColor || '#6c757d',
+                            extendedProps: {
+                                status: e.extendedProps.status,
+                                client: e.extendedProps.client,
+                                tech_name: e.extendedProps.tech_name,
+                                service_type: e.extendedProps.service_type,
+                                desc: e.extendedProps.desc,
+                                has_attachments: e.extendedProps.has_attachments
+                            }
+                        };
+                    });
                     renderGlobalTaskList();
                 }
             });
@@ -1758,18 +1782,9 @@
 
         function updateGlobalFilters() {
             if (!calendarGlobalInstance) return;
-
-            const activeTypes = getActiveFilters();
-
-            // Usar la API de FullCalendar para mostrar/ocultar eventos ya cargados
-            calendarGlobalInstance.getEvents().forEach(function(event) {
-                const type = event.extendedProps.service_type;
-                const visible = activeTypes.includes(type);
-                event.setProp('display', visible ? 'auto' : 'none');
-            });
-
-            // También filtrar la lista lateral
-            renderGlobalTaskList();
+            // refetchEvents() llama a la función events() que aplica getActiveFilters()
+            // eventsSet se dispara automáticamente y actualiza la lista lateral
+            calendarGlobalInstance.refetchEvents();
         }
 
         function refreshGlobalCalendar() {
@@ -1844,10 +1859,10 @@
             const showCompleted = document.getElementById('toggleCompletedGlobal')?.checked || false;
             const activeTypes = getActiveFilters();
 
-            // Filtrar por estado Y por tipo de servicio activo
+            // Filtrar por estado Y por tipo activo
             let filtered = cachedGlobalTasks.filter(t => {
                 const statusOk = showCompleted ? true : t.extendedProps.status !== 'Completado';
-                const typeOk = activeTypes.includes(t.extendedProps.service_type);
+                const typeOk = activeTypes.length === 0 || activeTypes.includes(t.extendedProps.service_type);
                 return statusOk && typeOk;
             });
 
@@ -2165,28 +2180,17 @@
                             const attachmentsList = document.getElementById('detailAttachmentsList');
                             attachmentsList.innerHTML = '';
 
-                            task.attachments.forEach(att => {
-                                // Soportar formato antiguo (string) y nuevo (objeto)
-                                const filename = typeof att === 'object' ? att.filename : att;
-                                const originalName = typeof att === 'object' ? (att.original_name || filename) : filename;
-                                const sizeKB = (att.size ? (att.size / 1024).toFixed(1) + ' KB' : '');
-
-                                const item = document.createElement('div');
-                                item.className = 'list-group-item bg-black text-white border-secondary d-flex justify-content-between align-items-center mb-1 rounded';
+                            task.attachments.forEach(filename => {
+                                const item = document.createElement('a');
+                                item.href = `/uploads/${filename}`;
+                                item.target = '_blank';
+                                item.className = 'list-group-item list-group-item-action bg-black text-white border-secondary d-flex justify-content-between align-items-center';
                                 item.innerHTML = `
                                     <span>
-                                        <i class="bi bi-file-earmark me-2 text-info"></i>
-                                        <strong>${originalName}</strong>
-                                        ${sizeKB ? '<br><small class="text-muted ms-4">' + sizeKB + '</small>' : ''}
+                                        <i class="bi bi-file-earmark-arrow-down me-2"></i>
+                                        ${filename}
                                     </span>
-                                    <div class="d-flex gap-2">
-                                        <button onclick="viewFile('/uploads/${filename}', '${originalName}', event)" class="btn btn-sm btn-info">
-                                            <i class="bi bi-eye"></i> Ver
-                                        </button>
-                                        <button onclick="downloadFile('/uploads/${filename}', '${originalName}', event)" class="btn btn-sm btn-success">
-                                            <i class="bi bi-download"></i>
-                                        </button>
-                                    </div>
+                                    <i class="bi bi-download text-warning"></i>
                                 `;
                                 attachmentsList.appendChild(item);
                             });
@@ -3327,82 +3331,80 @@
 
         // FUNCIÓN PARA MOSTRAR ARCHIVOS ADJUNTOS EN INFORMES
         function showAttachmentsModal(taskId, clientName) {
+            const container = document.getElementById('attachmentsListContainer');
+            container.innerHTML = '<div class="text-center text-muted py-3"><i class="bi bi-hourglass-split me-2"></i>Cargando archivos...</div>';
             document.getElementById('attachModalClient').innerText = clientName;
 
+            // Abrir modal inmediatamente mientras carga
+            const modal = new bootstrap.Modal(document.getElementById('modalAttachments'));
+            modal.show();
+
             fetch(`/api/task/${taskId}/attachments`)
-                .then(res => {
-                    if (!res.ok) {
-                        throw new Error(`HTTP error! status: ${res.status}`);
-                    }
+                .then(function(res) {
+                    if (!res.ok) throw new Error('Error ' + res.status);
                     return res.json();
                 })
-                .then(data => {
-                    console.log('Attachments data:', data); // Debug
-                    const container = document.getElementById('attachmentsListContainer');
-
-                    if (data.success && data.attachments && data.attachments.length > 0) {
-                        let html = '<div class="list-group">';
-                        data.attachments.forEach(att => {
-                            // Asegurar que att tiene los campos necesarios
-                            const filename = att.filename || att;
-                            const originalName = att.original_name || filename;
-                            const size = att.size || 0;
-                            const sizeKB = (size / 1024).toFixed(1);
-                            
-                            console.log('Processing attachment:', { filename, originalName, size }); // Debug
-                            
-                            html += `
-                                <div class="list-group-item bg-dark text-white border-secondary mb-2">
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <div>
-                                            <i class="bi bi-file-earmark text-info me-2"></i>
-                                            <strong>${originalName}</strong>
-                                            <br>
-                                            <small class="text-muted">${sizeKB} KB</small>
-                                        </div>
-                                        <div class="d-flex gap-2">
-                                            <button onclick="viewFile('/uploads/${filename}', '${originalName}', event)" class="btn btn-sm btn-info">
-                                                <i class="bi bi-eye"></i> Ver
-                                            </button>
-                                            <button onclick="downloadFile('/uploads/${filename}', '${originalName}', event)" class="btn btn-sm btn-success">
-                                                <i class="bi bi-download"></i> Descargar
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            `;
-                        });
-                        html += '</div>';
-                        container.innerHTML = html;
-                    } else {
-                        container.innerHTML = '<div class="text-center text-muted py-3"><i class="bi bi-inbox"></i> No hay archivos adjuntos</div>';
+                .then(function(data) {
+                    if (!data.success || !data.attachments || data.attachments.length === 0) {
+                        container.innerHTML = '<div class="text-center text-muted py-4"><i class="bi bi-inbox fs-1 d-block mb-2"></i>No hay archivos adjuntos</div>';
+                        return;
                     }
 
-                    new bootstrap.Modal(document.getElementById('modalAttachments')).show();
+                    let html = '';
+                    data.attachments.forEach(function(att) {
+                        // Soportar formato string o {filename, original_name, size}
+                        var filename = typeof att === 'object' ? (att.filename || att.name || att) : att;
+                        var originalName = typeof att === 'object' ? (att.original_name || att.name || filename) : att;
+                        var sizeKB = (att.size && att.size > 0) ? (att.size / 1024).toFixed(1) + ' KB' : '';
+
+                        // Escapar comillas para uso seguro en onclick
+                        var safeFilename = filename.replace(/'/g, "\\'");
+                        var safeName = originalName.replace(/'/g, "\\'");
+
+                        html += `
+                            <div class="d-flex justify-content-between align-items-center p-3 mb-2 rounded"
+                                 style="background:#1f1f1f; border:1px solid #444;">
+                                <div>
+                                    <i class="bi bi-file-earmark-fill text-info me-2"></i>
+                                    <strong class="text-white">${originalName}</strong>
+                                    ${sizeKB ? '<br><small class="text-muted ms-4">' + sizeKB + '</small>' : ''}
+                                </div>
+                                <div class="d-flex gap-2 ms-3">
+                                    <a href="/uploads/${filename}" target="_blank" rel="noopener noreferrer"
+                                       class="btn btn-sm btn-info">
+                                        <i class="bi bi-eye me-1"></i>Ver
+                                    </a>
+                                    <a href="/uploads/${filename}" download="${originalName}"
+                                       class="btn btn-sm btn-success">
+                                        <i class="bi bi-download me-1"></i>Descargar
+                                    </a>
+                                </div>
+                            </div>`;
+                    });
+                    container.innerHTML = html;
                 })
-                .catch(err => {
-                    console.error('Error cargando archivos:', err);
-                    alert('Error al cargar los archivos adjuntos: ' + err.message);
+                .catch(function(err) {
+                    container.innerHTML = '<div class="text-center text-danger py-3"><i class="bi bi-exclamation-triangle me-2"></i>Error al cargar archivos: ' + err.message + '</div>';
                 });
         }
 
-        // Función para manejar visualización y descarga de archivos adjuntos
-        function downloadFile(url, filename, event) {
-            if (event) event.preventDefault();
-            
-            const link = document.createElement('a');
+        // Ver archivo en nueva pestaña
+        function viewFile(url, filename, evt) {
+            if (evt) evt.preventDefault();
+            window.open(url, '_blank', 'noopener,noreferrer');
+        }
+
+        // Descargar archivo directamente sin fetch HEAD previo
+        function downloadFile(url, filename, evt) {
+            if (evt) evt.preventDefault();
+            var link = document.createElement('a');
             link.href = url;
-            link.download = filename;
+            link.download = filename || 'archivo';
             link.target = '_blank';
             link.rel = 'noopener noreferrer';
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-        }
-
-        function viewFile(url, filename, event) {
-            if (event) event.preventDefault();
-            window.open(url, '_blank', 'noopener,noreferrer');
         }
 
     </script>
