@@ -1196,9 +1196,14 @@
                         // Limpiar formulario
                         form.reset();
 
-                        // Recargar calendario
+                        // Recargar calendario y esperar a que se complete
                         if (calendar) {
                             calendar.refetchEvents();
+                            // Dar tiempo para que se actualicen los eventos y se llame a eventsSet
+                            setTimeout(() => {
+                                // Forzar renderizado de la lista de tareas
+                                renderTaskList();
+                            }, 500);
                         }
 
                         alert('✓ Cita agendada correctamente');
@@ -1285,11 +1290,16 @@
                 .then(res => res.json())
                 .then(data => {
                     if (data.success) {
-                        // Recargar eventos del calendario
-                        calendar.refetchEvents();
+                        // Recargar eventos del calendario y esperar a que se complete
+                        if (calendar) {
+                            calendar.refetchEvents();
+                            // Dar tiempo para que se actualicen los eventos
+                            setTimeout(() => {
+                                renderTaskList();
+                            }, 300);
+                        }
                         // Mostrar mensaje breve
                         const msg = data.status === 'Completado' ? '✓ Tarea completada' : '↻ Tarea marcada como pendiente';
-                        // No mostrar alert, solo actualizar visualmente
                         console.log(msg);
                     } else {
                         alert('Error: ' + (data.msg || 'No se pudo actualizar la tarea'));
@@ -1318,7 +1328,13 @@
                 })
                 .then(data => {
                     if (data.success) {
-                        calendar.refetchEvents(); // Recargar calendario y lista
+                        // Recargar calendario y lista
+                        if (calendar) {
+                            calendar.refetchEvents();
+                            setTimeout(() => {
+                                renderTaskList();
+                            }, 300);
+                        }
                         alert('✓ Tarea eliminada correctamente');
                     } else {
                         alert('❌ Error: ' + (data.msg || 'No se pudo eliminar la tarea'));

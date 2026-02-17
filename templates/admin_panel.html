@@ -3160,12 +3160,12 @@
                                             <small class="text-muted">${sizeKB} KB</small>
                                         </div>
                                         <div class="d-flex gap-2">
-                                            <a href="/uploads/${filename}" target="_blank" class="btn btn-sm btn-info">
+                                            <button onclick="downloadFile('/uploads/${filename}', '${originalName}', event)" class="btn btn-sm btn-info">
                                                 <i class="bi bi-eye"></i> Ver
-                                            </a>
-                                            <a href="/uploads/${filename}" download="${originalName}" class="btn btn-sm btn-success">
+                                            </button>
+                                            <button onclick="downloadFile('/uploads/${filename}', '${originalName}', event)" class="btn btn-sm btn-success">
                                                 <i class="bi bi-download"></i> Descargar
-                                            </a>
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
@@ -3182,6 +3182,34 @@
                 .catch(err => {
                     console.error('Error cargando archivos:', err);
                     alert('Error al cargar los archivos adjuntos: ' + err.message);
+                });
+        }
+
+        // Nueva función para manejar la descarga de archivos con mejor manejo de errores
+        function downloadFile(url, filename, event) {
+            if (event) event.preventDefault();
+            
+            // Crear un elemento temporal para la descarga
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            link.target = '_blank';
+            
+            // Verificar si el archivo existe antes de intentar descargarlo
+            fetch(url, { method: 'HEAD' })
+                .then(response => {
+                    if (response.ok) {
+                        // El archivo existe, proceder con la descarga
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                    } else {
+                        throw new Error('Archivo no encontrado en el servidor');
+                    }
+                })
+                .catch(err => {
+                    console.error('Error al verificar archivo:', err);
+                    alert('⚠️ Error: No se pudo acceder al archivo. El archivo puede no existir o puede haber un problema de permisos.');
                 });
         }
 

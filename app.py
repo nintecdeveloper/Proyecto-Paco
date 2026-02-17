@@ -2039,7 +2039,27 @@ def logout():
 @app.route('/uploads/<filename>')
 @login_required
 def uploaded_file(filename):
-    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+    """Endpoint para descargar archivos adjuntos"""
+    try:
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        
+        # Verificar que el archivo existe
+        if not os.path.exists(filepath):
+            print(f"Archivo no encontrado: {filepath}")
+            return jsonify({'error': 'Archivo no encontrado'}), 404
+        
+        # Verificar que el archivo está dentro del directorio de uploads (seguridad)
+        upload_folder = os.path.abspath(app.config['UPLOAD_FOLDER'])
+        requested_path = os.path.abspath(filepath)
+        
+        if not requested_path.startswith(upload_folder):
+            print(f"Intento de acceso fuera del directorio de uploads: {requested_path}")
+            return jsonify({'error': 'Acceso denegado'}), 403
+        
+        return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+    except Exception as e:
+        print(f"Error al servir archivo {filename}: {str(e)}")
+        return jsonify({'error': f'Error al servir el archivo: {str(e)}'}), 500
 
 # --- BLOQUE DE INICIALIZACIÓN ---
 with app.app_context():
