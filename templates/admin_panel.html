@@ -84,7 +84,7 @@
             color: #000;
             padding: 10px;
             border-radius: 10px;
-            min-height: 500px;
+            min-height: 620px;
         }
 
         /* Autocomplete Styles */
@@ -197,10 +197,11 @@
         .task-item {
             background: #1f1f1f;
             border-left: 4px solid #444;
-            padding: 10px;
-            margin-bottom: 10px;
+            padding: 7px 10px;
+            margin-bottom: 6px;
             border-radius: 4px;
             transition: all 0.2s;
+            font-size: 0.82rem;
             cursor: pointer;
         }
 
@@ -283,8 +284,12 @@
                                 onclick="loadEmployeeCalendar({{ u.id }})">
                                 <i class="bi bi-calendar-check-fill me-1"></i> Ver Calendario
                             </button>
-                            <button class="btn btn-sm btn-outline-info w-100" onclick="viewTechStats({{ u.id }})">
+                            <button class="btn btn-sm btn-outline-info w-100 mb-2" onclick="viewTechStats({{ u.id }})">
                                 <i class="bi bi-graph-up me-1"></i> Ver Estadísticas
+                            </button>
+                            <!-- ✅ NUEVO: Botón perfil técnico -->
+                            <button class="btn btn-sm btn-outline-warning w-100" onclick="openTechProfileModal({{ u.id }}, '{{ u.username }}')">
+                                <i class="bi bi-person-lines-fill me-1"></i> Ver Perfil
                             </button>
                         </div>
                     </div>
@@ -299,16 +304,16 @@
                         </button>
                     </div>
                     <div class="row">
-                        <div class="col-lg-8">
+                        <div class="col-lg-9">
                             <div id="calendarAdmin"></div>
                         </div>
-                        <div class="col-lg-4">
+                        <div class="col-lg-3">
                             <div class="card bg-dark border-secondary mt-3 mt-lg-0">
                                 <div class="card-header bg-secondary text-white">
-                                    <h6 class="mb-0"><i class="bi bi-list-task me-2"></i>Lista de Tareas</h6>
+                                    <h6 class="mb-0 small"><i class="bi bi-list-task me-2"></i>Lista de Tareas</h6>
                                 </div>
-                                <div class="card-body p-2">
-                                    <div id="adminTaskListContainer" class="task-list-container" style="max-height: 500px; overflow-y: auto;">
+                                <div class="card-body p-1">
+                                    <div id="adminTaskListContainer" class="task-list-container" style="max-height: 580px; overflow-y: auto;">
                                         <div class="text-center text-muted py-3">Cargando...</div>
                                     </div>
                                 </div>
@@ -354,20 +359,20 @@
                 </div>
 
                 <div class="row">
-                    <div class="col-lg-8">
+                    <div class="col-lg-9">
                         <div id="calendarGlobal"></div>
                     </div>
-                    <div class="col-lg-4">
+                    <div class="col-lg-3">
                         <div class="card bg-dark border-secondary mt-3 mt-lg-0">
                             <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
-                                <h6 class="mb-0"><i class="bi bi-list-task me-2"></i>Lista de Tareas</h6>
+                                <h6 class="mb-0 small"><i class="bi bi-list-task me-2"></i>Tareas</h6>
                                 <div class="form-check form-switch mb-0">
                                     <input class="form-check-input" type="checkbox" id="toggleCompletedGlobal" onchange="renderGlobalTaskList()">
-                                    <label class="form-check-label small" for="toggleCompletedGlobal">Completadas</label>
+                                    <label class="form-check-label" style="font-size:0.75rem;" for="toggleCompletedGlobal">Completadas</label>
                                 </div>
                             </div>
-                            <div class="card-body p-2">
-                                <div id="globalTaskListContainer" class="task-list-container" style="max-height: 500px; overflow-y: auto;">
+                            <div class="card-body p-1">
+                                <div id="globalTaskListContainer" class="task-list-container" style="max-height: 580px; overflow-y: auto;">
                                     <div class="text-center text-muted py-3">Cargando...</div>
                                 </div>
                             </div>
@@ -387,6 +392,7 @@
                                 <th>Servicio</th>
                                 <th>Fecha</th>
                                 <th>Técnico</th>
+                                <th><i class="bi bi-stopwatch me-1"></i>Tiempo</th>
                                 <th>Archivos</th>
                                 <th>Acción</th>
                             </tr>
@@ -399,6 +405,24 @@
                                 <td>{{ r.service_type.name if r.service_type is not string else r.service_type }}</td>
                                 <td>{{ r.date.strftime('%d/%m/%Y') }}</td>
                                 <td>{{ r.tech.username if r.tech else 'Sin técnico' }}</td>
+                                <td>
+                                    {% if r.work_duration %}
+                                        <span style="
+                                            font-family: 'Courier New', monospace;
+                                            font-size: 0.85rem;
+                                            font-weight: 700;
+                                            color: #f37021;
+                                            background: #1a0d00;
+                                            border: 1px solid #f37021;
+                                            border-radius: 6px;
+                                            padding: 3px 8px;
+                                            letter-spacing: 1px;
+                                            white-space: nowrap;
+                                        ">{{ r.work_duration }}</span>
+                                    {% else %}
+                                        <span class="text-muted small">—</span>
+                                    {% endif %}
+                                </td>
                                 <td>
                                     {% if r.attachments %}
                                     {% set att_list = r.attachments|from_json %}
@@ -578,16 +602,34 @@
                             <div class="card-body">
                                 <div class="d-flex justify-content-between align-items-start mb-2">
                                     <h6 class="card-title text-warning fw-bold mb-0">{{ c.name }}</h6>
-                                    {% if c.has_support %}
+                                {% if c.has_support %}
                                     <span class="badge support-badge">
                                         <i class="bi bi-shield-check"></i> Soporte
                                     </span>
-                                    {% else %}
+                                {% else %}
                                     <span class="badge no-support-badge">
                                         <i class="bi bi-shield-x"></i> Sin Soporte
                                     </span>
+                                {% endif %}
+                                </div>
+
+                                {% if c.has_support and c.support_schedule %}
+                                <div class="mb-1">
+                                    {% if c.support_schedule == 'lv' %}
+                                    <span class="badge bg-success bg-opacity-25 border border-success text-success" style="font-size:0.72rem;">
+                                        <i class="bi bi-clock me-1"></i>L–V
+                                    </span>
+                                    {% elif c.support_schedule == 'ls' %}
+                                    <span class="badge bg-warning bg-opacity-25 border border-warning text-warning" style="font-size:0.72rem;">
+                                        <i class="bi bi-clock me-1"></i>L–S
+                                    </span>
+                                    {% elif c.support_schedule == 'ld' %}
+                                    <span class="badge bg-danger bg-opacity-25 border border-danger text-danger" style="font-size:0.72rem;">
+                                        <i class="bi bi-clock me-1"></i>L–D
+                                    </span>
                                     {% endif %}
                                 </div>
+                                {% endif %}
 
                                 <hr class="border-secondary my-2">
 
@@ -626,7 +668,7 @@
                             <div class="card-footer bg-black border-secondary">
                                 <div class="d-flex gap-2">
                                     <button class="btn btn-sm btn-outline-warning flex-fill"
-                                        onclick="openEditClientModalFull({{ c.id }}, '{{ c.name }}', '{{ c.phone }}', '{{ c.email }}', '{{ c.address }}', '{{ c.link or '' }}', '{{ c.notes or '' }}', {{ c.has_support|lower }})">
+                                        onclick="openEditClientModalFull({{ c.id }}, '{{ c.name }}', '{{ c.phone }}', '{{ c.email }}', '{{ c.address }}', '{{ c.link or '' }}', '{{ c.notes or '' }}', {{ c.has_support|lower }}, '{{ c.support_schedule or '' }}')">
                                         <i class="bi bi-pencil-fill"></i> Editar
                                     </button>
                                     <form method="POST" action="/manage_clients" class="flex-fill">
@@ -818,19 +860,19 @@
                     <h5 class="modal-title"><i class="bi bi-box-seam-fill me-2"></i>Nuevo Artículo de Stock</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <form method="POST" action="/manage_stock">
+                <!-- ✅ CORREGIDO: usar AJAX en lugar de POST directo para controlar subcategory_id -->
+                <form id="formAddStock">
                     <div class="modal-body">
-                        <input type="hidden" name="action" value="add">
+                        <div id="addStockAlert" class="alert d-none mb-3" role="alert"></div>
 
                         <div class="mb-3">
                             <label class="form-label">Nombre del Producto *</label>
-                            <input type="text" name="name" class="form-control" required
+                            <input type="text" name="name" id="addStockName" class="form-control" required
                                 placeholder="Ej: Cajón Cashlogy 1500">
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label">Categoría * <small
-                                    class="text-muted">(Obligatorio)</small></label>
+                            <label class="form-label">Categoría * <small class="text-muted">(Obligatorio)</small></label>
                             <select name="category_id" id="addStockCategory" class="form-select" required
                                 onchange="loadSubcategories(this.value, 'addStockSubcategory')">
                                 <option value="">-- Seleccionar Categoría --</option>
@@ -840,7 +882,7 @@
                         <div class="mb-3" id="subcategorySection" style="display: none;">
                             <label class="form-label">Subcategoría <small class="text-muted">(Opcional)</small></label>
                             <select name="subcategory_id" id="addStockSubcategory" class="form-select">
-                                <option value="">-- Sin subcategoría --</option>
+                                <option value="">-- Sin subcategoría (guardar en categoría padre) --</option>
                             </select>
                         </div>
 
@@ -851,9 +893,16 @@
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Stock Mínimo *</label>
-                                <input type="number" name="min_stock" class="form-control" value="5" required min="1">
+                                <input type="number" name="min_stock" class="form-control" value="5" required min="0">
                                 <small class="text-muted">Se activará alerta cuando esté por debajo</small>
                             </div>
+                        </div>
+
+                        <!-- ✅ NUEVO: Campo Proveedor -->
+                        <div class="mb-3">
+                            <label class="form-label">Proveedor</label>
+                            <input type="text" name="supplier" class="form-control"
+                                placeholder="Ej: HP España, Canon Iberia...">
                         </div>
 
                         <div class="mb-3">
@@ -864,7 +913,7 @@
                     </div>
                     <div class="modal-footer border-secondary">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                        <button type="submit" class="btn btn-warning">
+                        <button type="submit" class="btn btn-warning" id="btnAddStockSubmit">
                             <i class="bi bi-plus-circle-fill me-1"></i>Añadir Producto
                         </button>
                     </div>
@@ -932,7 +981,7 @@
                     <h5 class="modal-title"><i class="bi bi-box-seam me-2"></i>Editar Artículo de Stock</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <form method="POST" action="/edit_stock_item">
+                <form id="formEditStockItem" method="POST" action="/edit_stock_item/0">
                     <div class="modal-body">
                         <input type="hidden" name="item_id" id="editStockItemId">
 
@@ -1090,7 +1139,7 @@
                             <label class="form-label fw-bold">¿Tiene Soporte Técnico Contratado?</label>
                             <div class="form-check form-switch">
                                 <input class="form-check-input" type="checkbox" id="hasSupportSwitch"
-                                    name="has_support">
+                                    name="has_support" onchange="toggleSupportSchedule('addSupportScheduleDiv', this.checked)">
                                 <label class="form-check-label" for="hasSupportSwitch">
                                     Sí, tiene soporte técnico
                                 </label>
@@ -1099,6 +1148,31 @@
                                 <i class="bi bi-info-circle me-1"></i>
                                 Marca esta opción si el cliente tiene contratado soporte técnico con OSLAPRINT
                             </small>
+                        </div>
+
+                        <!-- ✅ NUEVO: Horario de soporte -->
+                        <div class="mb-3" id="addSupportScheduleDiv" style="display:none;">
+                            <label class="form-label fw-bold text-info"><i class="bi bi-clock me-1"></i>Horario de Soporte</label>
+                            <div class="d-flex gap-3 flex-wrap">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="support_schedule" id="addSched_lv" value="lv" checked>
+                                    <label class="form-check-label" for="addSched_lv">
+                                        <i class="bi bi-calendar-week me-1 text-success"></i>Lunes a Viernes
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="support_schedule" id="addSched_ls" value="ls">
+                                    <label class="form-check-label" for="addSched_ls">
+                                        <i class="bi bi-calendar-week me-1 text-warning"></i>Lunes a Sábado
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="support_schedule" id="addSched_ld" value="ld">
+                                    <label class="form-check-label" for="addSched_ld">
+                                        <i class="bi bi-calendar-week me-1 text-danger"></i>Lunes a Domingo
+                                    </label>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div class="modal-footer border-secondary">
@@ -1163,7 +1237,8 @@
                         <div class="mb-3">
                             <label class="form-label fw-bold">¿Tiene Soporte Técnico Contratado?</label>
                             <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" id="editHasSupport" name="has_support">
+                                <input class="form-check-input" type="checkbox" id="editHasSupport" name="has_support"
+                                    onchange="toggleSupportSchedule('editSupportScheduleDiv', this.checked)">
                                 <label class="form-check-label" for="editHasSupport">
                                     Sí, tiene soporte técnico
                                 </label>
@@ -1173,6 +1248,31 @@
                                 Marca esta opción si el cliente tiene contratado soporte técnico con OSLAPRINT
                             </small>
                         </div>
+
+                        <!-- ✅ NUEVO: Horario de soporte en edición -->
+                        <div class="mb-3" id="editSupportScheduleDiv" style="display:none;">
+                            <label class="form-label fw-bold text-info"><i class="bi bi-clock me-1"></i>Horario de Soporte</label>
+                            <div class="d-flex gap-3 flex-wrap">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="support_schedule" id="editSched_lv" value="lv">
+                                    <label class="form-check-label" for="editSched_lv">
+                                        <i class="bi bi-calendar-week me-1 text-success"></i>Lunes a Viernes
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="support_schedule" id="editSched_ls" value="ls">
+                                    <label class="form-check-label" for="editSched_ls">
+                                        <i class="bi bi-calendar-week me-1 text-warning"></i>Lunes a Sábado
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="support_schedule" id="editSched_ld" value="ld">
+                                    <label class="form-check-label" for="editSched_ld">
+                                        <i class="bi bi-calendar-week me-1 text-danger"></i>Lunes a Domingo
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="modal-footer border-secondary">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -1181,6 +1281,117 @@
                         </button>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ✅ NUEVO Modal: Perfil de Técnico -->
+    <div class="modal fade" id="modalTechProfile" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">
+                        <i class="bi bi-person-lines-fill me-2 text-warning"></i>
+                        Perfil Técnico: <span id="techProfileUsername" class="text-warning"></span>
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="techProfileAlert" class="alert d-none mb-3"></div>
+                    <input type="hidden" id="techProfileUserId">
+
+                    <!-- Tabs del perfil -->
+                    <ul class="nav nav-tabs mb-3 border-secondary" role="tablist">
+                        <li class="nav-item">
+                            <button class="nav-link active text-white" data-bs-toggle="tab" data-bs-target="#tabPersonal">
+                                <i class="bi bi-person me-1"></i>Datos Personales
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link text-white" data-bs-toggle="tab" data-bs-target="#tabLaboral">
+                                <i class="bi bi-briefcase me-1"></i>Datos Laborales
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link text-white" data-bs-toggle="tab" data-bs-target="#tabNotas">
+                                <i class="bi bi-sticky me-1"></i>Notas Internas
+                            </button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content">
+                        <!-- DATOS PERSONALES -->
+                        <div class="tab-pane fade show active" id="tabPersonal">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Nombre Completo</label>
+                                    <input type="text" id="tp_full_name" class="form-control" placeholder="Nombre y apellidos">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">DNI / NIE</label>
+                                    <input type="text" id="tp_dni" class="form-control" placeholder="12345678A">
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Teléfono</label>
+                                    <input type="tel" id="tp_phone" class="form-control" placeholder="6XX XXX XXX">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Dirección</label>
+                                    <input type="text" id="tp_address" class="form-control" placeholder="Calle, número, ciudad">
+                                </div>
+                            </div>
+                            <hr class="border-secondary">
+                            <h6 class="text-info mb-3"><i class="bi bi-telephone-fill me-2"></i>Contacto de Emergencia</h6>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Nombre del Contacto</label>
+                                    <input type="text" id="tp_emergency_contact" class="form-control" placeholder="Nombre del familiar/contacto">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Teléfono de Emergencia</label>
+                                    <input type="tel" id="tp_emergency_phone" class="form-control" placeholder="6XX XXX XXX">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- DATOS LABORALES -->
+                        <div class="tab-pane fade" id="tabLaboral">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Fecha de Incorporación</label>
+                                    <input type="date" id="tp_start_date" class="form-control">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Email del Sistema</label>
+                                    <input type="email" id="tp_email_display" class="form-control" disabled style="opacity:0.7;">
+                                    <small class="text-muted">El email se gestiona desde el panel de usuarios</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- NOTAS INTERNAS -->
+                        <div class="tab-pane fade" id="tabNotas">
+                            <div class="mb-1">
+                                <label class="form-label">Notas Internas del Administrador</label>
+                                <div class="alert alert-warning py-2 small mb-2">
+                                    <i class="bi bi-eye-slash me-1"></i>
+                                    Estas notas son <strong>solo visibles para el administrador</strong>. El técnico no tiene acceso a ellas.
+                                </div>
+                                <textarea id="tp_internal_notes" class="form-control" rows="7"
+                                    placeholder="Observaciones internas, evaluaciones, incidencias, etc..."></textarea>
+                            </div>
+                            <div id="techProfileUpdatedAt" class="text-muted small mt-2"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                    <button type="button" class="btn btn-warning fw-bold" onclick="saveTechProfile()" id="btnSaveTechProfile">
+                        <i class="bi bi-save-fill me-1"></i>Guardar Perfil
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -1979,7 +2190,7 @@
         }
 
         // Nueva función completa para editar clientes con todos los campos
-        function openEditClientModalFull(id, name, phone, email, address, link, notes, hasSupport) {
+        function openEditClientModalFull(id, name, phone, email, address, link, notes, hasSupport, supportSchedule) {
             document.getElementById('editClientId').value = id;
             document.getElementById('editClientName').value = name;
             document.getElementById('editClientPhone').value = phone;
@@ -1989,7 +2200,98 @@
             document.getElementById('editClientNotes').value = notes || '';
             document.getElementById('editHasSupport').checked = hasSupport;
 
+            // ✅ NUEVO: gestionar horario de soporte
+            toggleSupportSchedule('editSupportScheduleDiv', hasSupport);
+            const sched = supportSchedule || 'lv';
+            const radio = document.getElementById('editSched_' + sched);
+            if (radio) radio.checked = true;
+
             new bootstrap.Modal(document.getElementById('modalEditClient')).show();
+        }
+
+        // ✅ NUEVO: mostrar/ocultar el selector de horario de soporte
+        function toggleSupportSchedule(divId, show) {
+            const div = document.getElementById(divId);
+            if (div) div.style.display = show ? 'block' : 'none';
+        }
+
+        // ✅ NUEVO: Abrir y cargar perfil de técnico
+        function openTechProfileModal(userId, username) {
+            document.getElementById('techProfileUserId').value = userId;
+            document.getElementById('techProfileUsername').textContent = username;
+            document.getElementById('techProfileAlert').classList.add('d-none');
+
+            // Reset campos
+            ['tp_full_name','tp_dni','tp_phone','tp_address','tp_emergency_contact',
+             'tp_emergency_phone','tp_start_date','tp_internal_notes'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+            document.getElementById('techProfileUpdatedAt').textContent = '';
+
+            fetch(`/api/tech_profile/${userId}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        const p = data.profile;
+                        const u = data.user;
+                        document.getElementById('tp_full_name').value = p.full_name || '';
+                        document.getElementById('tp_dni').value = p.dni || '';
+                        document.getElementById('tp_phone').value = p.phone || '';
+                        document.getElementById('tp_address').value = p.address || '';
+                        document.getElementById('tp_emergency_contact').value = p.emergency_contact || '';
+                        document.getElementById('tp_emergency_phone').value = p.emergency_phone || '';
+                        document.getElementById('tp_start_date').value = p.start_date || '';
+                        document.getElementById('tp_email_display').value = u.email || '';
+                        document.getElementById('tp_internal_notes').value = p.internal_notes || '';
+                        if (p.updated_at) {
+                            document.getElementById('techProfileUpdatedAt').textContent = 'Última actualización: ' + p.updated_at;
+                        }
+                    }
+                })
+                .catch(err => console.error('Error cargando perfil técnico:', err));
+
+            new bootstrap.Modal(document.getElementById('modalTechProfile')).show();
+        }
+
+        function saveTechProfile() {
+            const userId = document.getElementById('techProfileUserId').value;
+            const btn = document.getElementById('btnSaveTechProfile');
+            const alertDiv = document.getElementById('techProfileAlert');
+
+            const formData = new FormData();
+            formData.append('full_name', document.getElementById('tp_full_name').value);
+            formData.append('dni', document.getElementById('tp_dni').value);
+            formData.append('phone', document.getElementById('tp_phone').value);
+            formData.append('address', document.getElementById('tp_address').value);
+            formData.append('emergency_contact', document.getElementById('tp_emergency_contact').value);
+            formData.append('emergency_phone', document.getElementById('tp_emergency_phone').value);
+            formData.append('start_date', document.getElementById('tp_start_date').value);
+            formData.append('internal_notes', document.getElementById('tp_internal_notes').value);
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Guardando...';
+
+            fetch(`/api/tech_profile/${userId}`, { method: 'POST', body: formData })
+                .then(res => res.json())
+                .then(data => {
+                    alertDiv.className = data.success ? 'alert alert-success' : 'alert alert-danger';
+                    alertDiv.textContent = data.msg;
+                    alertDiv.classList.remove('d-none');
+                    if (data.success) {
+                        document.getElementById('techProfileUpdatedAt').textContent =
+                            'Última actualización: ' + new Date().toLocaleString('es-ES');
+                    }
+                })
+                .catch(err => {
+                    alertDiv.className = 'alert alert-danger';
+                    alertDiv.textContent = 'Error de conexión al guardar el perfil';
+                    alertDiv.classList.remove('d-none');
+                })
+                .finally(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-save-fill me-1"></i>Guardar Perfil';
+                });
         }
 
         function openEditServiceModal(id, name, color) {
@@ -2013,6 +2315,8 @@
                         document.getElementById('editStockItemSupplier').value = item.supplier || '';
                         document.getElementById('editStockItemDescription').value = item.description || '';
                         document.getElementById('editStockItemCategory').value = item.category_id || '';
+                        // ✅ Actualizar la URL de acción del formulario con el item_id correcto
+                        document.getElementById('formEditStockItem').action = `/edit_stock_item/${item.id}`;
                         new bootstrap.Modal(document.getElementById('modalEditStockItem')).show();
                     } else {
                         alert('Error al cargar los datos del artículo');
@@ -2620,14 +2924,108 @@
 
         function addSubcategoryTo(parentId, parentName) {
             document.getElementById('categoryType').value = 'sub';
-            document.getElementById('parentCategorySelect').value = parentId;
             toggleParentSelect();
+
+            // ✅ CORRECCIÓN: preseleccionar después de que loadMainCategoriesForParent termine
+            fetch('/api/stock_categories')
+                .then(res => res.json())
+                .then(data => {
+                    const select = document.getElementById('parentCategorySelect');
+                    select.innerHTML = '<option value="">-- Seleccionar --</option>';
+                    data.forEach(cat => {
+                        const opt = document.createElement('option');
+                        opt.value = cat.id;
+                        opt.textContent = cat.name;
+                        select.appendChild(opt);
+                    });
+                    select.value = String(parentId); // preseleccionar correctamente
+                })
+                .catch(err => console.error('Error cargando categorías padre:', err));
 
             const modal = new bootstrap.Modal(document.getElementById('modalAddCategory'));
             modal.show();
-
             document.getElementById('categoryName').placeholder = `Nueva subcategoría de ${parentName}`;
         }
+
+        // ✅ NUEVO: Cargar categorías cuando se abre el modal de añadir stock
+        document.getElementById('modalAddStock').addEventListener('show.bs.modal', function () {
+            loadCategoriesIntoAddStockSelect();
+        });
+
+        function loadCategoriesIntoAddStockSelect() {
+            fetch('/api/stock_categories')
+                .then(res => res.json())
+                .then(data => {
+                    const select = document.getElementById('addStockCategory');
+                    select.innerHTML = '<option value="">-- Seleccionar Categoría --</option>';
+                    addCategoryOptionsToSelect(select, data);
+                    // Ocultar subcategoría al recargar
+                    document.getElementById('subcategorySection').style.display = 'none';
+                    document.getElementById('addStockSubcategory').innerHTML = '<option value="">-- Sin subcategoría --</option>';
+                })
+                .catch(err => console.error('Error cargando categorías en modal:', err));
+        }
+
+        // ✅ NUEVO: Manejador AJAX del formulario de añadir stock
+        document.getElementById('formAddStock').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const btn = document.getElementById('btnAddStockSubmit');
+            const alertDiv = document.getElementById('addStockAlert');
+
+            // Validación básica frontend
+            const name = document.getElementById('addStockName').value.trim();
+            const catId = document.getElementById('addStockCategory').value;
+            if (!name) {
+                alertDiv.className = 'alert alert-danger';
+                alertDiv.textContent = 'El nombre del producto es obligatorio';
+                alertDiv.classList.remove('d-none');
+                return;
+            }
+            if (!catId) {
+                alertDiv.className = 'alert alert-danger';
+                alertDiv.textContent = 'Debes seleccionar una categoría';
+                alertDiv.classList.remove('d-none');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Añadiendo...';
+
+            const formData = new FormData(this);
+            formData.append('action', 'add');
+
+            fetch('/manage_stock', { method: 'POST', body: formData })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        alertDiv.className = 'alert alert-success';
+                        alertDiv.textContent = data.msg;
+                        alertDiv.classList.remove('d-none');
+                        this.reset();
+                        document.getElementById('subcategorySection').style.display = 'none';
+                        loadStockTree();
+                        loadCategoriesIntoAddStockSelect();
+                        setTimeout(() => {
+                            bootstrap.Modal.getInstance(document.getElementById('modalAddStock')).hide();
+                            alertDiv.classList.add('d-none');
+                        }, 1200);
+                    } else {
+                        alertDiv.className = 'alert alert-danger';
+                        alertDiv.textContent = 'Error: ' + (data.msg || 'Error desconocido');
+                        alertDiv.classList.remove('d-none');
+                    }
+                })
+                .catch(err => {
+                    console.error('Error:', err);
+                    alertDiv.className = 'alert alert-danger';
+                    alertDiv.textContent = 'Error de conexión al añadir el producto';
+                    alertDiv.classList.remove('d-none');
+                })
+                .finally(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-plus-circle-fill me-1"></i>Añadir Producto';
+                });
+        });
 
         function deleteCategory(id, name, itemCount) {
             if (itemCount > 0) {

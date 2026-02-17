@@ -103,21 +103,23 @@
             color: #333;
             padding: 10px;
             border-radius: 10px;
+            min-height: 620px;
         }
 
         /* Task List Styles */
         .task-list-container {
-            max-height: 600px;
+            max-height: 580px;
             overflow-y: auto;
         }
 
         .task-item {
             background: #1f1f1f;
             border-left: 4px solid #444;
-            padding: 10px;
-            margin-bottom: 10px;
+            padding: 7px 10px;
+            margin-bottom: 6px;
             border-radius: 4px;
             transition: all 0.2s;
+            font-size: 0.82rem;
         }
 
         .task-item:hover {
@@ -406,6 +408,52 @@
                     </select>
                 </div>
 
+                <!-- ===== CRONÓMETRO DE TRABAJO ===== -->
+                <div id="workTimerBlock" class="mb-3 p-3 rounded" style="background: #0d0d0d; border: 2px solid #2a2a2a; transition: border-color 0.4s;">
+                    <label class="form-label fw-bold mb-3 small d-flex align-items-center gap-2" style="color: #888; letter-spacing: 1px; text-transform: uppercase;">
+                        <i class="bi bi-stopwatch"></i> Cronómetro de trabajo
+                    </label>
+                    <div class="d-flex flex-wrap align-items-center gap-3">
+                        <div id="timerDisplay" style="
+                            font-family: 'Courier New', monospace;
+                            font-size: 2.4rem;
+                            font-weight: 700;
+                            color: #555;
+                            letter-spacing: 4px;
+                            min-width: 160px;
+                            text-align: center;
+                            background: #000;
+                            border: 2px solid #222;
+                            border-radius: 8px;
+                            padding: 6px 18px;
+                            transition: color 0.4s, border-color 0.4s;
+                        ">00:00:00</div>
+                        <button type="button" id="timerBtn" onclick="toggleTimer()" style="
+                            background: var(--osla-orange);
+                            color: #fff;
+                            border: none;
+                            border-radius: 8px;
+                            font-weight: 700;
+                            font-size: 1rem;
+                            min-width: 160px;
+                            padding: 11px 0;
+                            transition: background 0.3s;
+                            cursor: pointer;
+                        ">
+                            <i class="bi bi-play-fill me-1" id="timerIcon"></i>
+                            <span id="timerBtnText">Iniciar trabajo</span>
+                        </button>
+                        <span id="timerStatus" class="small" style="color: #555;">Detenido</span>
+                    </div>
+                    <div id="timerSummary" class="mt-2 small" style="display:none; color: #aaa;">
+                        <i class="bi bi-check-circle-fill text-success me-1"></i>
+                        Tiempo registrado: <strong id="timerSummaryText" style="color:#fff;"></strong>
+                    </div>
+                    <!-- Campo oculto: se envía con el formulario POST -->
+                    <input type="hidden" name="work_duration" id="workDurationInput" value="">
+                </div>
+                <!-- ===== FIN CRONÓMETRO ===== -->
+
                 <div class="row g-3 mb-3">
                     <div class="col-12 col-md-8 position-relative">
                         <label class="form-label">CLIENTE</label>
@@ -435,7 +483,7 @@
                     </div>
                     <div class="col-6 col-md-4">
                         <label class="form-label">SALIDA</label>
-                        <input type="time" name="exit_time" class="form-control" required>
+                        <input type="time" name="exit_time" id="fieldExitTime" class="form-control" required>
                     </div>
                 </div>
 
@@ -454,10 +502,53 @@
                             <div class="col-5">
                                 <select name="stock_item_id[]" class="form-select">
                                     <option value="">Sin artículo de stock</option>
-                                    {% for item in stock_items %}
-                                    <option value="{{ item.id }}">{{ item.name }} ({{ item.quantity }} disponibles)
-                                    </option>
-                                    {% endfor %}
+                                    {% if stock_categories %}
+                                        {% for cat in stock_categories %}
+                                            {% if cat.subcategories %}
+                                                {% for subcat in cat.subcategories %}
+                                                    {% set subcat_items = stock_items | selectattr('category_id', 'equalto', subcat.id) | list %}
+                                                    {% if subcat_items %}
+                                                    <optgroup label="{{ cat.name }} › {{ subcat.name }}">
+                                                        {% for item in subcat_items %}
+                                                        <option value="{{ item.id }}">{{ item.name }} ({{ item.quantity }} disponibles)</option>
+                                                        {% endfor %}
+                                                    </optgroup>
+                                                    {% endif %}
+                                                {% endfor %}
+                                                {# Items directamente en la categoría padre #}
+                                                {% set cat_items = stock_items | selectattr('category_id', 'equalto', cat.id) | list %}
+                                                {% if cat_items %}
+                                                <optgroup label="{{ cat.name }}">
+                                                    {% for item in cat_items %}
+                                                    <option value="{{ item.id }}">{{ item.name }} ({{ item.quantity }} disponibles)</option>
+                                                    {% endfor %}
+                                                </optgroup>
+                                                {% endif %}
+                                            {% else %}
+                                                {% set cat_items = stock_items | selectattr('category_id', 'equalto', cat.id) | list %}
+                                                {% if cat_items %}
+                                                <optgroup label="{{ cat.name }}">
+                                                    {% for item in cat_items %}
+                                                    <option value="{{ item.id }}">{{ item.name }} ({{ item.quantity }} disponibles)</option>
+                                                    {% endfor %}
+                                                </optgroup>
+                                                {% endif %}
+                                            {% endif %}
+                                        {% endfor %}
+                                        {# Items sin categoría #}
+                                        {% set uncategorized = stock_items | selectattr('category_id', 'none') | list %}
+                                        {% if uncategorized %}
+                                        <optgroup label="Sin categoría">
+                                            {% for item in uncategorized %}
+                                            <option value="{{ item.id }}">{{ item.name }} ({{ item.quantity }} disponibles)</option>
+                                            {% endfor %}
+                                        </optgroup>
+                                        {% endif %}
+                                    {% else %}
+                                        {% for item in stock_items %}
+                                        <option value="{{ item.id }}">{{ item.name }} ({{ item.quantity }} disponibles)</option>
+                                        {% endfor %}
+                                    {% endif %}
                                 </select>
                             </div>
                             <div class="col-2">
@@ -592,30 +683,30 @@
             </div>
 
             <div class="row g-3">
-                <div class="col-12 col-lg-8">
+                <div class="col-12 col-lg-9">
                     <div id="calendarSection">
                         <div id="calendar"></div>
                     </div>
                 </div>
-                <div class="col-12 col-lg-4">
-                    <div class="card bg-dark border-secondary p-3">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h5 class="text-white fw-bold m-0">Mis Tareas</h5>
+                <div class="col-12 col-lg-3">
+                    <div class="card bg-dark border-secondary p-2">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="text-white fw-bold m-0 small">Mis Tareas</h6>
                             <div class="btn-group btn-group-sm" role="group">
-                                <button type="button" class="btn btn-outline-light" onclick="sortTasks('date')"
+                                <button type="button" class="btn btn-outline-light btn-sm" onclick="sortTasks('date')"
                                     title="Ordenar por fecha">
                                     <i class="bi bi-calendar3"></i>
                                 </button>
-                                <button type="button" class="btn btn-outline-light" onclick="sortTasks('alpha')"
+                                <button type="button" class="btn btn-outline-light btn-sm" onclick="sortTasks('alpha')"
                                     title="Ordenar alfabético">
                                     <i class="bi bi-sort-alpha-down"></i>
                                 </button>
                             </div>
                         </div>
-                        <div class="form-check form-switch mb-3">
+                        <div class="form-check form-switch mb-2">
                             <input class="form-check-input" type="checkbox" id="toggleCompleted"
                                 onchange="renderTaskList()">
-                            <label class="form-check-label small" for="toggleCompleted">Mostrar completadas</label>
+                            <label class="form-check-label" style="font-size:0.75rem;" for="toggleCompleted">Mostrar completadas</label>
                         </div>
                         <div id="taskListContainer" class="task-list-container"></div>
                     </div>
@@ -933,9 +1024,51 @@
                         <label class="form-label fw-bold">Material Utilizado o Retirado</label>
                         <select id="completeStockItem" class="form-select mb-2">
                             <option value="">-- No se usó material --</option>
-                            {% for item in stock_items %}
-                            <option value="{{ item.id }}">{{ item.name }} (Stock: {{ item.quantity }})</option>
-                            {% endfor %}
+                            {% if stock_categories %}
+                                {% for cat in stock_categories %}
+                                    {% if cat.subcategories %}
+                                        {% for subcat in cat.subcategories %}
+                                            {% set subcat_items = stock_items | selectattr('category_id', 'equalto', subcat.id) | list %}
+                                            {% if subcat_items %}
+                                            <optgroup label="{{ cat.name }} › {{ subcat.name }}">
+                                                {% for item in subcat_items %}
+                                                <option value="{{ item.id }}">{{ item.name }} (Stock: {{ item.quantity }})</option>
+                                                {% endfor %}
+                                            </optgroup>
+                                            {% endif %}
+                                        {% endfor %}
+                                        {% set cat_items = stock_items | selectattr('category_id', 'equalto', cat.id) | list %}
+                                        {% if cat_items %}
+                                        <optgroup label="{{ cat.name }}">
+                                            {% for item in cat_items %}
+                                            <option value="{{ item.id }}">{{ item.name }} (Stock: {{ item.quantity }})</option>
+                                            {% endfor %}
+                                        </optgroup>
+                                        {% endif %}
+                                    {% else %}
+                                        {% set cat_items = stock_items | selectattr('category_id', 'equalto', cat.id) | list %}
+                                        {% if cat_items %}
+                                        <optgroup label="{{ cat.name }}">
+                                            {% for item in cat_items %}
+                                            <option value="{{ item.id }}">{{ item.name }} (Stock: {{ item.quantity }})</option>
+                                            {% endfor %}
+                                        </optgroup>
+                                        {% endif %}
+                                    {% endif %}
+                                {% endfor %}
+                                {% set uncategorized = stock_items | selectattr('category_id', 'none') | list %}
+                                {% if uncategorized %}
+                                <optgroup label="Sin categoría">
+                                    {% for item in uncategorized %}
+                                    <option value="{{ item.id }}">{{ item.name }} (Stock: {{ item.quantity }})</option>
+                                    {% endfor %}
+                                </optgroup>
+                                {% endif %}
+                            {% else %}
+                                {% for item in stock_items %}
+                                <option value="{{ item.id }}">{{ item.name }} (Stock: {{ item.quantity }})</option>
+                                {% endfor %}
+                            {% endif %}
                         </select>
 
                         <div id="stockDetailsDiv" style="display: none;">
@@ -1098,16 +1231,32 @@
 
         function showSection(id) {
             document.querySelectorAll('[id^="section-"], #home-menu').forEach(el => el.classList.add('d-none'));
-            document.getElementById(id).classList.remove('d-none');
+            const target = document.getElementById(id);
+            if (target) target.classList.remove('d-none');
 
-            // Inicializar calendario si es necesario
-            if (id === 'section-agenda' && !calendar) {
-                setTimeout(() => initCalendar(), 100);
+            // Inicializar o refrescar calendario
+            if (id === 'section-agenda') {
+                if (!calendar) {
+                    setTimeout(() => initCalendar(), 100);
+                } else {
+                    // Ya existe: forzar re-render por si el contenedor cambió de tamaño
+                    setTimeout(() => {
+                        try { calendar.updateSize(); calendar.refetchEvents(); } catch(e) {}
+                    }, 100);
+                }
             }
 
             // Inicializar firma cuando se muestra la sección de parte
             if (id === 'section-parte') {
-                setTimeout(() => mainSignaturePad.init(), 100);
+                setTimeout(() => { try { mainSignaturePad.init(); } catch(e) {} }, 100);
+                // ✅ Auto-rellenar hora de salida con la hora actual real
+                const exitField = document.getElementById('fieldExitTime');
+                if (exitField && !exitField.value) {
+                    const now = new Date();
+                    const hh = String(now.getHours()).padStart(2, '0');
+                    const mm = String(now.getMinutes()).padStart(2, '0');
+                    exitField.value = `${hh}:${mm}`;
+                }
             }
 
             // Cargar analíticas cuando se muestra la sección
@@ -2433,8 +2582,12 @@
 
             if (selected.value === 'none') {
                 document.getElementById('fieldClient').value = '';
-                document.getElementById('fieldDate').value = document.querySelector('[name="date"]').value;
                 document.getElementById('fieldEntryTime').value = '';
+                // Auto-fill exit time with current time when reset
+                const now = new Date();
+                const hh = String(now.getHours()).padStart(2, '0');
+                const mm = String(now.getMinutes()).padStart(2, '0');
+                document.getElementById('fieldExitTime').value = `${hh}:${mm}`;
                 document.getElementById('fieldService').selectedIndex = 0;
                 document.getElementById('fieldDescription').value = '';
                 hideClientInfo();
@@ -2452,6 +2605,11 @@
                         document.getElementById('fieldClient').value = task.client_name;
                         document.getElementById('fieldDate').value = task.date;
                         document.getElementById('fieldEntryTime').value = task.start_time;
+                        // ✅ Auto-fill exit_time with current time when linking a task
+                        const now = new Date();
+                        const hh = String(now.getHours()).padStart(2, '0');
+                        const mm = String(now.getMinutes()).padStart(2, '0');
+                        document.getElementById('fieldExitTime').value = `${hh}:${mm}`;
 
                         // Seleccionar tipo de servicio
                         const serviceSelect = document.getElementById('fieldService');
@@ -2610,6 +2768,87 @@
             row.remove();
         }
 
+
+        // ==================== CRONÓMETRO DE TRABAJO ====================
+        let timerInterval  = null;
+        let timerRunning   = false;
+        let timerStartEpoch = null;   // epoch ms del momento en que se inició
+        let timerElapsed   = 0;       // segundos acumulados al detener
+
+        function toggleTimer() {
+            if (!timerRunning) {
+                // ── INICIAR ──
+                timerRunning    = true;
+                timerStartEpoch = Date.now();
+                timerInterval   = setInterval(tickTimer, 500);
+
+                document.getElementById('timerBtn').style.background     = '#dc3545';
+                document.getElementById('timerIcon').className            = 'bi bi-stop-fill me-1';
+                document.getElementById('timerBtnText').textContent       = 'Finalizar trabajo';
+                document.getElementById('timerStatus').textContent        = 'En marcha...';
+                document.getElementById('timerStatus').style.color        = '#28a745';
+                document.getElementById('timerDisplay').style.color       = '#f37021';
+                document.getElementById('timerDisplay').style.borderColor = '#f37021';
+                document.getElementById('workTimerBlock').style.borderColor = '#f37021';
+                document.getElementById('timerSummary').style.display     = 'none';
+
+            } else {
+                // ── DETENER ──
+                clearInterval(timerInterval);
+                timerRunning = false;
+                timerElapsed = Math.floor((Date.now() - timerStartEpoch) / 1000);
+
+                const h = Math.floor(timerElapsed / 3600);
+                const m = Math.floor((timerElapsed % 3600) / 60);
+                const s = timerElapsed % 60;
+                const hms = `${pad2(h)}:${pad2(m)}:${pad2(s)}`;
+
+                // Guardar en el campo oculto para enviarlo con el POST
+                document.getElementById('workDurationInput').value = hms;
+
+                // Resumen legible
+                let readable = '';
+                if (h > 0) readable += h + 'h ';
+                if (m > 0 || h > 0) readable += m + 'min ';
+                readable += s + 's';
+
+                document.getElementById('timerBtn').style.background        = '#198754';
+                document.getElementById('timerIcon').className               = 'bi bi-check-circle me-1';
+                document.getElementById('timerBtnText').textContent          = 'Reiniciar';
+                document.getElementById('timerStatus').textContent           = 'Finalizado';
+                document.getElementById('timerStatus').style.color           = '#28a745';
+                document.getElementById('timerDisplay').style.color          = '#28a745';
+                document.getElementById('timerDisplay').style.borderColor    = '#28a745';
+                document.getElementById('workTimerBlock').style.borderColor  = '#198754';
+                document.getElementById('timerSummary').style.display        = 'block';
+                document.getElementById('timerSummaryText').textContent      = readable.trim();
+
+                // Rellenar automáticamente hora de entrada/salida si están vacías
+                try {
+                    const startDt = new Date(timerStartEpoch);
+                    const endDt   = new Date(timerStartEpoch + timerElapsed * 1000);
+                    const toHM = dt => pad2(dt.getHours()) + ':' + pad2(dt.getMinutes());
+                    const entryF = document.getElementById('fieldEntryTime');
+                    const exitF  = document.getElementById('fieldExitTime');
+                    if (entryF && !entryF.value) entryF.value = toHM(startDt);
+                    if (exitF  && !exitF.value)  exitF.value  = toHM(endDt);
+                } catch(e) {}
+
+                // Siguiente pulsación = reinicio completo
+                timerElapsed    = 0;
+                timerStartEpoch = null;
+            }
+        }
+
+        function tickTimer() {
+            const elapsed = Math.floor((Date.now() - timerStartEpoch) / 1000);
+            const h = Math.floor(elapsed / 3600);
+            const m = Math.floor((elapsed % 3600) / 60);
+            const s = elapsed % 60;
+            document.getElementById('timerDisplay').textContent = `${pad2(h)}:${pad2(m)}:${pad2(s)}`;
+        }
+
+        function pad2(n) { return String(n).padStart(2, '0'); }
 
         // ==================== INCIDENCIAS ====================
         function updateIncidenciaEmail() {

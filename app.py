@@ -36,7 +36,7 @@ login_manager.login_view = 'login'
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), unique=True, nullable=False, index=True)
-    email = db.Column(db.String(100), unique=True, nullable=False, index=True)  # ✅ CORREGIDO: unique=True
+    email = db.Column(db.String(100), nullable=False, index=True)  # ✅ Email puede ser compartido entre usuarios
     password_hash = db.Column(db.String(512))
     role = db.Column(db.String(20))  # 'admin' o 'tech'
     reset_token = db.Column(db.String(100), unique=True, nullable=True)
@@ -48,9 +48,26 @@ class Client(db.Model):
     phone = db.Column(db.String(20), nullable=False)
     email = db.Column(db.String(100), nullable=False)
     address = db.Column(db.String(250), nullable=False)
-    link = db.Column(db.String(500), nullable=True)  # Sitio web o URL
+    link = db.Column(db.String(500), nullable=True)
     notes = db.Column(db.Text)
     has_support = db.Column(db.Boolean, default=False)
+    # ✅ NUEVO: horario de soporte — 'lv'=L-V / 'ls'=L-S / 'ld'=L-D
+    support_schedule = db.Column(db.String(5), nullable=True)
+
+class TechProfile(db.Model):
+    """Perfil extendido de técnico - datos personales y notas internas del admin"""
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), unique=True, nullable=False)
+    user = db.relationship('User', backref=db.backref('profile', uselist=False))
+    full_name = db.Column(db.String(150), nullable=True)
+    phone = db.Column(db.String(20), nullable=True)
+    address = db.Column(db.String(250), nullable=True)
+    emergency_contact = db.Column(db.String(150), nullable=True)
+    emergency_phone = db.Column(db.String(20), nullable=True)
+    start_date = db.Column(db.String(10), nullable=True)
+    dni = db.Column(db.String(20), nullable=True)
+    internal_notes = db.Column(db.Text, nullable=True)
+    updated_at = db.Column(db.DateTime, default=datetime.now)
 
 class ServiceType(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -107,6 +124,8 @@ class Task(db.Model):
     # Cronómetro de parte (solo inicio y fin)
     work_start_time = db.Column(db.DateTime)
     work_end_time = db.Column(db.DateTime)
+    # Duración total medida por el cronómetro del técnico (formato HH:MM:SS)
+    work_duration = db.Column(db.String(20), nullable=True)
 
     tech = db.relationship('User', backref='tasks')
     client = db.relationship('Client', backref='tasks')
@@ -353,6 +372,8 @@ def dashboard():
         stock_items = Stock.query.order_by(Stock.name).all()
         # ✅ Obtener categorías para el panel de stock
         stock_categories = StockCategory.query.filter_by(parent_id=None).all()
+        # ✅ NUEVO: todas las categorías (incluidas subcategorías) para el selector de edición
+        all_categories = StockCategory.query.order_by(StockCategory.name).all()
         
         return render_template('admin_panel.html', 
                              empleados=empleados,
@@ -361,18 +382,25 @@ def dashboard():
                              informes=informes,
                              stock_items=stock_items,
                              stock_categories=stock_categories,
+                             all_categories=all_categories,
                              today_date=date.today().strftime('%Y-%m-%d'))
     else:
-        pending_tasks = Task.query.filter_by(
-            tech_id=current_user.id, 
-            status='Pendiente'
+        # ✅ Solo mostrar tareas pendientes de los próximos 3 días en el selector de parte
+        three_days_ahead = date.today() + timedelta(days=3)
+        pending_tasks = Task.query.filter(
+            Task.tech_id == current_user.id,
+            Task.status == 'Pendiente',
+            Task.date >= date.today(),
+            Task.date <= three_days_ahead
         ).order_by(Task.date.asc()).all()
         
         stock_items = Stock.query.filter(Stock.quantity > 0).order_by(Stock.name).all()
+        stock_categories = StockCategory.query.filter_by(parent_id=None).order_by(StockCategory.name).all()
         
         return render_template('tech_panel.html',
                              pending_tasks=pending_tasks,
                              stock_items=stock_items,
+                             stock_categories=stock_categories,
                              today_date=date.today().strftime('%Y-%m-%d'))
 
 @app.route('/change_password', methods=['POST'])
@@ -434,11 +462,7 @@ def manage_users():
                 flash('Ya existe un usuario con ese nombre', 'danger')
                 return redirect(url_for('dashboard'))
             
-            # ✅ VALIDACIÓN: Verificar email único
-            if User.query.filter_by(email=email).first():
-                flash('Ya existe un usuario con ese correo electrónico', 'danger')
-                return redirect(url_for('dashboard'))
-            
+            # ✅ El email puede ser compartido entre usuarios (no se valida unicidad)
             # Validar contraseña
             is_valid, message = validate_password(password)
             if not is_valid:
@@ -480,8 +504,6 @@ def manage_users():
         print(f"Error de integridad en manage_users: {str(e)}")
         if 'username' in str(e).lower():
             flash('Error: El nombre de usuario ya existe', 'danger')
-        elif 'email' in str(e).lower():
-            flash('Error: El correo electrónico ya existe', 'danger')
         else:
             flash('Error de integridad en la base de datos', 'danger')
     except SQLAlchemyError as e:
@@ -509,6 +531,7 @@ def manage_clients():
         link = request.form.get('link', '')
         notes = request.form.get('notes', '')
         has_support = request.form.get('has_support') == 'on'
+        support_schedule = request.form.get('support_schedule', '') if has_support else None
         
         if Client.query.filter_by(name=name).first():
             flash('Ya existe un cliente con ese nombre', 'danger')
@@ -521,7 +544,8 @@ def manage_clients():
             address=address,
             link=link,
             notes=notes,
-            has_support=has_support
+            has_support=has_support,
+            support_schedule=support_schedule if support_schedule else None
         )
         db.session.add(new_client)
         db.session.commit()
@@ -547,9 +571,10 @@ def manage_clients():
             client.address = request.form.get('address')
             client.link = request.form.get('link', '')
             client.notes = request.form.get('notes', '')
-            # El campo has_support solo se actualiza si está marcado, no cambia automáticamente
             has_support_value = request.form.get('has_support')
             client.has_support = (has_support_value == 'on' or has_support_value == 'true')
+            # ✅ NUEVO: guardar horario de soporte
+            client.support_schedule = request.form.get('support_schedule', '') if client.has_support else None
             
             db.session.commit()
             flash('Cliente actualizado correctamente', 'success')
@@ -610,24 +635,59 @@ def manage_stock():
     action = request.form.get('action')
     
     if action == 'add':
-        name = request.form.get('name')
-        category_id = request.form.get('category_id')
-        quantity = int(request.form.get('quantity', 0))
-        min_stock = int(request.form.get('min_stock', 5))
-        supplier = request.form.get('supplier', '')  # ✅ NUEVO CAMPO
-        
-        new_item = Stock(
-            name=name,
-            category_id=int(category_id) if category_id else None,
-            quantity=quantity,
-            min_stock=min_stock,
-            supplier=supplier  # ✅ GUARDAR PROVEEDOR
-        )
-        db.session.add(new_item)
-        db.session.commit()
-        check_low_stock()
-        
-        return jsonify({'success': True, 'msg': 'Artículo añadido correctamente'})
+        try:
+            name = request.form.get('name', '').strip()
+            if not name:
+                return jsonify({'success': False, 'msg': 'El nombre del producto es obligatorio'})
+
+            # ✅ CORRECCIÓN CRÍTICA: usar subcategory_id si está seleccionado, si no usar category_id
+            subcategory_id = request.form.get('subcategory_id', '').strip()
+            category_id    = request.form.get('category_id', '').strip()
+            final_category_id = subcategory_id if subcategory_id else category_id
+
+            # Validar que la categoría exista (si se proporcionó)
+            if final_category_id:
+                cat = StockCategory.query.get(int(final_category_id))
+                if not cat:
+                    return jsonify({'success': False, 'msg': 'La categoría seleccionada no existe'})
+
+            # ✅ CORRECCIÓN: int() dentro de try para evitar crash con valores inválidos
+            try:
+                quantity  = int(request.form.get('quantity', 0))
+                min_stock = int(request.form.get('min_stock', 5))
+            except (ValueError, TypeError):
+                return jsonify({'success': False, 'msg': 'Los campos de cantidad deben ser números enteros'})
+
+            if quantity < 0:
+                return jsonify({'success': False, 'msg': 'La cantidad no puede ser negativa'})
+            if min_stock < 0:
+                return jsonify({'success': False, 'msg': 'El stock mínimo no puede ser negativo'})
+
+            supplier    = request.form.get('supplier', '').strip()
+            description = request.form.get('description', '').strip()
+
+            new_item = Stock(
+                name=name,
+                category_id=int(final_category_id) if final_category_id else None,
+                quantity=quantity,
+                min_stock=min_stock,
+                supplier=supplier,
+                description=description
+            )
+            db.session.add(new_item)
+            db.session.commit()
+            check_low_stock()
+
+            return jsonify({'success': True, 'msg': f'Producto "{name}" añadido correctamente'})
+
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            print(f"Error SQLAlchemy en manage_stock add: {str(e)}")
+            return jsonify({'success': False, 'msg': 'Error al guardar en la base de datos'})
+        except Exception as e:
+            db.session.rollback()
+            print(f"Error inesperado en manage_stock add: {str(e)}")
+            return jsonify({'success': False, 'msg': f'Error inesperado: {str(e)}'})
     
     elif action == 'edit':  # ✅ NUEVA ACCIÓN PARA EDITAR
         item_id = request.form.get('item_id')
@@ -646,23 +706,45 @@ def manage_stock():
         return jsonify({'success': False, 'msg': 'Artículo no encontrado'})
     
     elif action == 'adjust':
-        item_id = request.form.get('item_id')
-        adjustment = int(request.form.get('adjustment', 0))
-        
-        item = Stock.query.get(item_id)
-        if item:
-            item.quantity += adjustment
+        try:
+            item_id = request.form.get('item_id')
+            if not item_id:
+                return jsonify({'success': False, 'msg': 'ID de artículo no proporcionado'})
+            try:
+                adjustment = int(request.form.get('adjustment', request.form.get('adjust_qty', 0)))
+            except (ValueError, TypeError):
+                return jsonify({'success': False, 'msg': 'El ajuste debe ser un número entero'})
+
+            item = Stock.query.get(int(item_id))
+            if not item:
+                return jsonify({'success': False, 'msg': 'Artículo no encontrado'})
+
+            new_qty = item.quantity + adjustment
+            if new_qty < 0:
+                return jsonify({'success': False, 'msg': f'Stock insuficiente. Stock actual: {item.quantity}'})
+
+            item.quantity = new_qty
             db.session.commit()
             check_low_stock()
             return jsonify({'success': True, 'msg': 'Stock ajustado', 'new_quantity': item.quantity})
-    
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'msg': 'Error al ajustar el stock'})
+
     elif action == 'delete':
-        item_id = request.form.get('item_id')
-        item = Stock.query.get(item_id)
-        if item:
+        try:
+            item_id = request.form.get('item_id')
+            if not item_id:
+                return jsonify({'success': False, 'msg': 'ID de artículo no proporcionado'})
+            item = Stock.query.get(int(item_id))
+            if not item:
+                return jsonify({'success': False, 'msg': 'Artículo no encontrado'})
             db.session.delete(item)
             db.session.commit()
             return jsonify({'success': True, 'msg': 'Artículo eliminado'})
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'msg': 'Error al eliminar el artículo'})
     
     return jsonify({'success': False, 'msg': 'Acción no válida'})
 
@@ -682,18 +764,30 @@ def manage_stock_categories():
             if not name:
                 return jsonify({'success': False, 'msg': 'El nombre de la categoría es obligatorio'})
             
-            # Verificar si ya existe una categoría con ese nombre
-            if StockCategory.query.filter_by(name=name).first():
-                return jsonify({'success': False, 'msg': 'Ya existe una categoría con ese nombre'})
+            parent_id_val = int(parent_id) if parent_id and parent_id.isdigit() else None
+
+            # ✅ CORRECCIÓN: verificar nombre único dentro del mismo nivel jerárquico
+            duplicate = StockCategory.query.filter_by(name=name, parent_id=parent_id_val).first()
+            if duplicate:
+                return jsonify({'success': False, 'msg': f'Ya existe una {"subcategoría" if parent_id_val else "categoría"} con el nombre "{name}"'})
+            
+            # Validar que el padre exista si se especificó
+            if parent_id_val:
+                parent = StockCategory.query.get(parent_id_val)
+                if not parent:
+                    return jsonify({'success': False, 'msg': 'La categoría padre seleccionada no existe'})
+                # No permitir subcategorías de subcategorías (máximo 2 niveles)
+                if parent.parent_id is not None:
+                    return jsonify({'success': False, 'msg': 'No se permiten más de 2 niveles de categorías'})
             
             new_category = StockCategory(
                 name=name,
-                parent_id=int(parent_id) if parent_id and parent_id != '' else None
+                parent_id=parent_id_val
             )
             db.session.add(new_category)
             db.session.commit()
             
-            return jsonify({'success': True, 'msg': 'Categoría creada correctamente'})
+            return jsonify({'success': True, 'msg': f'{"Subcategoría" if parent_id_val else "Categoría"} "{name}" creada correctamente', 'id': new_category.id})
         
         elif action == 'delete':
             category_id = request.form.get('category_id')
@@ -748,9 +842,12 @@ def save_report():
         stock_qtys = request.form.getlist('stock_quantity[]')
         stock_actions = request.form.getlist('stock_action[]')
         
-        # Firma digital
+        # Firma digital (el campo HTML se llama 'signature_name', no 'signature_client_name')
         signature_data = request.form.get('signature_data')
-        signature_name = request.form.get('signature_client_name')
+        signature_name = request.form.get('signature_name') or request.form.get('signature_client_name', '')
+        
+        # Duración del cronómetro (formato HH:MM:SS, enviado desde el campo oculto)
+        work_duration = request.form.get('work_duration', '').strip() or None
         
         if not signature_data:
             flash('⚠️ La firma del cliente es obligatoria', 'danger')
@@ -805,6 +902,8 @@ def save_report():
                 task.signature_timestamp = datetime.now()
                 task.status = 'Completado'
                 task.work_end_time = datetime.now()
+                if work_duration:
+                    task.work_duration = work_duration
                 
                 # Guardar items de stock
                 if stock_items_used:
@@ -868,7 +967,8 @@ def save_report():
             signature_client_name=signature_name,
             signature_timestamp=datetime.now(),
             status='Completado',
-            work_end_time=datetime.now()
+            work_end_time=datetime.now(),
+            work_duration=work_duration
         )
         
         # Guardar items de stock
@@ -1122,6 +1222,7 @@ def get_task_details(task_id):
             'signature_timestamp': task.signature_timestamp.strftime('%d/%m/%Y %H:%M') if task.signature_timestamp else None,
             'work_start_time': task.work_start_time.strftime('%H:%M') if task.work_start_time else None,
             'work_end_time': task.work_end_time.strftime('%H:%M') if task.work_end_time else None,
+            'work_duration': task.work_duration or None,
             'stock_info': {
                 'item_name': task.stock_item.name if task.stock_item else None,
                 'quantity': task.stock_quantity_used,
@@ -1335,6 +1436,62 @@ def get_admin_analytics():
             'monthly_tasks': monthly_tasks
         }
     })
+
+@app.route('/api/tech_profile/<int:user_id>', methods=['GET'])
+@login_required
+def get_tech_profile(user_id):
+    """Obtener perfil extendido de un técnico"""
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'msg': 'No autorizado'}), 403
+    tech = User.query.filter_by(id=user_id, role='tech').first()
+    if not tech:
+        return jsonify({'success': False, 'msg': 'Técnico no encontrado'}), 404
+    profile = tech.profile  # puede ser None si nunca se editó
+    return jsonify({
+        'success': True,
+        'user': {'id': tech.id, 'username': tech.username, 'email': tech.email},
+        'profile': {
+            'full_name': profile.full_name if profile else '',
+            'phone': profile.phone if profile else '',
+            'address': profile.address if profile else '',
+            'emergency_contact': profile.emergency_contact if profile else '',
+            'emergency_phone': profile.emergency_phone if profile else '',
+            'start_date': profile.start_date if profile else '',
+            'dni': profile.dni if profile else '',
+            'internal_notes': profile.internal_notes if profile else '',
+            'updated_at': profile.updated_at.strftime('%d/%m/%Y %H:%M') if profile and profile.updated_at else ''
+        }
+    })
+
+@app.route('/api/tech_profile/<int:user_id>', methods=['POST'])
+@login_required
+def save_tech_profile(user_id):
+    """Guardar/actualizar perfil extendido de un técnico"""
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'msg': 'No autorizado'}), 403
+    try:
+        tech = User.query.filter_by(id=user_id, role='tech').first()
+        if not tech:
+            return jsonify({'success': False, 'msg': 'Técnico no encontrado'}), 404
+        profile = tech.profile
+        if not profile:
+            profile = TechProfile(user_id=user_id)
+            db.session.add(profile)
+        profile.full_name = request.form.get('full_name', '').strip()
+        profile.phone = request.form.get('phone', '').strip()
+        profile.address = request.form.get('address', '').strip()
+        profile.emergency_contact = request.form.get('emergency_contact', '').strip()
+        profile.emergency_phone = request.form.get('emergency_phone', '').strip()
+        profile.start_date = request.form.get('start_date', '').strip()
+        profile.dni = request.form.get('dni', '').strip()
+        profile.internal_notes = request.form.get('internal_notes', '').strip()
+        profile.updated_at = datetime.now()
+        db.session.commit()
+        return jsonify({'success': True, 'msg': 'Perfil actualizado correctamente'})
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        print(f"Error guardando perfil técnico: {e}")
+        return jsonify({'success': False, 'msg': 'Error al guardar el perfil'})
 
 @app.route('/api/stock_categories')
 @login_required
@@ -2041,6 +2198,53 @@ def api_get_client(client_id):
     except Exception as e:
         return jsonify({'success': False, 'msg': str(e)}), 500
 
+@app.route('/report_incidencia', methods=['POST'])
+@login_required
+def report_incidencia():
+    """Endpoint para reportar incidencias desde el panel técnico"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'msg': 'No se recibieron datos'}), 400
+        
+        tipo = data.get('tipo', '')
+        asunto = data.get('asunto', '')
+        descripcion = data.get('descripcion', '')
+        cliente = data.get('cliente', '')
+        usuario = data.get('usuario', current_user.username)
+        
+        if not tipo or not asunto or not descripcion:
+            return jsonify({'success': False, 'msg': 'Faltan campos obligatorios'}), 400
+        
+        # Determinar destinatario
+        email_dest = 'paco@oslaprint.com' if tipo == 'operativa' else 'nintecdeveloper@gmail.com'
+        
+        # Crear alarma en el sistema para que el admin la vea
+        alarm = Alarm(
+            alarm_type='incidencia_' + tipo,
+            title=f'Incidencia {tipo.title()}: {asunto}',
+            description=f'Técnico: {usuario}\nCliente: {cliente or "N/A"}\n\n{descripcion}',
+            client_name=cliente if cliente else None,
+            priority='high' if tipo == 'tecnica' else 'normal'
+        )
+        db.session.add(alarm)
+        db.session.commit()
+        
+        # En producción se enviaría email a email_dest
+        print(f"\n{'='*60}")
+        print(f"📧 INCIDENCIA REPORTADA → {email_dest}")
+        print(f"Tipo: {tipo} | Asunto: {asunto}")
+        print(f"Técnico: {usuario} | Cliente: {cliente or 'N/A'}")
+        print(f"Descripción: {descripcion}")
+        print('='*60 + '\n')
+        
+        return jsonify({'success': True, 'msg': 'Incidencia reportada correctamente'})
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error en report_incidencia: {e}")
+        return jsonify({'success': False, 'msg': 'Error al procesar la incidencia'}), 500
+
 @app.route('/logout')
 def logout():
     logout_user()
@@ -2076,6 +2280,23 @@ def uploaded_file(filename):
 with app.app_context():
     db.create_all()
     
+    # ✅ MIGRACIÓN: Eliminar restricción unique de email en User (si existe)
+    try:
+        from sqlalchemy import inspect, text as sa_text
+        if db.engine.dialect.name == 'postgresql':
+            with db.engine.connect() as conn:
+                # Intentar eliminar el índice único de email si existe
+                conn.execute(sa_text('DROP INDEX IF EXISTS ix_user_email'))
+                conn.execute(sa_text('ALTER TABLE "user" DROP CONSTRAINT IF EXISTS uq_user_email'))
+                conn.execute(sa_text('ALTER TABLE "user" DROP CONSTRAINT IF EXISTS user_email_key'))
+                conn.commit()
+                print("✓ Restricción unique de email eliminada (si existía)")
+        elif db.engine.dialect.name == 'sqlite':
+            # SQLite no soporta DROP CONSTRAINT, se deja así (la columna ya no tiene unique en el modelo)
+            pass
+    except Exception as e:
+        print(f"Nota: Migración unique email: {e}")
+
     # ✅ MIGRACIÓN: Ampliar columna 'password_hash' a VARCHAR(512) si es PostgreSQL
     try:
         from sqlalchemy import inspect, text as sa_text
@@ -2118,6 +2339,31 @@ with app.app_context():
                 print("✓ Columna 'link' añadida")
     except Exception as e:
         print(f"Nota: Migración de 'link': {e}")
+
+    # ✅ MIGRACIÓN: Añadir columna 'work_duration' a Task
+    try:
+        from sqlalchemy import inspect
+        inspector = inspect(db.engine)
+        task_columns = [col['name'] for col in inspector.get_columns('task')]
+        if 'work_duration' not in task_columns:
+            with db.engine.connect() as conn:
+                conn.execute(db.text('ALTER TABLE task ADD COLUMN work_duration VARCHAR(20)'))
+                conn.commit()
+                print("✓ Columna 'work_duration' añadida a Task")
+    except Exception as e:
+        print(f"Nota: Migración 'work_duration': {e}")
+
+    # ✅ MIGRACIÓN: Añadir columna 'support_schedule' a Client
+    try:
+        inspector = inspect(db.engine)
+        client_cols = [col['name'] for col in inspector.get_columns('client')]
+        if 'support_schedule' not in client_cols:
+            with db.engine.connect() as conn:
+                conn.execute(db.text('ALTER TABLE client ADD COLUMN support_schedule VARCHAR(5)'))
+                conn.commit()
+                print("✓ Columna 'support_schedule' añadida a Client")
+    except Exception as e:
+        print(f"Nota: Migración 'support_schedule': {e}")
     
     # Usuarios de prueba
     if not User.query.filter_by(username='admin').first():
