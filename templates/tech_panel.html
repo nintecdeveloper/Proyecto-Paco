@@ -294,10 +294,40 @@
             border-radius: 10px;
             border: 1px solid #333;
         }
+
+        /* Toast notificaciones */
+        #toastContainer {
+            position: fixed;
+            top: 75px;
+            right: 20px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .osla-toast {
+            background: #1f1f1f;
+            border-left: 4px solid var(--osla-orange);
+            color: #fff;
+            padding: 12px 18px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            font-size: 0.95rem;
+            min-width: 260px;
+            animation: toastIn 0.25s ease;
+        }
+        .osla-toast.success { border-left-color: #198754; }
+        .osla-toast.error   { border-left-color: #dc3545; }
+        .osla-toast.info    { border-left-color: #0dcaf0; }
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateX(30px); }
+            to   { opacity: 1; transform: translateX(0); }
+        }
     </style>
 </head>
 
 <body>
+<div id="toastContainer"></div>
 
     <nav class="navbar px-3 py-3 mb-4 sticky-top">
         <div class="d-flex justify-content-between w-100 align-items-center">
@@ -316,7 +346,7 @@
     <div class="container-fluid px-3 px-md-5">
         {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}{% for category, message in messages %}
-        <div class="alert alert-{{ category }} alert-dismissible fade show bg-dark text-white border-secondary">
+        <div class="alert alert-{{ category }} alert-dismissible fade show bg-dark text-white border-secondary osla-flash">
             {{ message }}<button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
         </div>
         {% endfor %}{% endif %}
@@ -1003,13 +1033,68 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // ====== TOAST NOTIFICATIONS (reemplaza alert() bloqueantes) ======
+        function showToast(msg, type = 'success', duration = 1200) {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = 'osla-toast ' + type;
+            const icon = type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ';
+            toast.innerHTML = `<span style="margin-right:8px;font-weight:bold;">${icon}</span>${msg}`;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.transition = 'opacity 0.3s';
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 320);
+            }, duration);
+        }
+
+        // Auto-dismiss flash messages de Flask (1 segundo)
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.osla-flash').forEach(function(el) {
+                setTimeout(function() {
+                    el.style.transition = 'opacity 0.4s';
+                    el.style.opacity = '0';
+                    setTimeout(function() { el.remove(); }, 420);
+                }, 1000);
+            });
+        });
+
         let calendar;
         const modalAction = new bootstrap.Modal(document.getElementById('modalEventAction'));
 
         // Almacén local de tareas para la lista
-        let cachedTasks = [];
-        let currentSort = 'date'; // 'date' | 'alpha'
-        let selectedFiles = []; // Array para almacenar archivos seleccionados
+        let cachedTasks = [];       // Eventos del rango visible del calendario (para referencia)
+        let allTasksCache = [];     // TODOS los eventos del técnico (para la lista lateral)
+        let currentSort = 'date';   // 'date' | 'alpha'
+        let selectedFiles = [];     // Array para almacenar archivos seleccionados
+
+        // Carga TODOS los eventos (no solo el rango visible) para la lista lateral
+        function loadAllTasksForList() {
+            fetch('/api/tasks')
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    allTasksCache = data.map(function(e) {
+                        return {
+                            id: String(e.id),
+                            title: e.title || '',
+                            start: e.start || '',
+                            color: e.backgroundColor || e.color || '#6c757d',
+                            extendedProps: {
+                                status: e.extendedProps ? e.extendedProps.status : (e.status || 'Pendiente'),
+                                client: e.extendedProps ? e.extendedProps.client : (e.client || ''),
+                                client_id: e.extendedProps ? e.extendedProps.client_id : null,
+                                service_type: e.extendedProps ? e.extendedProps.service_type : (e.service_type || ''),
+                                desc: e.extendedProps ? e.extendedProps.desc : '',
+                                has_attachments: e.extendedProps ? e.extendedProps.has_attachments : false
+                            }
+                        };
+                    });
+                    renderTaskList();
+                })
+                .catch(function(err) {
+                    console.error('Error cargando todas las tareas:', err);
+                });
+        }
 
         function showSection(id) {
             document.querySelectorAll('[id^="section-"], #home-menu').forEach(el => el.classList.add('d-none'));
@@ -1044,7 +1129,21 @@
                     right: 'dayGridMonth,timeGridWeek,listWeek'
                 },
                 height: 'auto',
-                events: '/api/tasks',
+                events: function(fetchInfo, successCallback, failureCallback) {
+                    fetch('/api/tasks')
+                        .then(function(res) { return res.json(); })
+                        .then(function(data) {
+                            var activeTypes = getTechActiveFilters();
+                            var filtered = activeTypes.length === 0
+                                ? data
+                                : data.filter(function(ev) {
+                                    var stype = ev.extendedProps ? ev.extendedProps.service_type : ev.service_type;
+                                    return activeTypes.includes(stype);
+                                });
+                            successCallback(filtered);
+                        })
+                        .catch(failureCallback);
+                },
                 eventClick: handleEventClick,
                 dateClick: handleDateClick,
                 selectable: true,
@@ -1063,10 +1162,26 @@
                     }
                 },
                 eventsSet: function (events) {
-                    // ✅ Cachear eventos y actualizar lista
-                    cachedTasks = events;
-                    console.log('📅 Eventos actualizados:', events.length, 'tareas');
-                    renderTaskList();
+                    // Serializar EventApi para referencia local (solo rango visible)
+                    cachedTasks = events.map(function(e) {
+                        return {
+                            id: e.id,
+                            title: e.title,
+                            start: e.start ? e.start.toISOString() : '',
+                            color: e.backgroundColor || '#6c757d',
+                            extendedProps: {
+                                status: e.extendedProps.status,
+                                client: e.extendedProps.client,
+                                client_id: e.extendedProps.client_id,
+                                tech_name: e.extendedProps.tech_name,
+                                service_type: e.extendedProps.service_type,
+                                desc: e.extendedProps.desc,
+                                has_attachments: e.extendedProps.has_attachments
+                            }
+                        };
+                    });
+                    // Recargar TODOS los eventos para la lista (incluye completadas fuera del rango visible)
+                    loadAllTasksForList();
                 }
             });
             calendar.render();
@@ -1097,18 +1212,9 @@
 
         function updateTechFilters() {
             if (!calendar) return;
-
-            const activeTypes = getTechActiveFilters();
-
-            // Mostrar/ocultar eventos ya cargados usando la API de FullCalendar
-            calendar.getEvents().forEach(function(event) {
-                const type = event.extendedProps.service_type;
-                const visible = activeTypes.includes(type);
-                event.setProp('display', visible ? 'auto' : 'none');
-            });
-
-            // Sincronizar también la lista lateral
-            renderTaskList();
+            // refetchEvents() llama a la función events() que aplica getTechActiveFilters()
+            // loadAllTasksForList() se llama vía eventsSet automáticamente
+            calendar.refetchEvents();
         }
 
         function handleEventClick(info) {
@@ -1317,8 +1423,8 @@
                             calendar.refetchEvents();
                         }
 
-                        // Mostrar confirmación
-                        alert('✓ Cita agendada correctamente');
+                        // Mostrar confirmación no bloqueante
+                        showToast('✓ Cita agendada correctamente', 'success');
                     } else {
                         alert('Error al agendar cita: ' + (result.msg || 'Error desconocido'));
                     }
@@ -1336,11 +1442,15 @@
 
         function renderTaskList() {
             const container = document.getElementById('taskListContainer');
+            if (!container) return;
             const showCompleted = document.getElementById('toggleCompleted')?.checked || false;
             const activeTypes = getTechActiveFilters();
 
+            // Usar allTasksCache (todos los eventos) en lugar de cachedTasks (solo rango visible)
+            const source = allTasksCache.length > 0 ? allTasksCache : cachedTasks;
+
             // 1. Filtrar por estado Y por tipo activo
-            let filtered = cachedTasks.filter(t => {
+            let filtered = source.filter(t => {
                 const statusOk = showCompleted ? true : t.extendedProps.status !== 'Completado';
                 const typeOk = activeTypes.length === 0 || activeTypes.includes(t.extendedProps.service_type);
                 return statusOk && typeOk;
@@ -1409,13 +1519,9 @@
                 .then(res => res.json())
                 .then(data => {
                     if (data.success) {
-                        // Recargar eventos del calendario (eventsSet se ejecuta automáticamente)
-                        if (calendar) {
-                            calendar.refetchEvents();
-                        }
-                        // Mensaje en consola
-                        const msg = data.status === 'Completado' ? '✓ Tarea completada' : '↻ Tarea marcada como pendiente';
-                        console.log(msg);
+                        if (calendar) calendar.refetchEvents();
+                        const msg = data.status === 'Completado' ? '✓ Tarea completada' : '↻ Tarea pendiente';
+                        showToast(msg, 'success');
                     } else {
                         alert('Error: ' + (data.msg || 'No se pudo actualizar la tarea'));
                     }
@@ -1436,18 +1542,13 @@
 
             fetch(`/api/task_action/${id}/delete`, { method: 'POST' })
                 .then(res => {
-                    if (!res.ok) {
-                        throw new Error(`HTTP error! status: ${res.status}`);
-                    }
+                    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
                     return res.json();
                 })
                 .then(data => {
                     if (data.success) {
-                        // Recargar calendario (eventsSet se ejecuta automáticamente)
-                        if (calendar) {
-                            calendar.refetchEvents();
-                        }
-                        alert('✓ Tarea eliminada correctamente');
+                        if (calendar) calendar.refetchEvents();
+                        showToast('✓ Tarea eliminada', 'success');
                     } else {
                         alert('❌ Error: ' + (data.msg || 'No se pudo eliminar la tarea'));
                     }
@@ -1543,12 +1644,8 @@
                     if (data.success) {
                         calendar.refetchEvents();
                         modalAction.hide();
-
-                        // Mostrar mensaje de éxito
-                        setTimeout(() => {
-                            const successMsg = action === 'delete' ? 'Tarea eliminada correctamente' : 'Acción completada correctamente';
-                            alert('✓ ' + successMsg);
-                        }, 100);
+                        const successMsg = action === 'delete' ? 'Tarea eliminada' : 'Acción completada';
+                        showToast('✓ ' + successMsg, 'success');
                     } else {
                         alert('❌ Error: ' + (data.msg || 'No se pudo completar la acción'));
                     }
@@ -2310,8 +2407,8 @@
                 .then(res => res.json())
                 .then(result => {
                     if (result.success) {
-                        alert('✅ Parte completado y firmado correctamente');
-                        location.reload();
+                        showToast('✅ Parte completado y firmado correctamente', 'success', 1500);
+                        setTimeout(() => location.reload(), 1600);
                     } else {
                         alert('Error: ' + result.msg);
                     }
