@@ -107,8 +107,6 @@ class Task(db.Model):
     # Cronómetro de parte (solo inicio y fin)
     work_start_time = db.Column(db.DateTime)
     work_end_time = db.Column(db.DateTime)
-    # Duración total medida por el cronómetro del técnico (formato HH:MM:SS)
-    work_duration = db.Column(db.String(20), nullable=True)
 
     tech = db.relationship('User', backref='tasks')
     client = db.relationship('Client', backref='tasks')
@@ -750,12 +748,9 @@ def save_report():
         stock_qtys = request.form.getlist('stock_quantity[]')
         stock_actions = request.form.getlist('stock_action[]')
         
-        # Firma digital (el campo HTML se llama 'signature_name', no 'signature_client_name')
+        # Firma digital
         signature_data = request.form.get('signature_data')
-        signature_name = request.form.get('signature_name') or request.form.get('signature_client_name', '')
-        
-        # Duración del cronómetro (formato HH:MM:SS, enviado desde el campo oculto)
-        work_duration = request.form.get('work_duration', '').strip() or None
+        signature_name = request.form.get('signature_client_name')
         
         if not signature_data:
             flash('⚠️ La firma del cliente es obligatoria', 'danger')
@@ -810,8 +805,6 @@ def save_report():
                 task.signature_timestamp = datetime.now()
                 task.status = 'Completado'
                 task.work_end_time = datetime.now()
-                if work_duration:
-                    task.work_duration = work_duration
                 
                 # Guardar items de stock
                 if stock_items_used:
@@ -875,8 +868,7 @@ def save_report():
             signature_client_name=signature_name,
             signature_timestamp=datetime.now(),
             status='Completado',
-            work_end_time=datetime.now(),
-            work_duration=work_duration
+            work_end_time=datetime.now()
         )
         
         # Guardar items de stock
@@ -1130,7 +1122,6 @@ def get_task_details(task_id):
             'signature_timestamp': task.signature_timestamp.strftime('%d/%m/%Y %H:%M') if task.signature_timestamp else None,
             'work_start_time': task.work_start_time.strftime('%H:%M') if task.work_start_time else None,
             'work_end_time': task.work_end_time.strftime('%H:%M') if task.work_end_time else None,
-            'work_duration': task.work_duration or None,
             'stock_info': {
                 'item_name': task.stock_item.name if task.stock_item else None,
                 'quantity': task.stock_quantity_used,
