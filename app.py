@@ -385,12 +385,13 @@ def dashboard():
                              all_categories=all_categories,
                              today_date=date.today().strftime('%Y-%m-%d'))
     else:
-        # ✅ Solo mostrar tareas pendientes de los próximos 3 días en el selector de parte
+        # ✅ Solo mostrar tareas pendientes cercanas: desde ayer hasta 3 días adelante
+        yesterday = date.today() - timedelta(days=1)
         three_days_ahead = date.today() + timedelta(days=3)
         pending_tasks = Task.query.filter(
             Task.tech_id == current_user.id,
             Task.status == 'Pendiente',
-            Task.date >= date.today(),
+            Task.date >= yesterday,
             Task.date <= three_days_ahead
         ).order_by(Task.date.asc()).all()
         
@@ -1742,6 +1743,29 @@ def api_task_details(task_id):
         }
     })
 
+@app.route('/api/admin/tech_colors')
+@login_required
+def get_tech_colors():
+    """Endpoint para obtener colores asignados a cada técnico en el calendario global"""
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'msg': 'No autorizado'}), 403
+    
+    TECH_COLORS = [
+        '#3b82f6', '#22c55e', '#a855f7', '#f59e0b', '#ef4444',
+        '#06b6d4', '#ec4899', '#84cc16', '#f97316', '#14b8a6',
+    ]
+    
+    techs = User.query.filter_by(role='tech').order_by(User.id).all()
+    result = []
+    for i, tech in enumerate(techs):
+        result.append({
+            'id': tech.id,
+            'username': tech.username,
+            'color': TECH_COLORS[i % len(TECH_COLORS)]
+        })
+    
+    return jsonify({'success': True, 'data': result})
+
 @app.route('/api/admin/all_tasks')
 @login_required
 def admin_all_tasks():
@@ -1752,21 +1776,47 @@ def admin_all_tasks():
     tasks = Task.query.all()
     events = []
     
+    # Paleta de colores para diferenciar técnicos
+    TECH_COLORS = [
+        '#3b82f6',  # azul
+        '#22c55e',  # verde
+        '#a855f7',  # morado
+        '#f59e0b',  # ámbar
+        '#ef4444',  # rojo
+        '#06b6d4',  # cian
+        '#ec4899',  # rosa
+        '#84cc16',  # lima
+        '#f97316',  # naranja
+        '#14b8a6',  # teal
+    ]
+    
+    # Obtener todos los técnicos y asignarles colores
+    techs = User.query.filter_by(role='tech').order_by(User.id).all()
+    tech_color_map = {}
+    for i, tech in enumerate(techs):
+        tech_color_map[tech.id] = TECH_COLORS[i % len(TECH_COLORS)]
+    
     for task in tasks:
         service_type = ServiceType.query.get(task.service_type_id) if task.service_type_id else None
-        color = service_type.color if service_type else '#6c757d'
+        service_color = service_type.color if service_type else '#6c757d'
+        
+        # Color del técnico para el calendario global
+        tech_color = tech_color_map.get(task.tech_id, '#6c757d')
         
         events.append({
             'id': task.id,
             'title': f"{task.client_name}",
             'start': f"{task.date}T{task.start_time}:00" if task.start_time else str(task.date),
             'end': f"{task.date}T{task.end_time}:00" if task.end_time else str(task.date),
-            'backgroundColor': color,
-            'borderColor': color,
+            'backgroundColor': tech_color,
+            'borderColor': tech_color,
             'extendedProps': {
                 'client': task.client_name,
+                'tech_id': task.tech_id,
                 'tech_name': task.tech.username if task.tech else 'Sin asignar',
+                'tech_color': tech_color,
                 'service_type': service_type.name if service_type else 'Sin tipo',
+                'service_color': service_color,
                 'status': task.status,
                 'desc': task.description or '',
                 'has_attachments': bool(task.attachments)

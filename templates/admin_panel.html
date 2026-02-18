@@ -341,7 +341,7 @@
                 <!-- FILTROS DINÁMICOS POR TIPO -->
                 <div class="filter-group mb-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <small class="text-muted fw-bold">FILTRAR POR TIPO</small>
+                        <small class="text-muted fw-bold">FILTRAR POR TIPO DE SERVICIO</small>
                         <button class="btn btn-outline-light btn-sm" onclick="checkAllFilters()">
                             <i class="bi bi-check-all me-1"></i> Todos
                         </button>
@@ -355,6 +355,14 @@
                             {{ svc.name }}
                         </label>
                         {% endfor %}
+                    </div>
+                </div>
+
+                <!-- LEYENDA DE TÉCNICOS POR COLOR -->
+                <div id="techLegend" class="mb-3 p-3 rounded" style="background:#1a1a1a; border:1px solid #333;">
+                    <small class="text-muted fw-bold d-block mb-2"><i class="bi bi-person-fill me-1"></i>TÉCNICOS (color en calendario)</small>
+                    <div id="techLegendItems" class="d-flex flex-wrap gap-2">
+                        <span class="text-muted small">Cargando...</span>
                     </div>
                 </div>
 
@@ -648,6 +656,9 @@
                                 <div class="small mb-2">
                                     <i class="bi bi-geo-alt-fill text-info me-2"></i>
                                     <span class="text-muted">{{ c.address }}</span>
+                                    <a href="https://www.google.com/maps/search/?api=1&query={{ c.address | urlencode }}" target="_blank" class="btn btn-xs btn-outline-warning btn-sm ms-1 py-0 px-1" title="Abrir en Google Maps">
+                                        <i class="bi bi-geo-alt-fill" style="font-size:0.75rem;"></i>
+                                    </a>
                                 </div>
 
                                 {% if c.link %}
@@ -1890,6 +1901,9 @@
                 updateGlobalFilters();
                 return;
             }
+            
+            // Cargar leyenda de técnicos
+            loadTechLegend();
 
             var calendarEl = document.getElementById('calendarGlobal');
             var isMobile = window.innerWidth < 768;
@@ -1906,7 +1920,7 @@
                     today: 'Hoy',
                     month: 'Mes',
                     week: 'Semana',
-                    day: 'Día',
+                    día: 'Día',
                     list: 'Lista'
                 },
                 height: 'auto',
@@ -1933,8 +1947,8 @@
                 // Estilo de eventos completados
                 eventDidMount: function (info) {
                     if (info.event.extendedProps.status === 'Completado') {
-                        info.el.style.opacity = '0.7';
-                        info.el.style.border = '2px solid #198754';
+                        info.el.style.opacity = '0.75';
+                        info.el.style.borderLeft = '4px solid #198754';
                         const title = info.el.querySelector('.fc-event-title');
                         if (title && !title.innerHTML.startsWith('✓')) {
                             title.innerHTML = '✓ ' + title.innerHTML;
@@ -1945,14 +1959,14 @@
                 eventContent: function (arg) {
                     let techName = arg.event.extendedProps.tech_name || '';
                     let title = arg.event.title;
-                    let attachmentIcon = arg.event.extendedProps.has_attachments ? '<i class="bi bi-paperclip text-warning ms-1"></i>' : '';
-                    return { html: `<div class="fc-content overflow-hidden text-truncate"><span class="fw-bold badge bg-dark text-white me-1 border border-secondary">${techName}</span> ${title}${attachmentIcon}</div>` };
+                    let attachmentIcon = arg.event.extendedProps.has_attachments ? '<i class="bi bi-paperclip ms-1" style="font-size:0.7rem;"></i>' : '';
+                    let statusIcon = arg.event.extendedProps.status === 'Completado' ? '✓ ' : '';
+                    return { html: `<div class="fc-content overflow-hidden text-truncate" style="font-size:0.8rem;"><strong>${techName}:</strong> ${statusIcon}${title}${attachmentIcon}</div>` };
                 },
 
                 eventClick: handleEventClick,
                 
                 eventsSet: function (events) {
-                    // Serializar EventApi a objetos planos (.start es Date en FullCalendar, necesitamos string)
                     cachedGlobalTasks = events.map(function(e) {
                         return {
                             id: e.id,
@@ -1962,7 +1976,9 @@
                             extendedProps: {
                                 status: e.extendedProps.status,
                                 client: e.extendedProps.client,
+                                tech_id: e.extendedProps.tech_id,
                                 tech_name: e.extendedProps.tech_name,
+                                tech_color: e.extendedProps.tech_color,
                                 service_type: e.extendedProps.service_type,
                                 desc: e.extendedProps.desc,
                                 has_attachments: e.extendedProps.has_attachments
@@ -1974,6 +1990,31 @@
             });
             calendarGlobalInstance.render();
         });
+        
+        // Cargar y mostrar leyenda de colores de técnicos
+        function loadTechLegend() {
+            fetch('/api/admin/tech_colors')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success && data.data) {
+                        const container = document.getElementById('techLegendItems');
+                        container.innerHTML = '';
+                        data.data.forEach(tech => {
+                            const span = document.createElement('span');
+                            span.className = 'badge d-flex align-items-center gap-1';
+                            span.style.cssText = `background-color: ${tech.color}; color: #fff; font-size: 0.85rem; padding: 6px 10px; border-radius: 20px;`;
+                            span.innerHTML = `<i class="bi bi-person-fill"></i> ${tech.username}`;
+                            container.appendChild(span);
+                        });
+                        if (data.data.length === 0) {
+                            container.innerHTML = '<span class="text-muted small">No hay técnicos registrados</span>';
+                        }
+                    }
+                })
+                .catch(() => {
+                    document.getElementById('techLegendItems').innerHTML = '<span class="text-muted small">Error al cargar técnicos</span>';
+                });
+        }
 
         // --- LÓGICA DE FILTRADO DINÁMICO ---
         function getActiveFilters() {
@@ -2090,23 +2131,24 @@
                 const isDone = t.extendedProps.status === 'Completado';
                 const dateStr = t.start.split('T')[0];
                 const timeStr = t.start.includes('T') ? t.start.split('T')[1].substring(0, 5) : '';
+                const techColor = t.extendedProps.tech_color || t.color || '#6c757d';
                 const typeColor = t.color || '#6c757d';
 
                 const div = document.createElement('div');
                 div.className = `task-item status-${t.extendedProps.status}`;
-                div.style.borderLeftColor = typeColor;
+                div.style.borderLeftColor = techColor;
                 if (isDone) div.style.opacity = '0.6';
 
                 div.innerHTML = `
                     <div class="fw-bold text-white">${t.extendedProps.client || 'Sin cliente'}</div>
-                    <div class="small">
-                        <span class="badge bg-secondary">${t.extendedProps.tech_name || 'Sin técnico'}</span>
+                    <div class="small mb-1">
+                        <span class="badge" style="background:${techColor}; color:#fff;"><i class="bi bi-person-fill me-1"></i>${t.extendedProps.tech_name || 'Sin técnico'}</span>
                     </div>
                     <div class="small text-secondary">
                         <i class="bi bi-calendar-event me-1"></i>${dateStr} ${timeStr ? '| ' + timeStr : ''}
                         <br>
                         <span class="badge ${isDone ? 'bg-success' : 'bg-warning text-dark'}">${t.extendedProps.status}</span>
-                        <span class="badge" style="background:${typeColor}">${t.extendedProps.service_type || 'Sin tipo'}</span>
+                        <span class="badge" style="background:${typeColor}; font-size:0.65rem;">${t.extendedProps.service_type || 'Sin tipo'}</span>
                     </div>
                 `;
                 
@@ -3553,9 +3595,8 @@
 
         // ==================== GESTIÓN DE STOCK MEJORADA ====================
 
-        document.getElementById('modalAddStock').addEventListener('show.bs.modal', function () {
-            loadCategoriesForStockForm('addStock');
-        });
+        // NOTA: La carga de categorías en modalAddStock se gestiona arriba con loadCategoriesIntoAddStockSelect()
+        // que soporta correctamente subcategorías dinámicas.
 
         function loadCategoriesForStockForm(prefix) {
             const select = document.getElementById(prefix + 'Category');

@@ -1417,13 +1417,10 @@
                                             <i class="bi bi-geo-alt-fill text-warning me-2" style="font-size: 1.1rem;"></i>
                                             <strong class="text-white">Dirección:</strong>
                                         </div>
-                                        <span class="text-white fw-bold d-block" style="font-size: 1.05rem;" id="clientAddress">${client.address}</span>
+                                        <span class="text-white fw-bold d-block" style="font-size: 1.05rem;">${client.address}</span>
                                         <div class="d-flex gap-2 mt-2">
-                                            <button class="btn btn-sm btn-outline-info flex-fill" onclick="copyAddress('${client.address.replace(/'/g, "\\'")}')">
-                                                <i class="bi bi-clipboard me-1"></i>Copiar
-                                            </button>
-                                            <a href="https://www.google.com/maps" target="_blank" class="btn btn-sm btn-outline-warning flex-fill">
-                                                <i class="bi bi-map me-1"></i>Abrir Maps
+                                            <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(client.address)}" target="_blank" class="btn btn-sm btn-warning fw-bold flex-fill">
+                                                <i class="bi bi-geo-alt-fill me-1"></i>Abrir en Google Maps
                                             </a>
                                         </div>
                                     </div>
@@ -2251,6 +2248,15 @@
             const reportForm = document.querySelector('form[action="/save_report"]');
             if (reportForm) {
                 reportForm.addEventListener('submit', function (e) {
+                    // ✅ AUTO-FILL hora de salida con la hora actual real al guardar el parte
+                    const exitField = document.getElementById('fieldExitTime');
+                    if (exitField) {
+                        const now = new Date();
+                        const hh = String(now.getHours()).padStart(2, '0');
+                        const mm = String(now.getMinutes()).padStart(2, '0');
+                        exitField.value = `${hh}:${mm}`;
+                    }
+
                     // Validar nombre del firmante
                     const signatureName = document.getElementById('signatureName').value.trim();
                     if (!signatureName) {
@@ -2270,10 +2276,6 @@
                     // Capturar firma en base64 y guardarla en el campo oculto
                     const signatureData = mainSignaturePad.toDataURL();
                     document.getElementById('signatureDataInput').value = signatureData;
-
-                    // Opcional: Mostrar mensaje de confirmación
-                    console.log('✅ Firma capturada correctamente');
-                    console.log('✅ Nombre del firmante:', signatureName);
 
                     // Permitir envío del formulario
                     return true;
@@ -2663,11 +2665,16 @@
                             <div class="mb-2">
                                 <i class="bi bi-geo-alt text-warning me-2"></i>
                                 <span class="text-white">${clientInfo.address}</span>
+                                <div class="mt-1">
+                                    <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(clientInfo.address)}" target="_blank" class="btn btn-sm btn-warning fw-bold">
+                                        <i class="bi bi-geo-alt-fill me-1"></i>Abrir en Google Maps
+                                    </a>
+                                </div>
                             </div>
                             ${clientInfo.link ? `
                                 <div class="mt-2">
-                                    <a href="${clientInfo.link}" target="_blank" class="btn btn-sm btn-warning fw-bold">
-                                        <i class="bi bi-map me-1"></i>Abrir en Maps
+                                    <a href="${clientInfo.link}" target="_blank" class="btn btn-sm btn-outline-info fw-bold">
+                                        <i class="bi bi-globe me-1"></i>Sitio Web / Portal
                                     </a>
                                 </div>
                             ` : ''}
