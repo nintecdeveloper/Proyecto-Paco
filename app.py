@@ -143,6 +143,27 @@ class Alarm(db.Model):
     is_read = db.Column(db.Boolean, default=False)
     priority = db.Column(db.String(20), default='normal')
 
+class ClientPayment(db.Model):
+    """Registro de pago principal asociado a un cliente"""
+    id = db.Column(db.Integer, primary_key=True)
+    client_id = db.Column(db.Integer, db.ForeignKey('client.id'), nullable=False, unique=True)
+    client = db.relationship('Client', backref=db.backref('payment', uselist=False))
+    total_amount = db.Column(db.Float, default=0.0)
+    budget_number = db.Column(db.String(50), nullable=True)
+    first_payment = db.Column(db.Float, default=0.0)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now)
+
+class PaymentRecord(db.Model):
+    """Cobro parcial registrado para un cliente"""
+    id = db.Column(db.Integer, primary_key=True)
+    client_payment_id = db.Column(db.Integer, db.ForeignKey('client_payment.id'), nullable=False)
+    client_payment = db.relationship('ClientPayment', backref='records')
+    amount = db.Column(db.Float, nullable=False)
+    date = db.Column(db.Date, default=date.today)
+    notes = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
 @login_manager.user_loader
 def load_user(id):
     return User.query.get(int(id))
@@ -1743,6 +1764,148 @@ def api_task_details(task_id):
         }
     })
 
+
+
+# --- RUTAS DE PAGOS ---
+@app.route('/api/payments/client/<int:client_id>', methods=['GET'])
+@login_required
+def get_client_payment(client_id):
+    """Obtener datos de pago de un cliente"""
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'msg': 'No autorizado'}), 403
+    client = Client.query.get(client_id)
+    if not client:
+        return jsonify({'success': False, 'msg': 'Cliente no encontrado'}), 404
+    payment = ClientPayment.query.filter_by(client_id=client_id).first()
+    if not payment:
+        return jsonify({'success': True, 'data': {
+            'id': None, 'client_id': client_id, 'client_name': client.name,
+            'total_amount': 0, 'budget_number': '', 'first_payment': 0,
+            'records': [], 'total_paid': 0, 'pending': 0
+        }})
+    records = [{'id': r.id, 'amount': r.amount, 'date': r.date.strftime('%Y-%m-%d'), 'notes': r.notes or ''}
+               for r in sorted(payment.records, key=lambda r: r.date)]
+    total_paid = payment.first_payment + sum(r.amount for r in payment.records)
+    pending = max(0, payment.total_amount - total_paid)
+    return jsonify({'success': True, 'data': {
+        'id': payment.id, 'client_id': client_id, 'client_name': client.name,
+        'total_amount': payment.total_amount, 'budget_number': payment.budget_number or '',
+        'first_payment': payment.first_payment, 'records': records,
+        'total_paid': round(total_paid, 2), 'pending': round(pending, 2)
+    }})
+
+
+@app.route('/api/payments/client/<int:client_id>', methods=['POST'])
+@login_required
+def save_client_payment(client_id):
+    """Guardar datos de pago principales"""
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'msg': 'No autorizado'}), 403
+    client = Client.query.get(client_id)
+    if not client:
+        return jsonify({'success': False, 'msg': 'Cliente no encontrado'}), 404
+    try:
+        data = request.get_json()
+        payment = ClientPayment.query.filter_by(client_id=client_id).first()
+        if not payment:
+            payment = ClientPayment(client_id=client_id)
+            db.session.add(payment)
+        payment.total_amount = float(data.get('total_amount', 0))
+        payment.budget_number = data.get('budget_number', '').strip()
+        payment.first_payment = float(data.get('first_payment', 0))
+        payment.updated_at = datetime.now()
+        db.session.commit()
+        return jsonify({'success': True, 'payment_id': payment.id})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'msg': str(e)}), 500
+
+
+@app.route('/api/payments/record', methods=['POST'])
+@login_required
+def add_payment_record():
+    """Anadir cobro parcial"""
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'msg': 'No autorizado'}), 403
+    try:
+        data = request.get_json()
+        client_id = int(data.get('client_id'))
+        amount = float(data.get('amount', 0))
+        date_str = data.get('date', date.today().strftime('%Y-%m-%d'))
+        notes = data.get('notes', '').strip()
+        payment = ClientPayment.query.filter_by(client_id=client_id).first()
+        if not payment:
+            client = Client.query.get(client_id)
+            if not client:
+                return jsonify({'success': False, 'msg': 'Cliente no encontrado'}), 404
+            payment = ClientPayment(client_id=client_id)
+            db.session.add(payment)
+            db.session.flush()
+        record_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        record = PaymentRecord(client_payment_id=payment.id, amount=amount, date=record_date, notes=notes)
+        db.session.add(record)
+        db.session.commit()
+        return jsonify({'success': True, 'record_id': record.id})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'msg': str(e)}), 500
+
+
+@app.route('/api/payments/record/<int:record_id>', methods=['DELETE'])
+@login_required
+def delete_payment_record(record_id):
+    """Eliminar cobro parcial"""
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'msg': 'No autorizado'}), 403
+    try:
+        record = PaymentRecord.query.get(record_id)
+        if not record:
+            return jsonify({'success': False, 'msg': 'Registro no encontrado'}), 404
+        db.session.delete(record)
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'msg': str(e)}), 500
+
+
+@app.route('/api/payments/summary')
+@login_required
+def payments_summary():
+    """Resumen de pagos de todos los clientes (mismo listado que CLIENTES, siempre actualizado)"""
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'msg': 'No autorizado'}), 403
+    # Misma consulta que el dashboard para clientes, siempre fresco de BD
+    clients = Client.query.order_by(Client.name).all()
+    result = []
+    for client in clients:
+        payment = client.payment
+        if payment:
+            total_paid = payment.first_payment + sum(r.amount for r in payment.records)
+            pending = max(0, payment.total_amount - total_paid)
+            if payment.total_amount > 0 and pending <= 0:
+                status = 'paid'
+            elif payment.total_amount > 0:
+                status = 'pending'
+            else:
+                status = 'none'
+        else:
+            total_paid = 0
+            pending = 0
+            status = 'none'
+        result.append({
+            'id': client.id,
+            'name': client.name,
+            'phone': client.phone,
+            'has_support': client.has_support,
+            'total_amount': payment.total_amount if payment else 0,
+            'budget_number': payment.budget_number if payment else '',
+            'total_paid': round(total_paid, 2),
+            'pending': round(pending, 2),
+            'status': status
+        })
+    return jsonify({'success': True, 'data': result})
+
 @app.route('/api/admin/tech_colors')
 @login_required
 def get_tech_colors():
@@ -2240,9 +2403,10 @@ def api_get_client(client_id):
                 'phone': client.phone,
                 'email': client.email,
                 'address': client.address,
-                'link': client.link,
-                'notes': client.notes,
-                'has_support': client.has_support
+                'link': client.link or '',
+                'notes': client.notes or '',
+                'has_support': client.has_support,
+                'support_schedule': client.support_schedule or 'lv'
             }
         })
     except Exception as e:
@@ -2415,6 +2579,21 @@ with app.app_context():
     except Exception as e:
         print(f"Nota: Migración 'support_schedule': {e}")
     
+
+    # MIGRACION: Tablas de pagos (se crean si no existen)
+    try:
+        from sqlalchemy import inspect as sa_inspect
+        _inspector = sa_inspect(db.engine)
+        _existing = _inspector.get_table_names()
+        if 'client_payment' not in _existing:
+            ClientPayment.__table__.create(db.engine)
+            print("Tabla 'client_payment' creada")
+        if 'payment_record' not in _existing:
+            PaymentRecord.__table__.create(db.engine)
+            print("Tabla 'payment_record' creada")
+    except Exception as _e:
+        print(f"Nota: Migracion tablas pago: {_e}")
+
     # Usuarios de prueba
     if not User.query.filter_by(username='admin').first():
         db.session.add(User(
