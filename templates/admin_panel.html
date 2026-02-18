@@ -237,8 +237,24 @@
 
     <div class="container mt-3 pb-5">
         {% with messages = get_flashed_messages() %}
-        {% if messages %}{% for m in messages %}<div class="alert alert-info py-2 small">{{ m }}</div>{% endfor %}{%
-        endif %}
+        {% if messages %}
+        <div id="flashMessages">
+            {% for m in messages %}
+            <div class="alert alert-info py-2 small flash-msg">{{ m }}</div>
+            {% endfor %}
+        </div>
+        <script>
+            // Auto-dismiss flash messages after 2 seconds
+            setTimeout(function() {
+                var msgs = document.querySelectorAll('.flash-msg');
+                msgs.forEach(function(m) {
+                    m.style.transition = 'opacity 0.5s';
+                    m.style.opacity = '0';
+                    setTimeout(function() { m.remove(); }, 500);
+                });
+            }, 2000);
+        </script>
+        {% endif %}
         {% endwith %}
 
         <ul class="nav nav-tabs mb-4 border-0 bg-dark sticky-top pt-2" style="top:55px; z-index:900;" role="tablist">
@@ -254,6 +270,8 @@
                     data-bs-target="#stock">STOCK</button></li>
             <li class="nav-item"><button class="nav-link w-100" data-bs-toggle="tab"
                     data-bs-target="#clients">CLIENTES</button></li>
+            <li class="nav-item"><button class="nav-link w-100" data-bs-toggle="tab"
+                    data-bs-target="#pagos" id="tabPagosBtn" onclick="loadPaymentsList()">PAGOS</button></li>
             <li class="nav-item"><button class="nav-link w-100" data-bs-toggle="tab"
                     data-bs-target="#config">CONFIGURACIÓN</button></li>
         </ul>
@@ -678,8 +696,8 @@
 
                             <div class="card-footer bg-black border-secondary">
                                 <div class="d-flex gap-2">
-                                    <button class="btn btn-sm btn-outline-warning flex-fill"
-                                        onclick="openEditClientModalFull({{ c.id }}, '{{ c.name }}', '{{ c.phone }}', '{{ c.email }}', '{{ c.address }}', '{{ c.link or '' }}', '{{ c.notes or '' }}', {{ c.has_support|lower }}, '{{ c.support_schedule or '' }}')">
+                                    <button class="btn btn-sm btn-outline-warning flex-fill edit-client-btn"
+                                        data-client-id="{{ c.id }}">
                                         <i class="bi bi-pencil-fill"></i> Editar
                                     </button>
                                     <form method="POST" action="/manage_clients" class="flex-fill">
@@ -704,6 +722,45 @@
                         </div>
                     </div>
                     {% endif %}
+                </div>
+            </div>
+
+
+            <!-- ======================================================= -->
+            <!-- PESTAÑA PAGOS                                            -->
+            <!-- ======================================================= -->
+            <div class="tab-pane fade" id="pagos">
+                <div class="d-flex justify-content-between mb-3 align-items-center flex-wrap gap-2">
+                    <h4 class="fw-bold text-white fs-5 m-0">
+                        <i class="bi bi-cash-coin me-2 text-warning"></i>Gestión de Pagos
+                    </h4>
+                    <span class="text-muted small" id="pagosTotalCount"></span>
+                </div>
+
+                <!-- Filtros y búsqueda -->
+                <div class="d-flex gap-2 mb-3 flex-wrap align-items-center">
+                    <button class="btn btn-sm btn-outline-light" id="payFilterAll" onclick="filterPayments('all')">
+                        <i class="bi bi-list me-1"></i>Todos
+                    </button>
+                    <button class="btn btn-sm" id="payFilterPending" onclick="filterPayments('pending')"
+                        style="background:#dc3545;color:white;border:none;">
+                        <i class="bi bi-clock-fill me-1"></i>Pendientes
+                    </button>
+                    <button class="btn btn-sm" id="payFilterPaid" onclick="filterPayments('paid')"
+                        style="background:#198754;color:white;border:none;">
+                        <i class="bi bi-check-circle-fill me-1"></i>Pagados
+                    </button>
+                    <input type="text" id="paySearchInput" class="form-control form-control-sm"
+                        placeholder="🔍 Buscar cliente..." style="max-width:220px;margin-left:auto;"
+                        oninput="renderPaymentList()">
+                </div>
+
+                <!-- Contenedor lista clientes -->
+                <div class="row g-3" id="paymentsListContainer">
+                    <div class="col-12 text-center text-muted py-5">
+                        <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                        Cargando clientes...
+                    </div>
                 </div>
             </div>
 
@@ -2016,6 +2073,13 @@
                 });
         }
 
+        // Escuchar evento Bootstrap cuando PAGOS tab se muestra (más fiable que onclick)
+        document.addEventListener('shown.bs.tab', function(e) {
+            if (e.target && e.target.getAttribute('data-bs-target') === '#pagos') {
+                loadPaymentsList();
+            }
+        });
+
         // --- LÓGICA DE FILTRADO DINÁMICO ---
         function getActiveFilters() {
             const activeTypes = [];
@@ -2226,30 +2290,71 @@
         }
 
         function openEditClientModal(id, name) {
-            document.getElementById('editClientId').value = id;
-            document.getElementById('editClientName').value = name;
-            new bootstrap.Modal(document.getElementById('modalEditClient')).show();
+            // Redirige a la función completa
+            openEditClientModalFull(id);
         }
 
-        // Nueva función completa para editar clientes con todos los campos
-        function openEditClientModalFull(id, name, phone, email, address, link, notes, hasSupport, supportSchedule) {
-            document.getElementById('editClientId').value = id;
-            document.getElementById('editClientName').value = name;
-            document.getElementById('editClientPhone').value = phone;
-            document.getElementById('editClientEmail').value = email;
-            document.getElementById('editClientAddress').value = address;
-            document.getElementById('editClientLink').value = link || '';
-            document.getElementById('editClientNotes').value = notes || '';
-            document.getElementById('editHasSupport').checked = hasSupport;
-
-            // ✅ NUEVO: gestionar horario de soporte
-            toggleSupportSchedule('editSupportScheduleDiv', hasSupport);
-            const sched = supportSchedule || 'lv';
-            const radio = document.getElementById('editSched_' + sched);
-            if (radio) radio.checked = true;
+        // Carga el cliente vía API para evitar errores de caracteres especiales en inline JS
+        function openEditClientModalFull(clientId) {
+            // Mostrar modal con spinner mientras carga
+            document.getElementById('editClientId').value = clientId;
+            document.getElementById('editClientName').value = '';
+            document.getElementById('editClientPhone').value = '';
+            document.getElementById('editClientEmail').value = '';
+            document.getElementById('editClientAddress').value = '';
+            document.getElementById('editClientLink').value = '';
+            document.getElementById('editClientNotes').value = '';
+            document.getElementById('editHasSupport').checked = false;
+            toggleSupportSchedule('editSupportScheduleDiv', false);
 
             new bootstrap.Modal(document.getElementById('modalEditClient')).show();
+
+            // Cargar datos reales desde API
+            fetch('/api/client/' + clientId)
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    if (data.success && data.client) {
+                        var c = data.client;
+                        document.getElementById('editClientId').value = c.id;
+                        document.getElementById('editClientName').value = c.name;
+                        document.getElementById('editClientPhone').value = c.phone;
+                        document.getElementById('editClientEmail').value = c.email;
+                        document.getElementById('editClientAddress').value = c.address;
+                        document.getElementById('editClientLink').value = c.link || '';
+                        document.getElementById('editClientNotes').value = c.notes || '';
+                        document.getElementById('editHasSupport').checked = c.has_support;
+                        toggleSupportSchedule('editSupportScheduleDiv', c.has_support);
+                        var sched = c.support_schedule || 'lv';
+                        var radio = document.getElementById('editSched_' + sched);
+                        if (radio) radio.checked = true;
+                    } else {
+                        alert('Error al cargar datos del cliente');
+                        bootstrap.Modal.getInstance(document.getElementById('modalEditClient')).hide();
+                    }
+                })
+                .catch(function(err) {
+                    alert('Error de conexión al cargar cliente: ' + err.message);
+                    bootstrap.Modal.getInstance(document.getElementById('modalEditClient')).hide();
+                });
         }
+
+        // Delegación de eventos para botones de editar cliente (evita problemas con caracteres especiales)
+        document.addEventListener('DOMContentLoaded', function() {
+            document.body.addEventListener('click', function(e) {
+                var btn = e.target.closest('.edit-client-btn');
+                if (btn) {
+                    e.preventDefault();
+                    var clientId = btn.getAttribute('data-client-id');
+                    openEditClientModalFull(clientId);
+                }
+                var payBtn = e.target.closest('.open-payment-btn');
+                if (payBtn) {
+                    e.preventDefault();
+                    var payId = payBtn.getAttribute('data-pay-id');
+                    openPaymentModal(payId);
+                }
+            });
+        });
 
         // ✅ NUEVO: mostrar/ocultar el selector de horario de soporte
         function toggleSupportSchedule(divId, show) {
@@ -3846,7 +3951,468 @@
             document.body.removeChild(link);
         }
 
+
+        // =====================================================================
+        // MÓDULO PAGOS — carga siempre desde el servidor (misma BD que Clientes)
+        // =====================================================================
+        let _allPaymentsData = [];
+        let _currentPayFilter = 'all';
+        let _paymentsLoaded = false;
+
+        // Se llama al hacer clic en la pestaña PAGOS
+        function loadPaymentsList() {
+            // Siempre recarga para reflejar clientes nuevos o eliminados
+            _paymentsLoaded = false;
+            const container = document.getElementById('paymentsListContainer');
+            if (container) {
+                container.innerHTML = '<div class="col-12 text-center text-muted py-5"><div class="spinner-border spinner-border-sm me-2"></div>Cargando clientes...</div>';
+            }
+            fetch('/api/payments/summary')
+                .then(function(res) {
+                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                    return res.json();
+                })
+                .then(function(data) {
+                    if (data.success) {
+                        _allPaymentsData = data.data;
+                        _paymentsLoaded = true;
+                        renderPaymentList();
+                        var countEl = document.getElementById('pagosTotalCount');
+                        if (countEl) countEl.innerText = _allPaymentsData.length + ' clientes';
+                    } else {
+                        throw new Error(data.msg || 'Error desconocido');
+                    }
+                })
+                .catch(function(err) {
+                    var container = document.getElementById('paymentsListContainer');
+                    if (container) {
+                        container.innerHTML = '<div class="col-12 text-center text-danger py-5"><i class="bi bi-exclamation-triangle me-2"></i>Error al cargar: ' + err.message + '</div>';
+                    }
+                    console.error('Error loadPaymentsList:', err);
+                });
+        }
+
+        function filterPayments(filter) {
+            _currentPayFilter = filter;
+            // Reset button styles
+            var btnAll = document.getElementById('payFilterAll');
+            var btnPend = document.getElementById('payFilterPending');
+            var btnPaid = document.getElementById('payFilterPaid');
+            if (btnAll) { btnAll.className = 'btn btn-sm ' + (filter === 'all' ? 'btn-light' : 'btn-outline-light'); }
+            if (btnPend) { btnPend.style.opacity = filter === 'pending' ? '1' : '0.55'; }
+            if (btnPaid) { btnPaid.style.opacity = filter === 'paid' ? '1' : '0.55'; }
+            renderPaymentList();
+        }
+
+        function renderPaymentList() {
+            var container = document.getElementById('paymentsListContainer');
+            if (!container) return;
+            if (!_paymentsLoaded) return; // Evitar renderizar antes de que cargue
+
+            var searchVal = (document.getElementById('paySearchInput') ? document.getElementById('paySearchInput').value : '').toLowerCase();
+
+            var filtered = _allPaymentsData.filter(function(c) {
+                var nameMatch = c.name.toLowerCase().indexOf(searchVal) >= 0 || c.phone.indexOf(searchVal) >= 0;
+                var statusMatch = _currentPayFilter === 'all' ? true :
+                    (_currentPayFilter === 'paid' ? c.status === 'paid' :
+                    (_currentPayFilter === 'pending' ? c.status === 'pending' : true));
+                return nameMatch && statusMatch;
+            });
+
+            if (filtered.length === 0) {
+                container.innerHTML = '<div class="col-12 text-center text-muted py-5"><i class="bi bi-search me-2"></i>No hay clientes que coincidan con los filtros</div>';
+                return;
+            }
+
+            container.innerHTML = '';
+            filtered.forEach(function(c) {
+                var isPaid = c.status === 'paid';
+                var isPending = c.status === 'pending';
+                var borderColor = isPaid ? '#198754' : (isPending ? '#dc3545' : '#444');
+                var nameColor = isPaid ? '#4ade80' : (isPending ? '#f87171' : '#f59e0b');
+
+                var statusBadge = isPaid
+                    ? '<span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i>Pagado</span>'
+                    : (isPending
+                        ? '<span class="badge bg-danger"><i class="bi bi-clock-fill me-1"></i>Pendiente</span>'
+                        : '<span class="badge bg-secondary">Sin datos</span>');
+
+                var progressPct = (c.total_amount > 0) ? Math.min(100, (c.total_paid / c.total_amount * 100)).toFixed(1) : 0;
+
+                var amountHtml = (c.total_amount > 0) ? (
+                    '<div class="mt-2 pt-2 border-top border-secondary">' +
+                    '<div class="d-flex justify-content-between small mb-1"><span class="text-muted">Total:</span><span class="text-warning fw-bold">' + formatEuro(c.total_amount) + '</span></div>' +
+                    '<div class="d-flex justify-content-between small mb-1"><span class="text-muted">Pagado:</span><span class="text-success fw-bold">' + formatEuro(c.total_paid) + '</span></div>' +
+                    '<div class="d-flex justify-content-between small mb-1"><span class="text-muted">Pendiente:</span><span class="' + (isPending ? 'text-danger fw-bold' : 'text-muted') + '">' + formatEuro(c.pending) + '</span></div>' +
+                    '<div class="mt-2"><div class="progress" style="height:5px;background:#333;"><div class="progress-bar bg-success" style="width:' + progressPct + '%"></div></div></div>' +
+                    '</div>'
+                ) : '<div class="small text-muted mt-2"><i class="bi bi-exclamation-circle me-1"></i>Sin importe registrado</div>';
+
+                var budgetHtml = c.budget_number ? '<div class="small text-muted mt-1"><i class="bi bi-file-earmark-text me-1"></i>Pres. ' + _esc(c.budget_number) + '</div>' : '';
+
+                var col = document.createElement('div');
+                col.className = 'col-12 col-md-6 col-lg-4';
+                col.innerHTML =
+                    '<div class="card text-white h-100" style="background:#161616;border:2px solid ' + borderColor + ';border-radius:12px;">' +
+                        '<div class="card-body">' +
+                            '<div class="d-flex justify-content-between align-items-start mb-2">' +
+                                '<h6 class="card-title fw-bold mb-0" style="color:' + nameColor + ';">' +
+                                    '<i class="bi bi-building me-1"></i>' + _esc(c.name) +
+                                '</h6>' +
+                                statusBadge +
+                            '</div>' +
+                            '<div class="small text-muted mb-1"><i class="bi bi-telephone-fill me-1 text-info"></i>' + _esc(c.phone) + '</div>' +
+                            budgetHtml +
+                            amountHtml +
+                        '</div>' +
+                        '<div class="card-footer bg-black border-0 pt-0">' +
+                            '<button class="btn btn-sm btn-warning w-100 fw-bold open-payment-btn" data-pay-id="' + c.id + '">' +
+                                '<i class="bi bi-cash-stack me-1"></i>Gestionar Pagos' +
+                            '</button>' +
+                        '</div>' +
+                    '</div>';
+                container.appendChild(col);
+            });
+        }
+
+        function _esc(str) {
+            if (!str) return '';
+            return str.toString()
+                .replace(/&/g,'&amp;')
+                .replace(/</g,'&lt;')
+                .replace(/>/g,'&gt;')
+                .replace(/"/g,'&quot;');
+        }
+
+        function formatEuro(val) {
+            return parseFloat(val || 0).toLocaleString('es-ES', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' €';
+        }
+
+        function openPaymentModal(clientId) {
+            document.getElementById('paymentClientId').value = clientId;
+            document.getElementById('paymentClientName').innerText = 'Cargando...';
+            // Reset
+            document.getElementById('payBudgetNumber').value = '';
+            document.getElementById('payTotalAmount').value = '';
+            document.getElementById('payFirstPayment').value = '';
+            document.getElementById('payTotal').innerText = '0,00 €';
+            document.getElementById('payPaid').innerText = '0,00 €';
+            document.getElementById('payPending').innerText = '0,00 €';
+            document.getElementById('payProgressBar').style.width = '0%';
+            document.getElementById('paymentRecordsList').innerHTML = '<div class="text-muted text-center py-2 small"><div class="spinner-border spinner-border-sm me-2"></div>Cargando...</div>';
+            hideAddRecordForm();
+            var today = new Date().toISOString().split('T')[0];
+            document.getElementById('newRecordDate').value = today;
+            new bootstrap.Modal(document.getElementById('modalClientPayment')).show();
+            loadPaymentDetail(clientId);
+        }
+
+        function loadPaymentDetail(clientId) {
+            fetch('/api/payments/client/' + clientId)
+                .then(function(res) {
+                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                    return res.json();
+                })
+                .then(function(data) {
+                    if (data.success) {
+                        var d = data.data;
+                        // Set client name from API (safe, no JS injection issues)
+                        document.getElementById('paymentClientName').innerText = d.client_name || 'Cliente';
+                        document.getElementById('payBudgetNumber').value = d.budget_number || '';
+                        document.getElementById('payTotalAmount').value = d.total_amount || '';
+                        document.getElementById('payFirstPayment').value = d.first_payment || '';
+                        updatePaySummary(d.total_amount, d.total_paid, d.pending);
+                        renderRecordsList(d.records);
+                    } else {
+                        document.getElementById('paymentRecordsList').innerHTML = '<div class="text-danger small">Error: ' + (data.msg || 'desconocido') + '</div>';
+                    }
+                })
+                .catch(function(err) {
+                    document.getElementById('paymentRecordsList').innerHTML = '<div class="text-danger small"><i class="bi bi-exclamation-triangle me-1"></i>Error al cargar: ' + err.message + '</div>';
+                });
+        }
+
+        function updatePaySummary(total, paid, pending) {
+            total = parseFloat(total) || 0;
+            paid = parseFloat(paid) || 0;
+            pending = parseFloat(pending) || 0;
+            document.getElementById('payTotal').innerText = formatEuro(total);
+            document.getElementById('payPaid').innerText = formatEuro(paid);
+            document.getElementById('payPending').innerText = formatEuro(pending);
+            var pct = total > 0 ? Math.min(100, (paid / total * 100)).toFixed(1) : 0;
+            document.getElementById('payProgressBar').style.width = pct + '%';
+        }
+
+        function recalcPaymentLive() {
+            // Recalcula en tiempo real mientras el usuario edita sin guardar
+            var total = parseFloat(document.getElementById('payTotalAmount').value) || 0;
+            var first = parseFloat(document.getElementById('payFirstPayment').value) || 0;
+            var recordAmounts = [].slice.call(document.querySelectorAll('.pay-record-row')).map(function(el) {
+                return parseFloat(el.dataset.amount) || 0;
+            });
+            var recordSum = recordAmounts.reduce(function(a,b){ return a+b; }, 0);
+            var paid = first + recordSum;
+            var pending = Math.max(0, total - paid);
+            updatePaySummary(total, paid, pending);
+        }
+
+        function savePaymentData() {
+            var clientId = document.getElementById('paymentClientId').value;
+            var btn = event.target;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Guardando...';
+            fetch('/api/payments/client/' + clientId, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    total_amount: parseFloat(document.getElementById('payTotalAmount').value) || 0,
+                    budget_number: document.getElementById('payBudgetNumber').value.trim(),
+                    first_payment: parseFloat(document.getElementById('payFirstPayment').value) || 0
+                })
+            })
+            .then(function(res) { return res.json(); })
+            .then(function(result) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-floppy-fill me-1"></i>Guardar Datos';
+                if (result.success) {
+                    loadPaymentDetail(clientId);
+                    loadPaymentsList(); // Refresca la lista principal
+                    showPayToast('✓ Datos guardados correctamente', 'success');
+                } else {
+                    alert('Error: ' + result.msg);
+                }
+            })
+            .catch(function(err) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-floppy-fill me-1"></i>Guardar Datos';
+                alert('Error de conexión: ' + err.message);
+            });
+        }
+
+        function renderRecordsList(records) {
+            var container = document.getElementById('paymentRecordsList');
+            if (!records || records.length === 0) {
+                container.innerHTML = '<div class="text-muted text-center py-2 small"><i class="bi bi-inbox me-1"></i>Sin cobros parciales registrados</div>';
+                return;
+            }
+            container.innerHTML = '';
+            records.forEach(function(r) {
+                var div = document.createElement('div');
+                div.className = 'd-flex justify-content-between align-items-start p-2 mb-2 rounded pay-record-row';
+                div.dataset.amount = r.amount;
+                div.style.cssText = 'background:#1a2a1a;border:1px solid #198754;';
+                div.innerHTML =
+                    '<div>' +
+                        '<span class="fw-bold text-success me-2">' + formatEuro(r.amount) + '</span>' +
+                        '<span class="badge bg-secondary small">' + r.date + '</span>' +
+                        (r.notes ? '<div class="small text-muted mt-1"><i class="bi bi-chat-text me-1"></i>' + _esc(r.notes) + '</div>' : '') +
+                    '</div>' +
+                    '<button class="btn btn-sm btn-outline-danger flex-shrink-0 ms-2" onclick="deleteRecord(' + r.id + ')" title="Eliminar cobro">' +
+                        '<i class="bi bi-trash-fill"></i>' +
+                    '</button>';
+                container.appendChild(div);
+            });
+        }
+
+        function showAddRecordForm() {
+            document.getElementById('addRecordForm').style.display = 'block';
+            document.getElementById('newRecordAmount').focus();
+        }
+        function hideAddRecordForm() {
+            var f = document.getElementById('addRecordForm');
+            if (f) f.style.display = 'none';
+            var amt = document.getElementById('newRecordAmount');
+            var notes = document.getElementById('newRecordNotes');
+            if (amt) amt.value = '';
+            if (notes) notes.value = '';
+        }
+
+        function submitPaymentRecord() {
+            var clientId = document.getElementById('paymentClientId').value;
+            var amount = parseFloat(document.getElementById('newRecordAmount').value);
+            var dateVal = document.getElementById('newRecordDate').value;
+            var notes = document.getElementById('newRecordNotes').value.trim();
+            if (!amount || amount <= 0) { alert('Introduce un importe válido mayor que 0'); return; }
+            if (!dateVal) { alert('Selecciona una fecha'); return; }
+            fetch('/api/payments/record', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({client_id: parseInt(clientId), amount: amount, date: dateVal, notes: notes})
+            })
+            .then(function(res) { return res.json(); })
+            .then(function(result) {
+                if (result.success) {
+                    hideAddRecordForm();
+                    loadPaymentDetail(clientId);
+                    loadPaymentsList();
+                    showPayToast('✓ Cobro registrado', 'success');
+                } else {
+                    alert('Error: ' + result.msg);
+                }
+            })
+            .catch(function(err) { alert('Error de conexión: ' + err.message); });
+        }
+
+        function deleteRecord(recordId) {
+            if (!confirm('¿Eliminar este cobro parcial?')) return;
+            var clientId = document.getElementById('paymentClientId').value;
+            fetch('/api/payments/record/' + recordId, {method: 'DELETE'})
+            .then(function(res) { return res.json(); })
+            .then(function(result) {
+                if (result.success) {
+                    loadPaymentDetail(clientId);
+                    loadPaymentsList();
+                    showPayToast('✓ Cobro eliminado', 'success');
+                } else {
+                    alert('Error: ' + result.msg);
+                }
+            })
+            .catch(function(err) { alert('Error de conexión: ' + err.message); });
+        }
+
+        function showPayToast(msg, type) {
+            var old = document.getElementById('_payToast');
+            if (old) old.remove();
+            var t = document.createElement('div');
+            t.id = '_payToast';
+            t.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:9999;padding:10px 22px;border-radius:10px;font-weight:bold;color:white;transition:opacity 0.4s;box-shadow:0 4px 20px rgba(0,0,0,0.5);';
+            t.style.background = type === 'success' ? '#198754' : '#dc3545';
+            t.innerText = msg;
+            document.body.appendChild(t);
+            setTimeout(function() { t.style.opacity = '0'; setTimeout(function() { t.remove(); }, 450); }, 2500);
+        }
+        // =====================================================================
+
     </script>
+
+    <!-- ======================================================= -->
+    <!-- Modal: Detalle de Pagos del Cliente                      -->
+    <!-- ======================================================= -->
+    <div class="modal fade" id="modalClientPayment" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">
+                        <i class="bi bi-cash-coin me-2 text-warning"></i>
+                        Pagos &mdash; <span id="paymentClientName">Cliente</span>
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="paymentClientId">
+
+                    <!-- Resumen visual -->
+                    <div class="row g-2 mb-4">
+                        <div class="col-4">
+                            <div class="text-center p-3 rounded" style="background:#1a1a2e;border:1px solid #444;">
+                                <div class="small text-muted mb-1">TOTAL TRABAJO</div>
+                                <div class="fs-4 fw-bold text-warning" id="payTotal">0,00 €</div>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="text-center p-3 rounded" style="background:#0d2b1a;border:1px solid #198754;">
+                                <div class="small text-muted mb-1">TOTAL PAGADO</div>
+                                <div class="fs-4 fw-bold text-success" id="payPaid">0,00 €</div>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="text-center p-3 rounded" style="background:#2b0d0d;border:1px solid #dc3545;">
+                                <div class="small text-muted mb-1">PENDIENTE</div>
+                                <div class="fs-4 fw-bold text-danger" id="payPending">0,00 €</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Barra de progreso -->
+                    <div class="mb-4">
+                        <div class="progress" style="height:8px;border-radius:4px;background:#333;">
+                            <div class="progress-bar bg-success" id="payProgressBar" style="width:0%;transition:width 0.4s;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Datos del presupuesto -->
+                    <div class="p-3 mb-3 rounded" style="background:#111;border:1px solid #333;">
+                        <h6 class="text-warning fw-bold mb-3">
+                            <i class="bi bi-file-earmark-text me-2"></i>Datos del Presupuesto
+                        </h6>
+                        <div class="row g-2">
+                            <div class="col-md-4">
+                                <label class="form-label small">N&ordm; Presupuesto</label>
+                                <input type="text" id="payBudgetNumber" class="form-control form-control-sm"
+                                    placeholder="Ej: PRES-2024-001">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">Importe Total (&euro;)</label>
+                                <input type="number" id="payTotalAmount" class="form-control form-control-sm"
+                                    placeholder="0.00" step="0.01" min="0" oninput="recalcPaymentLive()">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">Primer Pago / Se&ntilde;al (&euro;)</label>
+                                <input type="number" id="payFirstPayment" class="form-control form-control-sm"
+                                    placeholder="0.00" step="0.01" min="0" oninput="recalcPaymentLive()">
+                            </div>
+                        </div>
+                        <div class="mt-3 text-end">
+                            <button class="btn btn-warning btn-sm fw-bold" onclick="savePaymentData()">
+                                <i class="bi bi-floppy-fill me-1"></i>Guardar Datos
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Historial de cobros -->
+                    <div class="p-3 rounded" style="background:#111;border:1px solid #333;">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="text-warning fw-bold mb-0">
+                                <i class="bi bi-list-check me-2"></i>Historial de Cobros Parciales
+                            </h6>
+                            <button class="btn btn-sm btn-outline-success fw-bold" onclick="showAddRecordForm()">
+                                <i class="bi bi-plus-circle-fill me-1"></i>A&ntilde;adir Cobro
+                            </button>
+                        </div>
+
+                        <!-- Formulario nuevo cobro (inline) -->
+                        <div id="addRecordForm" style="display:none;" class="p-3 mb-3 rounded border border-secondary" style="background:#1a1a1a;">
+                            <h6 class="text-info small fw-bold mb-2">Nuevo Cobro Parcial</h6>
+                            <div class="row g-2">
+                                <div class="col-md-3">
+                                    <label class="form-label small">Importe (&euro;) *</label>
+                                    <input type="number" id="newRecordAmount" class="form-control form-control-sm"
+                                        placeholder="0.00" step="0.01" min="0.01">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small">Fecha *</label>
+                                    <input type="date" id="newRecordDate" class="form-control form-control-sm">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small">Observaciones</label>
+                                    <input type="text" id="newRecordNotes" class="form-control form-control-sm"
+                                        placeholder="Opcional...">
+                                </div>
+                            </div>
+                            <div class="mt-2 d-flex gap-2">
+                                <button class="btn btn-success btn-sm fw-bold" onclick="submitPaymentRecord()">
+                                    <i class="bi bi-check-lg me-1"></i>Guardar Cobro
+                                </button>
+                                <button class="btn btn-secondary btn-sm" onclick="hideAddRecordForm()">Cancelar</button>
+                            </div>
+                        </div>
+
+                        <!-- Lista de cobros registrados -->
+                        <div id="paymentRecordsList">
+                            <div class="text-muted text-center py-2 small">
+                                <i class="bi bi-inbox me-1"></i>Sin cobros registrados
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
 </body>
 
 </html>
