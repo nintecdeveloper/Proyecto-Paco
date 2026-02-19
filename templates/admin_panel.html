@@ -236,23 +236,35 @@
     </nav>
 
     <div class="container mt-3 pb-5">
-        {% with messages = get_flashed_messages() %}
+        {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
-        <div id="flashMessages">
-            {% for m in messages %}
-            <div class="alert alert-info py-2 small flash-msg">{{ m }}</div>
+        <div id="flashMessages" style="position:fixed;top:70px;right:20px;z-index:9999;min-width:300px;max-width:450px;">
+            {% for category, m in messages %}
+            <div class="alert alert-{{ 'success' if category == 'success' else 'danger' if category == 'danger' else 'info' }} py-2 small flash-msg shadow" style="border-radius:10px;">
+                <i class="bi bi-{{ 'check-circle-fill' if category == 'success' else 'exclamation-triangle-fill' if category == 'danger' else 'info-circle-fill' }} me-1"></i>
+                {{ m }}
+                <button type="button" class="btn-close btn-close-sm float-end" onclick="this.parentElement.remove()" style="font-size:0.65rem;"></button>
+            </div>
             {% endfor %}
         </div>
         <script>
-            // Auto-dismiss flash messages after 2 seconds
+            // Auto-dismiss success messages after 4 seconds, keep error messages longer
+            setTimeout(function() {
+                var msgs = document.querySelectorAll('.flash-msg.alert-success');
+                msgs.forEach(function(m) {
+                    m.style.transition = 'opacity 0.5s';
+                    m.style.opacity = '0';
+                    setTimeout(function() { if(m.parentElement) m.remove(); }, 500);
+                });
+            }, 4000);
             setTimeout(function() {
                 var msgs = document.querySelectorAll('.flash-msg');
                 msgs.forEach(function(m) {
                     m.style.transition = 'opacity 0.5s';
                     m.style.opacity = '0';
-                    setTimeout(function() { m.remove(); }, 500);
+                    setTimeout(function() { if(m.parentElement) m.remove(); }, 500);
                 });
-            }, 2000);
+            }, 9000);
         </script>
         {% endif %}
         {% endwith %}
@@ -860,7 +872,12 @@
                         <label class="form-label">Usuario</label>
                         <input type="text" name="username" class="form-control mb-2" required>
                         <label class="form-label">Contraseña</label>
-                        <input type="password" name="password" class="form-control mb-2" required>
+                        <input type="password" name="password" class="form-control mb-2" required id="newUserPassword">
+                        <div class="alert alert-secondary py-2 px-3 mb-2" style="font-size:0.78rem;background:#1e1e1e;border:1px solid #444;color:#aaa;">
+                            <i class="bi bi-info-circle me-1 text-info"></i>
+                            Mínimo 6 caracteres, con: <b class="text-warning">mayúscula</b>, <b class="text-warning">minúscula</b>, <b class="text-warning">número</b> y <b class="text-warning">carácter especial</b> (ej: <code>!</code><code>@</code><code>#</code><code>$</code>).<br>
+                            <span class="text-muted">Ejemplo válido: <code>Tecnico1!</code></span>
+                        </div>
                         <label class="form-label">Email</label>
                         <input type="email" name="email" class="form-control mb-2" required
                             placeholder="ejemplo@oslaprint.com">
@@ -4267,34 +4284,76 @@
             }
             container.innerHTML = '';
             records.forEach(function(r) {
+                var isPaid = r.is_paid === true || r.is_paid === 1;
+                var bgColor = isPaid ? '#0d2b1a' : '#2b0d0d';
+                var borderColor = isPaid ? '#198754' : '#dc3545';
+                var amountColor = isPaid ? 'text-success' : 'text-danger';
+                var toggleLabel = isPaid
+                    ? '<i class="bi bi-check-circle-fill me-1"></i>Pagado'
+                    : '<i class="bi bi-clock-fill me-1"></i>Pendiente';
+                var toggleClass = isPaid ? 'btn-success' : 'btn-danger';
+
                 var div = document.createElement('div');
-                div.className = 'd-flex justify-content-between align-items-start p-2 mb-2 rounded pay-record-row';
+                div.id = 'record-row-' + r.id;
+                div.className = 'p-2 mb-2 rounded pay-record-row';
                 div.dataset.amount = r.amount;
-                div.style.cssText = 'background:#1a2a1a;border:1px solid #198754;';
+                div.style.cssText = 'background:' + bgColor + ';border:1px solid ' + borderColor + ';';
                 div.innerHTML =
-                    '<div>' +
-                        '<span class="fw-bold text-success me-2">' + formatEuro(r.amount) + '</span>' +
-                        '<span class="badge bg-secondary small">' + r.date + '</span>' +
-                        (r.notes ? '<div class="small text-muted mt-1"><i class="bi bi-chat-text me-1"></i>' + _esc(r.notes) + '</div>' : '') +
-                    '</div>' +
-                    '<button class="btn btn-sm btn-outline-danger flex-shrink-0 ms-2" onclick="deleteRecord(' + r.id + ')" title="Eliminar cobro">' +
-                        '<i class="bi bi-trash-fill"></i>' +
-                    '</button>';
+                    '<div class="d-flex justify-content-between align-items-start">' +
+                        '<div>' +
+                            '<span class="fw-bold ' + amountColor + ' me-2">' + formatEuro(r.amount) + '</span>' +
+                            '<span class="badge bg-secondary small">' + r.date + '</span>' +
+                            (r.notes ? '<div class="small text-muted mt-1"><i class="bi bi-chat-text me-1"></i>' + _esc(r.notes) + '</div>' : '') +
+                        '</div>' +
+                        '<div class="d-flex gap-2 align-items-center ms-2">' +
+                            '<button class="btn btn-sm ' + toggleClass + ' fw-bold" style="font-size:0.75rem;min-width:110px;" onclick="toggleRecordPaid(' + r.id + ')" title="Cambiar estado de pago">' +
+                                toggleLabel +
+                            '</button>' +
+                            '<button class="btn btn-sm btn-outline-danger flex-shrink-0" onclick="deleteRecord(' + r.id + ')" title="Eliminar cobro">' +
+                                '<i class="bi bi-trash-fill"></i>' +
+                            '</button>' +
+                        '</div>' +
+                    '</div>';
                 container.appendChild(div);
             });
+        }
+
+        function toggleRecordPaid(recordId) {
+            fetch('/api/payments/record/' + recordId + '/toggle_paid', {method: 'POST'})
+            .then(function(res) { return res.json(); })
+            .then(function(result) {
+                if (result.success) {
+                    var clientId = document.getElementById('paymentClientId').value;
+                    loadPaymentDetail(clientId);
+                    loadPaymentsList();
+                    showPayToast(result.is_paid ? '✓ Marcado como Pagado' : '✓ Marcado como Pendiente', 'success');
+                } else {
+                    alert('Error: ' + result.msg);
+                }
+            })
+            .catch(function(err) { alert('Error de conexión: ' + err.message); });
         }
 
         function showAddRecordForm() {
             document.getElementById('addRecordForm').style.display = 'block';
             document.getElementById('newRecordAmount').focus();
+            // Reset switch state
+            var sw = document.getElementById('newRecordIsPaid');
+            var lbl = document.getElementById('newRecordIsPaidLabel');
+            if (sw) sw.checked = false;
+            if (lbl) { lbl.style.color = '#dc3545'; lbl.innerText = 'Pendiente'; }
         }
         function hideAddRecordForm() {
             var f = document.getElementById('addRecordForm');
             if (f) f.style.display = 'none';
             var amt = document.getElementById('newRecordAmount');
             var notes = document.getElementById('newRecordNotes');
+            var isPaidSwitch = document.getElementById('newRecordIsPaid');
+            var isPaidLabel = document.getElementById('newRecordIsPaidLabel');
             if (amt) amt.value = '';
             if (notes) notes.value = '';
+            if (isPaidSwitch) { isPaidSwitch.checked = false; }
+            if (isPaidLabel) { isPaidLabel.style.color = '#dc3545'; isPaidLabel.innerText = 'Pendiente'; }
         }
 
         function submitPaymentRecord() {
@@ -4302,12 +4361,13 @@
             var amount = parseFloat(document.getElementById('newRecordAmount').value);
             var dateVal = document.getElementById('newRecordDate').value;
             var notes = document.getElementById('newRecordNotes').value.trim();
+            var isPaid = document.getElementById('newRecordIsPaid').checked;
             if (!amount || amount <= 0) { alert('Introduce un importe válido mayor que 0'); return; }
             if (!dateVal) { alert('Selecciona una fecha'); return; }
             fetch('/api/payments/record', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({client_id: parseInt(clientId), amount: amount, date: dateVal, notes: notes})
+                body: JSON.stringify({client_id: parseInt(clientId), amount: amount, date: dateVal, notes: notes, is_paid: isPaid})
             })
             .then(function(res) { return res.json(); })
             .then(function(result) {
@@ -4351,6 +4411,25 @@
             document.body.appendChild(t);
             setTimeout(function() { t.style.opacity = '0'; setTimeout(function() { t.remove(); }, 450); }, 2500);
         }
+
+        // Toggle visual label for is_paid switch
+        document.addEventListener('DOMContentLoaded', function() {
+            var sw = document.getElementById('newRecordIsPaid');
+            if (sw) {
+                sw.addEventListener('change', function() {
+                    var lbl = document.getElementById('newRecordIsPaidLabel');
+                    if (lbl) {
+                        if (sw.checked) {
+                            lbl.innerText = 'Pagado';
+                            lbl.style.color = '#198754';
+                        } else {
+                            lbl.innerText = 'Pendiente';
+                            lbl.style.color = '#dc3545';
+                        }
+                    }
+                });
+            }
+        });
         // =====================================================================
 
     </script>
@@ -4453,10 +4532,17 @@
                                     <label class="form-label small">Fecha *</label>
                                     <input type="date" id="newRecordDate" class="form-control form-control-sm">
                                 </div>
-                                <div class="col-md-6">
+                                <div class="col-md-4">
                                     <label class="form-label small">Observaciones</label>
                                     <input type="text" id="newRecordNotes" class="form-control form-control-sm"
                                         placeholder="Opcional...">
+                                </div>
+                                <div class="col-md-2 d-flex flex-column justify-content-end">
+                                    <label class="form-label small d-block">Estado</label>
+                                    <div class="form-check form-switch mt-1">
+                                        <input class="form-check-input" type="checkbox" id="newRecordIsPaid" role="switch">
+                                        <label class="form-check-label small" for="newRecordIsPaid" id="newRecordIsPaidLabel" style="color:#dc3545;font-weight:bold;">Pendiente</label>
+                                    </div>
                                 </div>
                             </div>
                             <div class="mt-2 d-flex gap-2">
