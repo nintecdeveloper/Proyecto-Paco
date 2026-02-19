@@ -162,6 +162,7 @@ class PaymentRecord(db.Model):
     amount = db.Column(db.Float, nullable=False)
     date = db.Column(db.Date, default=date.today)
     notes = db.Column(db.Text, nullable=True)
+    is_paid = db.Column(db.Boolean, default=False, nullable=False)  # ✅ Estado manual del cobro
     created_at = db.Column(db.DateTime, default=datetime.now)
 
 @login_manager.user_loader
@@ -1783,7 +1784,8 @@ def get_client_payment(client_id):
             'total_amount': 0, 'budget_number': '', 'first_payment': 0,
             'records': [], 'total_paid': 0, 'pending': 0
         }})
-    records = [{'id': r.id, 'amount': r.amount, 'date': r.date.strftime('%Y-%m-%d'), 'notes': r.notes or ''}
+    records = [{'id': r.id, 'amount': r.amount, 'date': r.date.strftime('%Y-%m-%d'),
+                'notes': r.notes or '', 'is_paid': bool(r.is_paid)}
                for r in sorted(payment.records, key=lambda r: r.date)]
     total_paid = payment.first_payment + sum(r.amount for r in payment.records)
     pending = max(0, payment.total_amount - total_paid)
@@ -1842,7 +1844,8 @@ def add_payment_record():
             db.session.add(payment)
             db.session.flush()
         record_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-        record = PaymentRecord(client_payment_id=payment.id, amount=amount, date=record_date, notes=notes)
+        is_paid = bool(data.get('is_paid', False))
+        record = PaymentRecord(client_payment_id=payment.id, amount=amount, date=record_date, notes=notes, is_paid=is_paid)
         db.session.add(record)
         db.session.commit()
         return jsonify({'success': True, 'record_id': record.id})
@@ -1869,6 +1872,24 @@ def delete_payment_record(record_id):
         return jsonify({'success': False, 'msg': str(e)}), 500
 
 
+@app.route('/api/payments/record/<int:record_id>/toggle_paid', methods=['POST'])
+@login_required
+def toggle_payment_record_paid(record_id):
+    """Alternar estado pagado/pendiente de un cobro parcial"""
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'msg': 'No autorizado'}), 403
+    try:
+        record = PaymentRecord.query.get(record_id)
+        if not record:
+            return jsonify({'success': False, 'msg': 'Registro no encontrado'}), 404
+        record.is_paid = not record.is_paid
+        db.session.commit()
+        return jsonify({'success': True, 'is_paid': record.is_paid})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'msg': str(e)}), 500
+
+
 @app.route('/api/payments/summary')
 @login_required
 def payments_summary():
@@ -1883,12 +1904,14 @@ def payments_summary():
         if payment:
             total_paid = payment.first_payment + sum(r.amount for r in payment.records)
             pending = max(0, payment.total_amount - total_paid)
-            if payment.total_amount > 0 and pending <= 0:
+            records = payment.records
+            if not records:
+                # Sin cobros parciales: pendiente si hay importe, neutro si no
+                status = 'pending' if payment.total_amount > 0 else 'none'
+            elif all(r.is_paid for r in records):
                 status = 'paid'
-            elif payment.total_amount > 0:
-                status = 'pending'
             else:
-                status = 'none'
+                status = 'pending'
         else:
             total_paid = 0
             pending = 0
@@ -2593,6 +2616,19 @@ with app.app_context():
             print("Tabla 'payment_record' creada")
     except Exception as _e:
         print(f"Nota: Migracion tablas pago: {_e}")
+
+    # ✅ MIGRACIÓN: Añadir columna 'is_paid' a PaymentRecord
+    try:
+        from sqlalchemy import inspect as sa_inspect2
+        _inspector2 = sa_inspect2(db.engine)
+        pr_cols = [col['name'] for col in _inspector2.get_columns('payment_record')]
+        if 'is_paid' not in pr_cols:
+            with db.engine.connect() as conn:
+                conn.execute(db.text('ALTER TABLE payment_record ADD COLUMN is_paid BOOLEAN NOT NULL DEFAULT 0'))
+                conn.commit()
+                print("✓ Columna 'is_paid' añadida a PaymentRecord")
+    except Exception as e:
+        print(f"Nota: Migración 'is_paid': {e}")
 
     # Usuarios de prueba
     if not User.query.filter_by(username='admin').first():

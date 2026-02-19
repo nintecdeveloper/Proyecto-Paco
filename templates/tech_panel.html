@@ -2249,19 +2249,31 @@
             const reportForm = document.querySelector('form[action="/save_report"]');
             if (reportForm) {
                 reportForm.addEventListener('submit', function (e) {
-                    // ✅ AUTO-FILL hora de salida solo si el cronómetro NO fue usado.
-                    // Si el cronómetro se usó, la hora de salida ya fue fijada al detenerlo (hora real de parada).
-                    // Si no se usó, tomamos la hora actual del sistema en el momento de guardar.
-                    const exitField = document.getElementById('fieldExitTime');
-                    if (exitField) {
-                        const timerWasUsed = (document.getElementById('workDurationInput')?.value || '').trim();
-                        if (!timerWasUsed) {
-                            // Sin cronómetro: hora de salida = hora actual del sistema
-                            const now = new Date();
-                            exitField.value = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
-                        }
-                        // Con cronómetro: la hora ya está correcta (fijada al detener)
+                    // ── Hora de salida: si aún está vacía (no se usó cronómetro), poner la hora actual ──
+                    const entryField = document.getElementById('fieldEntryTime');
+                    const exitField  = document.getElementById('fieldExitTime');
+                    if (exitField && !exitField.value) {
+                        const now = new Date();
+                        exitField.value = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
                     }
+
+                    // ✅ work_duration = diferencia entre hora de SALIDA y hora de ENTRADA
+                    // Este es el tiempo que verá el admin, independientemente de si se usó cronómetro o no.
+                    try {
+                        const eVal = (entryField && entryField.value) ? entryField.value : null;
+                        const xVal = (exitField  && exitField.value)  ? exitField.value  : null;
+                        if (eVal && xVal) {
+                            const [eh, em] = eVal.split(':').map(Number);
+                            const [xh, xm] = xVal.split(':').map(Number);
+                            let totalMin = (xh * 60 + xm) - (eh * 60 + em);
+                            if (totalMin < 0) totalMin += 24 * 60; // cruce de medianoche
+                            const dh = Math.floor(totalMin / 60);
+                            const dm = totalMin % 60;
+                            const durationStr = String(dh).padStart(2,'0') + ':' + String(dm).padStart(2,'0') + ':00';
+                            const durInput = document.getElementById('workDurationInput');
+                            if (durInput) durInput.value = durationStr;
+                        }
+                    } catch(e) {}
 
                     // Validar nombre del firmante
                     const signatureName = document.getElementById('signatureName').value.trim();
@@ -2796,11 +2808,11 @@
                 timerStartEpoch = Date.now();
                 timerInterval   = setInterval(tickTimer, 500);
 
-                // ✅ Sincronizar hora de ENTRADA con la hora del sistema al iniciar el cronómetro
-                // Solo si el campo está vacío (nunca sobreescribir valor introducido manualmente)
+                // ✅ Hora de ENTRADA = hora exacta del sistema al pulsar "Iniciar trabajo"
+                // Se escribe siempre (sobrescribe cualquier valor previo) para garantizar coherencia.
                 try {
                     const entryF = document.getElementById('fieldEntryTime');
-                    if (entryF && !entryF.value) {
+                    if (entryF) {
                         const now = new Date(timerStartEpoch);
                         entryF.value = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
                     }
@@ -2847,17 +2859,13 @@
                 document.getElementById('timerSummary').style.display        = 'block';
                 document.getElementById('timerSummaryText').textContent      = readable.trim();
 
-                // ✅ Sincronizar horas al detener el cronómetro:
-                // - Hora de ENTRADA: solo si está vacía (puede haber sido rellenada al iniciar)
-                // - Hora de SALIDA: siempre se actualiza con la hora real de parada del cronómetro
+                // ✅ Hora de SALIDA = hora exacta del sistema al pulsar "Finalizar trabajo"
+                // La hora de entrada ya fue fijada al iniciar; aquí solo actualizamos la salida.
                 try {
-                    const startDt = new Date(timerStartEpoch);
-                    const endDt   = new Date(timerStartEpoch + timerElapsed * 1000);
-                    const toHM = dt => pad2(dt.getHours()) + ':' + pad2(dt.getMinutes());
-                    const entryF = document.getElementById('fieldEntryTime');
+                    const endDt  = new Date(timerStartEpoch + timerElapsed * 1000);
+                    const toHM   = dt => pad2(dt.getHours()) + ':' + pad2(dt.getMinutes());
                     const exitF  = document.getElementById('fieldExitTime');
-                    if (entryF && !entryF.value) entryF.value = toHM(startDt);
-                    if (exitF)  exitF.value = toHM(endDt);  // siempre: la hora de parada es la correcta
+                    if (exitF)   exitF.value = toHM(endDt);
                 } catch(e) {}
 
                 // Siguiente pulsación = reinicio completo
