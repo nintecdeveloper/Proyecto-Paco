@@ -1978,6 +1978,16 @@ def admin_all_tasks():
         '#f97316',  # naranja
         '#14b8a6',  # teal
     ]
+
+    def get_contrast_color(hex_color):
+        """Devuelve #000 o #fff para máximo contraste sobre el color de fondo dado."""
+        try:
+            h = hex_color.lstrip('#')
+            r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+            luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+            return '#000000' if luminance > 0.5 else '#ffffff'
+        except Exception:
+            return '#ffffff'
     
     # Obtener todos los técnicos y asignarles colores
     techs = User.query.filter_by(role='tech').order_by(User.id).all()
@@ -1991,6 +2001,7 @@ def admin_all_tasks():
         
         # Color del técnico para el calendario global
         tech_color = tech_color_map.get(task.tech_id, '#6c757d')
+        text_color = get_contrast_color(tech_color)
         
         events.append({
             'id': task.id,
@@ -1999,11 +2010,13 @@ def admin_all_tasks():
             'end': f"{task.date}T{task.end_time}:00" if task.end_time else str(task.date),
             'backgroundColor': tech_color,
             'borderColor': tech_color,
+            'textColor': text_color,
             'extendedProps': {
                 'client': task.client_name,
                 'tech_id': task.tech_id,
                 'tech_name': task.tech.username if task.tech else 'Sin asignar',
                 'tech_color': tech_color,
+                'text_color': text_color,
                 'service_type': service_type.name if service_type else 'Sin tipo',
                 'service_color': service_color,
                 'status': task.status,

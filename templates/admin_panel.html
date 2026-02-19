@@ -1860,6 +1860,23 @@
         var cachedAdminTasks = []; // ✅ NUEVO: Caché de tareas del empleado
         var cachedGlobalTasks = []; // ✅ NUEVO: Caché de tareas globales
 
+        /**
+         * Devuelve '#000000' o '#ffffff' según cuál ofrezca mayor contraste
+         * sobre el color hexadecimal de fondo dado. Usado en el calendario global.
+         */
+        function getContrastColor(hex) {
+            try {
+                var h = (hex || '#6c757d').replace('#', '');
+                if (h.length === 3) { h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2]; }
+                var r = parseInt(h.substring(0,2), 16);
+                var g = parseInt(h.substring(2,4), 16);
+                var b = parseInt(h.substring(4,6), 16);
+                // Fórmula de luminancia perceptiva (W3C)
+                var luminance = (0.299*r + 0.587*g + 0.114*b) / 255;
+                return luminance > 0.55 ? '#000000' : '#ffffff';
+            } catch(e) { return '#ffffff'; }
+        }
+
         // Aplicar colores dinámicos a los labels de filtros
         document.addEventListener('DOMContentLoaded', function () {
             document.querySelectorAll('label[data-color]').forEach(function (label) {
@@ -2001,24 +2018,40 @@
                 dateClick: handleAdminDateClickGlobal,
                 selectable: true,
 
-                // Estilo de eventos completados
+                // Forzar colores del técnico directamente en el DOM del evento
                 eventDidMount: function (info) {
+                    var bgColor  = info.event.backgroundColor  || info.event.extendedProps.tech_color || '#6c757d';
+                    var txtColor = info.event.textColor         || info.event.extendedProps.text_color || getContrastColor(bgColor);
+
+                    // Aplicar sobre el elemento raíz del evento
+                    info.el.style.setProperty('background-color', bgColor,  'important');
+                    info.el.style.setProperty('border-color',     bgColor,  'important');
+                    info.el.style.setProperty('color',             txtColor, 'important');
+
+                    // También propagar a todos los hijos de texto que FC pueda crear
+                    info.el.querySelectorAll('.fc-event-title, .fc-event-time, .fc-content, div, span').forEach(function(child) {
+                        child.style.setProperty('color', txtColor, 'important');
+                    });
+
+                    // Estilo extra para completados
                     if (info.event.extendedProps.status === 'Completado') {
-                        info.el.style.opacity = '0.75';
-                        info.el.style.borderLeft = '4px solid #198754';
-                        const title = info.el.querySelector('.fc-event-title');
-                        if (title && !title.innerHTML.startsWith('✓')) {
-                            title.innerHTML = '✓ ' + title.innerHTML;
-                        }
+                        info.el.style.setProperty('opacity', '0.80', 'important');
+                        info.el.style.setProperty('border-left', '4px solid #198754', 'important');
                     }
                 },
 
                 eventContent: function (arg) {
-                    let techName = arg.event.extendedProps.tech_name || '';
-                    let title = arg.event.title;
-                    let attachmentIcon = arg.event.extendedProps.has_attachments ? '<i class="bi bi-paperclip ms-1" style="font-size:0.7rem;"></i>' : '';
-                    let statusIcon = arg.event.extendedProps.status === 'Completado' ? '✓ ' : '';
-                    return { html: `<div class="fc-content overflow-hidden text-truncate" style="font-size:0.8rem;"><strong>${techName}:</strong> ${statusIcon}${title}${attachmentIcon}</div>` };
+                    var bgColor  = arg.event.backgroundColor  || arg.event.extendedProps.tech_color || '#6c757d';
+                    var txtColor = arg.event.textColor         || arg.event.extendedProps.text_color || getContrastColor(bgColor);
+                    var techName   = arg.event.extendedProps.tech_name || '';
+                    var title      = arg.event.title;
+                    var paperclip  = arg.event.extendedProps.has_attachments ? '<i class="bi bi-paperclip ms-1" style="font-size:0.7rem;"></i>' : '';
+                    var statusIcon = arg.event.extendedProps.status === 'Completado' ? '✓ ' : '';
+                    return {
+                        html: '<div class="fc-content overflow-hidden text-truncate" style="font-size:0.8rem;color:' + txtColor + ';padding:1px 3px;">'
+                            + '<strong>' + techName + ':</strong> ' + statusIcon + title + paperclip
+                            + '</div>'
+                    };
                 },
 
                 eventClick: handleEventClick,
@@ -4197,40 +4230,19 @@
             }
             container.innerHTML = '';
             records.forEach(function(r) {
-                var isPaid = r.is_paid === true;
-                var rowBg    = isPaid ? '#0d2b1a' : '#2b0d0d';
-                var rowBorder = isPaid ? '#198754' : '#dc3545';
-                var badge    = isPaid
-                    ? '<span class="badge bg-success ms-2"><i class="bi bi-check-circle-fill me-1"></i>Pagado</span>'
-                    : '<span class="badge bg-danger ms-2"><i class="bi bi-clock-fill me-1"></i>Pendiente</span>';
-                var toggleLabel = isPaid ? 'Marcar Pendiente' : 'Marcar Pagado';
-                var toggleIcon  = isPaid ? 'bi-x-circle' : 'bi-check-circle';
-                var toggleStyle = isPaid
-                    ? 'btn btn-sm btn-outline-danger flex-shrink-0'
-                    : 'btn btn-sm btn-outline-success flex-shrink-0';
-
                 var div = document.createElement('div');
                 div.className = 'd-flex justify-content-between align-items-start p-2 mb-2 rounded pay-record-row';
                 div.dataset.amount = r.amount;
-                div.dataset.isPaid = isPaid ? '1' : '0';
-                div.style.cssText = 'background:' + rowBg + ';border:1px solid ' + rowBorder + ';transition:border-color 0.3s,background 0.3s;';
+                div.style.cssText = 'background:#1a2a1a;border:1px solid #198754;';
                 div.innerHTML =
-                    '<div style="flex:1;">' +
-                        '<div class="d-flex align-items-center flex-wrap gap-1">' +
-                            '<span class="fw-bold ' + (isPaid ? 'text-success' : 'text-danger') + ' me-1">' + formatEuro(r.amount) + '</span>' +
-                            '<span class="badge bg-secondary small">' + r.date + '</span>' +
-                            badge +
-                        '</div>' +
+                    '<div>' +
+                        '<span class="fw-bold text-success me-2">' + formatEuro(r.amount) + '</span>' +
+                        '<span class="badge bg-secondary small">' + r.date + '</span>' +
                         (r.notes ? '<div class="small text-muted mt-1"><i class="bi bi-chat-text me-1"></i>' + _esc(r.notes) + '</div>' : '') +
                     '</div>' +
-                    '<div class="d-flex gap-1 flex-shrink-0 ms-2">' +
-                        '<button class="' + toggleStyle + '" onclick="toggleRecordPaid(' + r.id + ')" title="' + toggleLabel + '">' +
-                            '<i class="bi ' + toggleIcon + ' me-1"></i><span class="d-none d-md-inline">' + toggleLabel + '</span>' +
-                        '</button>' +
-                        '<button class="btn btn-sm btn-outline-danger" onclick="deleteRecord(' + r.id + ')" title="Eliminar cobro">' +
-                            '<i class="bi bi-trash-fill"></i>' +
-                        '</button>' +
-                    '</div>';
+                    '<button class="btn btn-sm btn-outline-danger flex-shrink-0 ms-2" onclick="deleteRecord(' + r.id + ')" title="Eliminar cobro">' +
+                        '<i class="bi bi-trash-fill"></i>' +
+                    '</button>';
                 container.appendChild(div);
             });
         }
@@ -4244,10 +4256,8 @@
             if (f) f.style.display = 'none';
             var amt = document.getElementById('newRecordAmount');
             var notes = document.getElementById('newRecordNotes');
-            var isPaid = document.getElementById('newRecordIsPaid');
             if (amt) amt.value = '';
             if (notes) notes.value = '';
-            if (isPaid) { isPaid.checked = false; updateNewRecordBadge(); }
         }
 
         function submitPaymentRecord() {
@@ -4255,13 +4265,12 @@
             var amount = parseFloat(document.getElementById('newRecordAmount').value);
             var dateVal = document.getElementById('newRecordDate').value;
             var notes = document.getElementById('newRecordNotes').value.trim();
-            var isPaid = document.getElementById('newRecordIsPaid') ? document.getElementById('newRecordIsPaid').checked : false;
             if (!amount || amount <= 0) { alert('Introduce un importe válido mayor que 0'); return; }
             if (!dateVal) { alert('Selecciona una fecha'); return; }
             fetch('/api/payments/record', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({client_id: parseInt(clientId), amount: amount, date: dateVal, notes: notes, is_paid: isPaid})
+                body: JSON.stringify({client_id: parseInt(clientId), amount: amount, date: dateVal, notes: notes})
             })
             .then(function(res) { return res.json(); })
             .then(function(result) {
@@ -4294,45 +4303,13 @@
             .catch(function(err) { alert('Error de conexión: ' + err.message); });
         }
 
-        // ✅ Actualizar label del toggle en el formulario de nuevo cobro
-        function updateNewRecordBadge() {
-            var cb = document.getElementById('newRecordIsPaid');
-            var lbl = document.getElementById('newRecordIsPaidLabel');
-            if (!cb || !lbl) return;
-            if (cb.checked) {
-                lbl.textContent = 'Pagado';
-                lbl.style.color = '#4ade80';
-            } else {
-                lbl.textContent = 'Pendiente';
-                lbl.style.color = '#f87171';
-            }
-        }
-
-        // ✅ Cambiar estado pagado/pendiente de un cobro individual
-        function toggleRecordPaid(recordId) {
-            var clientId = document.getElementById('paymentClientId').value;
-            fetch('/api/payments/record/' + recordId + '/toggle_paid', {method: 'POST'})
-            .then(function(res) { return res.json(); })
-            .then(function(result) {
-                if (result.success) {
-                    loadPaymentDetail(clientId);
-                    loadPaymentsList();
-                    var msg = result.is_paid ? '✓ Cobro marcado como Pagado' : '↻ Cobro marcado como Pendiente';
-                    showPayToast(msg, result.is_paid ? 'success' : 'danger');
-                } else {
-                    alert('Error: ' + result.msg);
-                }
-            })
-            .catch(function(err) { alert('Error de conexión: ' + err.message); });
-        }
-
         function showPayToast(msg, type) {
             var old = document.getElementById('_payToast');
             if (old) old.remove();
             var t = document.createElement('div');
             t.id = '_payToast';
             t.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:9999;padding:10px 22px;border-radius:10px;font-weight:bold;color:white;transition:opacity 0.4s;box-shadow:0 4px 20px rgba(0,0,0,0.5);';
-            t.style.background = (type === 'success') ? '#198754' : (type === 'danger' ? '#dc3545' : '#dc3545');
+            t.style.background = type === 'success' ? '#198754' : '#dc3545';
             t.innerText = msg;
             document.body.appendChild(t);
             setTimeout(function() { t.style.opacity = '0'; setTimeout(function() { t.remove(); }, 450); }, 2500);
@@ -4439,23 +4416,10 @@
                                     <label class="form-label small">Fecha *</label>
                                     <input type="date" id="newRecordDate" class="form-control form-control-sm">
                                 </div>
-                                <div class="col-md-4">
+                                <div class="col-md-6">
                                     <label class="form-label small">Observaciones</label>
                                     <input type="text" id="newRecordNotes" class="form-control form-control-sm"
                                         placeholder="Opcional...">
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="form-label small">Estado</label>
-                                    <div class="d-flex align-items-center gap-2 mt-1">
-                                        <div class="form-check form-switch mb-0">
-                                            <input class="form-check-input" type="checkbox" id="newRecordIsPaid"
-                                                onchange="updateNewRecordBadge()">
-                                            <label class="form-check-label small" for="newRecordIsPaid"
-                                                id="newRecordIsPaidLabel" style="color:#dc3545;font-weight:600;">
-                                                Pendiente
-                                            </label>
-                                        </div>
-                                    </div>
                                 </div>
                             </div>
                             <div class="mt-2 d-flex gap-2">
