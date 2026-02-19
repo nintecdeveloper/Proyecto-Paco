@@ -306,8 +306,12 @@
                                 <i class="bi bi-graph-up me-1"></i> Ver Estadísticas
                             </button>
                             <!-- ✅ NUEVO: Botón perfil técnico -->
-                            <button class="btn btn-sm btn-outline-warning w-100" onclick="openTechProfileModal({{ u.id }}, '{{ u.username }}')">
+                            <button class="btn btn-sm btn-outline-warning w-100 mb-2" onclick="openTechProfileModal({{ u.id }}, '{{ u.username }}')">
                                 <i class="bi bi-person-lines-fill me-1"></i> Ver Perfil
+                            </button>
+                            <button class="btn btn-sm btn-outline-light w-100" data-bs-toggle="modal" data-bs-target="#modalRenameUser"
+                                onclick="openRenameModal({{ u.id }}, '{{ u.username }}')">
+                                <i class="bi bi-pencil-fill me-1"></i> Cambiar Nombre
                             </button>
                         </div>
                     </div>
@@ -891,6 +895,33 @@
                     <div class="modal-footer border-secondary">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                         <button type="submit" class="btn btn-danger">Eliminar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Cambiar Nombre de Usuario -->
+    <div class="modal fade" id="modalRenameUser" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title"><i class="bi bi-pencil-fill me-2 text-warning"></i>Cambiar Nombre de Usuario</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="/manage_users">
+                    <div class="modal-body">
+                        <input type="hidden" name="action" value="rename">
+                        <input type="hidden" name="user_id" id="renameUserId">
+                        <p class="text-muted mb-3">Renombrando al usuario: <strong class="text-white" id="renameCurrentUsername"></strong></p>
+                        <label class="form-label">Nuevo nombre de usuario</label>
+                        <input type="text" name="new_username" id="renameNewUsername" class="form-control" required
+                            placeholder="Introduce el nuevo nombre...">
+                        <small class="text-muted mt-1 d-block">Este nombre también se usará para iniciar sesión.</small>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-warning"><i class="bi bi-check-lg me-1"></i>Guardar Cambio</button>
                     </div>
                 </form>
             </div>
@@ -2396,6 +2427,12 @@
         }
 
         // ✅ NUEVO: Abrir y cargar perfil de técnico
+        function openRenameModal(userId, username) {
+            document.getElementById('renameUserId').value = userId;
+            document.getElementById('renameCurrentUsername').textContent = username;
+            document.getElementById('renameNewUsername').value = username;
+        }
+
         function openTechProfileModal(userId, username) {
             document.getElementById('techProfileUserId').value = userId;
             document.getElementById('techProfileUsername').textContent = username;

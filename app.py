@@ -519,6 +519,23 @@ def manage_users():
             else:
                 flash('No puedes eliminar tu propio usuario', 'danger')
         
+        elif action == 'rename':
+            user_id = request.form.get('user_id')
+            new_username = request.form.get('new_username', '').strip()
+            user = User.query.get(user_id)
+
+            if not user:
+                flash('Usuario no encontrado', 'danger')
+            elif not new_username:
+                flash('El nuevo nombre de usuario no puede estar vacío', 'danger')
+            elif User.query.filter(User.username == new_username, User.id != user.id).first():
+                flash(f'El nombre "{new_username}" ya está en uso por otro usuario', 'danger')
+            else:
+                old_username = user.username
+                user.username = new_username
+                db.session.commit()
+                flash(f'Usuario "{old_username}" renombrado a "{new_username}" correctamente', 'success')
+
         else:
             flash('Acción no válida', 'danger')
     
