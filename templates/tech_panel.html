@@ -1417,11 +1417,12 @@
                                             <i class="bi bi-geo-alt-fill text-warning me-2" style="font-size: 1.1rem;"></i>
                                             <strong class="text-white">Dirección:</strong>
                                         </div>
-                                        <span class="text-white fw-bold d-block" style="font-size: 1.05rem;">${client.address}</span>
+                                        <span class="text-white fw-bold d-block" style="font-size: 1.05rem;">${client.address || '<em class=\"text-muted\">Sin dirección registrada</em>'}</span>
                                         <div class="d-flex gap-2 mt-2">
-                                            <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(client.address)}" target="_blank" class="btn btn-sm btn-warning fw-bold flex-fill">
-                                                <i class="bi bi-geo-alt-fill me-1"></i>Abrir en Google Maps
-                                            </a>
+                                            ${(client.address || '').trim()
+                                                ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((client.address).trim())}" target="_blank" rel="noopener" class="btn btn-sm btn-warning fw-bold flex-fill"><i class="bi bi-geo-alt-fill me-1"></i>Abrir en Google Maps</a>`
+                                                : `<button class="btn btn-sm btn-secondary flex-fill" disabled title="No hay dirección registrada para este cliente"><i class="bi bi-geo-alt me-1"></i>Sin dirección</button>`
+                                            }
                                         </div>
                                     </div>
                             `;
@@ -2248,13 +2249,18 @@
             const reportForm = document.querySelector('form[action="/save_report"]');
             if (reportForm) {
                 reportForm.addEventListener('submit', function (e) {
-                    // ✅ AUTO-FILL hora de salida con la hora actual real al guardar el parte
+                    // ✅ AUTO-FILL hora de salida solo si el cronómetro NO fue usado.
+                    // Si el cronómetro se usó, la hora de salida ya fue fijada al detenerlo (hora real de parada).
+                    // Si no se usó, tomamos la hora actual del sistema en el momento de guardar.
                     const exitField = document.getElementById('fieldExitTime');
                     if (exitField) {
-                        const now = new Date();
-                        const hh = String(now.getHours()).padStart(2, '0');
-                        const mm = String(now.getMinutes()).padStart(2, '0');
-                        exitField.value = `${hh}:${mm}`;
+                        const timerWasUsed = (document.getElementById('workDurationInput')?.value || '').trim();
+                        if (!timerWasUsed) {
+                            // Sin cronómetro: hora de salida = hora actual del sistema
+                            const now = new Date();
+                            exitField.value = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+                        }
+                        // Con cronómetro: la hora ya está correcta (fijada al detener)
                     }
 
                     // Validar nombre del firmante
@@ -2664,11 +2670,12 @@
                             </div>
                             <div class="mb-2">
                                 <i class="bi bi-geo-alt text-warning me-2"></i>
-                                <span class="text-white">${clientInfo.address}</span>
+                                <span class="text-white">${clientInfo.address || '<em class="text-muted">Sin dirección</em>'}</span>
                                 <div class="mt-1">
-                                    <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(clientInfo.address)}" target="_blank" class="btn btn-sm btn-warning fw-bold">
-                                        <i class="bi bi-geo-alt-fill me-1"></i>Abrir en Google Maps
-                                    </a>
+                                    ${(clientInfo.address || '').trim()
+                                        ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((clientInfo.address).trim())}" target="_blank" rel="noopener" class="btn btn-sm btn-warning fw-bold"><i class="bi bi-geo-alt-fill me-1"></i>Abrir en Google Maps</a>`
+                                        : `<button class="btn btn-sm btn-secondary" disabled title="No hay dirección registrada"><i class="bi bi-geo-alt me-1"></i>Sin dirección registrada</button>`
+                                    }
                                 </div>
                             </div>
                             ${clientInfo.link ? `
@@ -2789,6 +2796,16 @@
                 timerStartEpoch = Date.now();
                 timerInterval   = setInterval(tickTimer, 500);
 
+                // ✅ Sincronizar hora de ENTRADA con la hora del sistema al iniciar el cronómetro
+                // Solo si el campo está vacío (nunca sobreescribir valor introducido manualmente)
+                try {
+                    const entryF = document.getElementById('fieldEntryTime');
+                    if (entryF && !entryF.value) {
+                        const now = new Date(timerStartEpoch);
+                        entryF.value = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+                    }
+                } catch(e) {}
+
                 document.getElementById('timerBtn').style.background     = '#dc3545';
                 document.getElementById('timerIcon').className            = 'bi bi-stop-fill me-1';
                 document.getElementById('timerBtnText').textContent       = 'Finalizar trabajo';
@@ -2830,7 +2847,9 @@
                 document.getElementById('timerSummary').style.display        = 'block';
                 document.getElementById('timerSummaryText').textContent      = readable.trim();
 
-                // Rellenar automáticamente hora de entrada/salida si están vacías
+                // ✅ Sincronizar horas al detener el cronómetro:
+                // - Hora de ENTRADA: solo si está vacía (puede haber sido rellenada al iniciar)
+                // - Hora de SALIDA: siempre se actualiza con la hora real de parada del cronómetro
                 try {
                     const startDt = new Date(timerStartEpoch);
                     const endDt   = new Date(timerStartEpoch + timerElapsed * 1000);
@@ -2838,7 +2857,7 @@
                     const entryF = document.getElementById('fieldEntryTime');
                     const exitF  = document.getElementById('fieldExitTime');
                     if (entryF && !entryF.value) entryF.value = toHM(startDt);
-                    if (exitF  && !exitF.value)  exitF.value  = toHM(endDt);
+                    if (exitF)  exitF.value = toHM(endDt);  // siempre: la hora de parada es la correcta
                 } catch(e) {}
 
                 // Siguiente pulsación = reinicio completo
