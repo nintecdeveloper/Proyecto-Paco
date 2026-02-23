@@ -454,6 +454,51 @@
                 </div>
                 <!-- ===== FIN CRONÓMETRO ===== -->
 
+                <!-- ===== CRONÓMETRO DE TRAYECTO / UBICACIÓN ===== -->
+                <div id="travelTimerBlock" class="mb-3 p-3 rounded" style="background: #0d0d0d; border: 2px solid #2a2a2a; transition: border-color 0.4s;">
+                    <label class="form-label fw-bold mb-3 small d-flex align-items-center gap-2" style="color: #888; letter-spacing: 1px; text-transform: uppercase;">
+                        <i class="bi bi-car-front-fill text-info"></i> Cronómetro de trayecto
+                    </label>
+                    <div class="d-flex flex-wrap align-items-center gap-3">
+                        <div id="travelTimerDisplay" style="
+                            font-family: 'Courier New', monospace;
+                            font-size: 2.4rem;
+                            font-weight: 700;
+                            color: #555;
+                            letter-spacing: 4px;
+                            min-width: 160px;
+                            text-align: center;
+                            background: #000;
+                            border: 2px solid #222;
+                            border-radius: 8px;
+                            padding: 6px 18px;
+                            transition: color 0.4s, border-color 0.4s;
+                        ">00:00:00</div>
+                        <button type="button" id="travelTimerBtn" onclick="toggleTravelTimer()" style="
+                            background: #0d6efd;
+                            color: #fff;
+                            border: none;
+                            border-radius: 8px;
+                            font-weight: 700;
+                            font-size: 1rem;
+                            min-width: 160px;
+                            padding: 11px 0;
+                            transition: background 0.3s;
+                            cursor: pointer;
+                        ">
+                            <i class="bi bi-play-fill me-1" id="travelTimerIcon"></i>
+                            <span id="travelTimerBtnText">Iniciar trayecto</span>
+                        </button>
+                        <span id="travelTimerStatus" class="small" style="color: #555;">Detenido</span>
+                    </div>
+                    <div id="travelTimerSummary" class="mt-2 small" style="display:none; color: #aaa;">
+                        <i class="bi bi-check-circle-fill text-info me-1"></i>
+                        Trayecto registrado: <strong id="travelTimerSummaryText" style="color:#06b6d4;"></strong>
+                    </div>
+                    <input type="hidden" name="travel_duration" id="travelDurationInput" value="">
+                </div>
+                <!-- ===== FIN CRONÓMETRO TRAYECTO ===== -->
+
                 <div class="row g-3 mb-3">
                     <div class="col-12 col-md-8 position-relative">
                         <label class="form-label">CLIENTE</label>
@@ -2883,6 +2928,70 @@
         }
 
         function pad2(n) { return String(n).padStart(2, '0'); }
+
+        // ==================== CRONÓMETRO DE TRAYECTO ====================
+        let travelTimerInterval  = null;
+        let travelTimerRunning   = false;
+        let travelTimerStartEpoch = null;
+        let travelTimerElapsed   = 0;
+
+        function toggleTravelTimer() {
+            if (!travelTimerRunning) {
+                // INICIAR
+                travelTimerRunning    = true;
+                travelTimerStartEpoch = Date.now();
+                travelTimerInterval   = setInterval(tickTravelTimer, 500);
+
+                document.getElementById('travelTimerBtn').style.background     = '#dc3545';
+                document.getElementById('travelTimerIcon').className            = 'bi bi-stop-fill me-1';
+                document.getElementById('travelTimerBtnText').textContent       = 'Finalizar trayecto';
+                document.getElementById('travelTimerStatus').textContent        = 'En marcha...';
+                document.getElementById('travelTimerStatus').style.color        = '#0dcaf0';
+                document.getElementById('travelTimerDisplay').style.color       = '#0dcaf0';
+                document.getElementById('travelTimerDisplay').style.borderColor = '#0dcaf0';
+                document.getElementById('travelTimerBlock').style.borderColor   = '#0dcaf0';
+                document.getElementById('travelTimerSummary').style.display     = 'none';
+            } else {
+                // DETENER
+                clearInterval(travelTimerInterval);
+                travelTimerRunning = false;
+                travelTimerElapsed = Math.floor((Date.now() - travelTimerStartEpoch) / 1000);
+
+                const h = Math.floor(travelTimerElapsed / 3600);
+                const m = Math.floor((travelTimerElapsed % 3600) / 60);
+                const s = travelTimerElapsed % 60;
+                const hms = `${pad2(h)}:${pad2(m)}:${pad2(s)}`;
+
+                document.getElementById('travelDurationInput').value = hms;
+
+                let readable = '';
+                if (h > 0) readable += h + 'h ';
+                if (m > 0 || h > 0) readable += m + 'min ';
+                readable += s + 's';
+
+                document.getElementById('travelTimerBtn').style.background        = '#198754';
+                document.getElementById('travelTimerIcon').className               = 'bi bi-check-circle me-1';
+                document.getElementById('travelTimerBtnText').textContent          = 'Reiniciar trayecto';
+                document.getElementById('travelTimerStatus').textContent           = 'Finalizado';
+                document.getElementById('travelTimerStatus').style.color           = '#0dcaf0';
+                document.getElementById('travelTimerDisplay').style.color          = '#0dcaf0';
+                document.getElementById('travelTimerDisplay').style.borderColor    = '#0dcaf0';
+                document.getElementById('travelTimerBlock').style.borderColor      = '#198754';
+                document.getElementById('travelTimerSummary').style.display        = 'block';
+                document.getElementById('travelTimerSummaryText').textContent      = readable.trim();
+
+                travelTimerElapsed    = 0;
+                travelTimerStartEpoch = null;
+            }
+        }
+
+        function tickTravelTimer() {
+            const elapsed = Math.floor((Date.now() - travelTimerStartEpoch) / 1000);
+            const h = Math.floor(elapsed / 3600);
+            const m = Math.floor((elapsed % 3600) / 60);
+            const s = elapsed % 60;
+            document.getElementById('travelTimerDisplay').textContent = `${pad2(h)}:${pad2(m)}:${pad2(s)}`;
+        }
 
         // ==================== INCIDENCIAS ====================
         function updateIncidenciaEmail() {

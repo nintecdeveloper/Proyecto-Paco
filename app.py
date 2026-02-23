@@ -132,6 +132,14 @@ class Task(db.Model):
     service_type = db.relationship('ServiceType', backref='tasks')
     stock_item = db.relationship('Stock', backref='tasks')
 
+class TaskTechnician(db.Model):
+    """Tabla auxiliar para múltiples técnicos en una misma cita"""
+    id = db.Column(db.Integer, primary_key=True)
+    task_id = db.Column(db.Integer, db.ForeignKey('task.id', ondelete='CASCADE'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
+    task = db.relationship('Task', backref=db.backref('extra_technicians', cascade='all, delete-orphan'))
+    user = db.relationship('User', backref='extra_tasks')
+
 class Alarm(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     alarm_type = db.Column(db.String(50))
@@ -410,18 +418,35 @@ def dashboard():
         # ✅ Solo mostrar tareas pendientes cercanas: desde ayer hasta 3 días adelante
         yesterday = date.today() - timedelta(days=1)
         three_days_ahead = date.today() + timedelta(days=3)
-        pending_tasks = Task.query.filter(
+        primary_pending = Task.query.filter(
             Task.tech_id == current_user.id,
             Task.status == 'Pendiente',
             Task.date >= yesterday,
             Task.date <= three_days_ahead
         ).order_by(Task.date.asc()).all()
         
+        # Incluir tareas donde es técnico secundario
+        extra_task_ids = db.session.query(TaskTechnician.task_id).filter_by(user_id=current_user.id).all()
+        extra_task_ids = [r[0] for r in extra_task_ids]
+        if extra_task_ids:
+            extra_pending = Task.query.filter(
+                Task.id.in_(extra_task_ids),
+                Task.tech_id != current_user.id,
+                Task.status == 'Pendiente',
+                Task.date >= yesterday,
+                Task.date <= three_days_ahead
+            ).order_by(Task.date.asc()).all()
+        else:
+            extra_pending = []
+        
+        # Combinar y ordenar
+        pending_tasks_all = sorted(primary_pending + extra_pending, key=lambda t: (t.date, t.start_time or ''))
+        
         stock_items = Stock.query.filter(Stock.quantity > 0).order_by(Stock.name).all()
         stock_categories = StockCategory.query.filter_by(parent_id=None).order_by(StockCategory.name).all()
         
         return render_template('tech_panel.html',
-                             pending_tasks=pending_tasks,
+                             pending_tasks=pending_tasks_all,
                              stock_items=stock_items,
                              stock_categories=stock_categories,
                              today_date=date.today().strftime('%Y-%m-%d'))
@@ -624,9 +649,26 @@ def manage_clients():
         client = Client.query.get(client_id)
         
         if client:
-            db.session.delete(client)
-            db.session.commit()
-            flash('Cliente eliminado correctamente', 'success')
+            try:
+                # 1. Nullify client_id in tasks (tasks are kept, just unlinked)
+                for task in client.tasks:
+                    task.client_id = None
+                db.session.flush()
+                # 2. Delete payment records then payment
+                payment = ClientPayment.query.filter_by(client_id=client.id).first()
+                if payment:
+                    PaymentRecord.query.filter_by(client_payment_id=payment.id).delete()
+                    db.session.delete(payment)
+                    db.session.flush()
+                # 3. Delete extra technicians on tasks via cascade (task_technician)
+                # Already handled by CASCADE in FK definition
+                db.session.delete(client)
+                db.session.commit()
+                flash('Cliente eliminado correctamente', 'success')
+            except Exception as e:
+                db.session.rollback()
+                print(f"Error deleting client: {e}")
+                flash(f'Error al eliminar el cliente: {str(e)}', 'danger')
     
     return redirect(url_for('dashboard'))
 
@@ -1111,12 +1153,23 @@ def get_all_tasks():
         else:
             tasks = Task.query.all()
     else:
-        tasks = Task.query.filter_by(tech_id=current_user.id).all()
+        # Incluir tareas donde el usuario es técnico principal O secundario
+        primary_tasks = Task.query.filter_by(tech_id=current_user.id).all()
+        extra_task_ids = db.session.query(TaskTechnician.task_id).filter_by(user_id=current_user.id).all()
+        extra_task_ids = [r[0] for r in extra_task_ids]
+        extra_tasks = Task.query.filter(Task.id.in_(extra_task_ids), Task.tech_id != current_user.id).all() if extra_task_ids else []
+        tasks = primary_tasks + extra_tasks
     
     events = []
     for task in tasks:
         service_type = ServiceType.query.get(task.service_type_id) if task.service_type_id else None
         color = service_type.color if service_type else '#6c757d'
+        
+        # Obtener todos los técnicos de la cita
+        extra_techs = [tt.user.username for tt in task.extra_technicians if tt.user]
+        all_tech_names = (task.tech.username if task.tech else 'Sin asignar')
+        if extra_techs:
+            all_tech_names += ', ' + ', '.join(extra_techs)
         
         events.append({
             'id': task.id,
@@ -1127,11 +1180,11 @@ def get_all_tasks():
             'borderColor': color,
             'extendedProps': {
                 'client': task.client_name,
-                'client_id': task.client_id,  # Agregar client_id para poder obtener más información
+                'client_id': task.client_id,
                 'service_type': service_type.name if service_type else 'Sin tipo',
                 'status': task.status,
                 'tech_id': task.tech_id,
-                'tech_name': task.tech.username if task.tech else 'Sin asignar',
+                'tech_name': all_tech_names,
                 'desc': task.description or '',
                 'has_signature': bool(task.signature_data)
             }
@@ -2020,6 +2073,13 @@ def admin_all_tasks():
         tech_color = tech_color_map.get(task.tech_id, '#6c757d')
         text_color = get_contrast_color(tech_color)
         
+        all_tech_names = []
+        if task.tech:
+            all_tech_names.append(task.tech.username)
+        for t in task.technicians:
+            if t.id != task.tech_id:
+                all_tech_names.append(t.username)
+        
         events.append({
             'id': task.id,
             'title': f"{task.client_name}",
@@ -2031,7 +2091,8 @@ def admin_all_tasks():
             'extendedProps': {
                 'client': task.client_name,
                 'tech_id': task.tech_id,
-                'tech_name': task.tech.username if task.tech else 'Sin asignar',
+                'tech_name': ' + '.join(all_tech_names) if all_tech_names else 'Sin asignar',
+                'all_tech_names': all_tech_names,
                 'tech_color': tech_color,
                 'text_color': text_color,
                 'service_type': service_type.name if service_type else 'Sin tipo',
@@ -2204,19 +2265,27 @@ def schedule_appointment():
             flash('Solo administradores pueden agendar citas', 'danger')
             return redirect(url_for('dashboard'))
         
-        tech_id = request.form.get('tech_id')
+        # Soportar múltiples técnicos (select múltiple envía tech_ids[])
+        tech_ids = request.form.getlist('tech_ids[]')
+        # Compatibilidad hacia atrás con campo único tech_id
+        if not tech_ids:
+            single = request.form.get('tech_id')
+            if single:
+                tech_ids = [single]
+        
         client_name = request.form.get('client_name')
         date_str = request.form.get('date')
         time_str = request.form.get('time')
+        end_time_str = request.form.get('end_time', '')
         service_type_name = request.form.get('service_type')
         notes = request.form.get('notes', '')
         
         # Validaciones
-        if not all([tech_id, client_name, date_str, time_str, service_type_name]):
+        if not all([tech_ids, client_name, date_str, time_str, service_type_name]):
             flash('Todos los campos son obligatorios', 'danger')
             return redirect(url_for('dashboard'))
         
-        # Buscar o crear cliente
+        # Buscar cliente
         client = Client.query.filter_by(name=client_name).first()
         client_id = client.id if client else None
         
@@ -2229,22 +2298,41 @@ def schedule_appointment():
         # Convertir fecha
         task_date = datetime.strptime(date_str, '%Y-%m-%d').date()
         
-        # Crear tarea
-        new_task = Task(
-            tech_id=int(tech_id),
-            client_id=client_id,
-            client_name=client_name,
-            description=notes,
-            date=task_date,
-            start_time=time_str,
-            service_type_id=service_type.id,
-            status='Pendiente'
-        )
+        # Crear una tarea por cada técnico seleccionado
+        created_tasks = []
+        for tech_id in tech_ids:
+            new_task = Task(
+                tech_id=int(tech_id),
+                client_id=client_id,
+                client_name=client_name,
+                description=notes,
+                date=task_date,
+                start_time=time_str,
+                end_time=end_time_str if end_time_str else None,
+                service_type_id=service_type.id,
+                status='Pendiente'
+            )
+            db.session.add(new_task)
+            created_tasks.append(new_task)
         
-        db.session.add(new_task)
         db.session.commit()
         
-        flash('Cita agendada correctamente', 'success')
+        # Si hay más de un técnico, registrar los técnicos secundarios en TaskTechnician
+        # (cada task del segundo técnico en adelante referencia al primero como "vinculada")
+        if len(created_tasks) > 1:
+            primary_task = created_tasks[0]
+            for extra_task in created_tasks[1:]:
+                # Añadir el técnico principal como extra al técnico secundario
+                db.session.add(TaskTechnician(task_id=primary_task.id, user_id=extra_task.tech_id))
+                # Y el secundario como extra al primero
+                db.session.add(TaskTechnician(task_id=extra_task.id, user_id=primary_task.tech_id))
+            db.session.commit()
+        
+        num_techs = len(tech_ids)
+        if num_techs > 1:
+            flash(f'Cita agendada para {num_techs} técnicos correctamente', 'success')
+        else:
+            flash('Cita agendada correctamente', 'success')
         return redirect(url_for('dashboard'))
         
     except Exception as e:
@@ -2468,7 +2556,132 @@ def api_get_client(client_id):
     except Exception as e:
         return jsonify({'success': False, 'msg': str(e)}), 500
 
-@app.route('/report_incidencia', methods=['POST'])
+@app.route('/api/client/<int:client_id>/monthly_hours')
+@login_required
+def api_client_monthly_hours(client_id):
+    """API para obtener las horas de trabajo registradas para un cliente en el mes actual"""
+    try:
+        today = date.today()
+        month_start = today.replace(day=1)
+        
+        tasks = Task.query.filter(
+            Task.client_id == client_id,
+            Task.status == 'Completado',
+            Task.date >= month_start,
+            Task.date <= today
+        ).all()
+        
+        total_minutes = 0
+        work_entries = []
+        
+        for task in tasks:
+            # Calcular duración desde work_duration si está disponible
+            if task.work_duration:
+                try:
+                    parts = task.work_duration.split(':')
+                    h, m, s = int(parts[0]), int(parts[1]), int(parts[2])
+                    mins = h * 60 + m + (1 if s >= 30 else 0)
+                    total_minutes += mins
+                    work_entries.append({
+                        'date': task.date.strftime('%d/%m/%Y'),
+                        'tech': task.tech.username if task.tech else 'N/A',
+                        'duration': task.work_duration,
+                        'service': task.service_type.name if task.service_type else 'N/A',
+                        'description': task.description or ''
+                    })
+                except:
+                    pass
+            elif task.start_time and task.end_time:
+                try:
+                    sh, sm = map(int, task.start_time.split(':'))
+                    eh, em = map(int, task.end_time.split(':'))
+                    mins = (eh * 60 + em) - (sh * 60 + sm)
+                    if mins > 0:
+                        total_minutes += mins
+                        work_entries.append({
+                            'date': task.date.strftime('%d/%m/%Y'),
+                            'tech': task.tech.username if task.tech else 'N/A',
+                            'duration': f"{mins//60:02d}:{mins%60:02d}:00",
+                            'service': task.service_type.name if task.service_type else 'N/A',
+                            'description': task.description or ''
+                        })
+                except:
+                    pass
+        
+        total_hours = total_minutes // 60
+        remaining_minutes = total_minutes % 60
+        
+        return jsonify({
+            'success': True,
+            'month': today.strftime('%B %Y'),
+            'total_hours': total_hours,
+            'total_minutes': remaining_minutes,
+            'total_formatted': f"{total_hours}h {remaining_minutes}min",
+            'entries': work_entries,
+            'num_visits': len(work_entries)
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'msg': str(e)}), 500
+
+@app.route('/api/client_work_hours/<int:client_id>')
+@login_required
+def api_client_work_hours_alias(client_id):
+    """Alias para obtener horas de trabajo del cliente este mes (formato legado)"""
+    try:
+        today = date.today()
+        month_start = today.replace(day=1)
+        
+        tasks = Task.query.filter(
+            Task.client_id == client_id,
+            Task.status == 'Completado',
+            Task.date >= month_start,
+            Task.date <= today
+        ).all()
+        
+        total_minutes = 0
+        task_list = []
+        
+        for task in tasks:
+            duration_str = '—'
+            mins = 0
+            if task.work_duration:
+                try:
+                    parts = task.work_duration.split(':')
+                    h, m, s = int(parts[0]), int(parts[1]), int(parts[2])
+                    mins = h * 60 + m + (1 if s >= 30 else 0)
+                    duration_str = task.work_duration
+                except:
+                    pass
+            elif task.start_time and task.end_time:
+                try:
+                    sh, sm = map(int, task.start_time.split(':'))
+                    eh, em = map(int, task.end_time.split(':'))
+                    mins = (eh * 60 + em) - (sh * 60 + sm)
+                    if mins > 0:
+                        duration_str = f"{mins//60:02d}:{mins%60:02d}:00"
+                except:
+                    pass
+            if mins > 0:
+                total_minutes += mins
+            task_list.append({
+                'date': task.date.strftime('%d/%m/%Y'),
+                'tech': task.tech.username if task.tech else 'N/A',
+                'service': task.service_type.name if task.service_type else 'N/A',
+                'duration': duration_str
+            })
+        
+        h = total_minutes // 60
+        m = total_minutes % 60
+        total_str = f"{h}h {m}min" if h > 0 or m > 0 else '0h'
+        
+        return jsonify({
+            'success': True,
+            'total_hours': total_str,
+            'month': today.strftime('%B %Y'),
+            'tasks': task_list
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'msg': str(e)}), 500
 @login_required
 def report_incidencia():
     """Endpoint para reportar incidencias desde el panel técnico"""
@@ -2676,6 +2889,16 @@ with app.app_context():
                             print(f"Nota: Migración 'is_paid' fallback: {e2}")
     except Exception as e:
         print(f"Nota: Migración 'is_paid': {e}")
+
+    # ✅ MIGRACIÓN: Tabla task_technician para múltiples técnicos por cita
+    try:
+        from sqlalchemy import inspect as sa_inspect3
+        _inspector3 = sa_inspect3(db.engine)
+        if 'task_technician' not in _inspector3.get_table_names():
+            TaskTechnician.__table__.create(db.engine)
+            print("✓ Tabla 'task_technician' creada")
+    except Exception as e:
+        print(f"Nota: Migración 'task_technician': {e}")
 
     # Usuarios de prueba
     if not User.query.filter_by(username='admin').first():

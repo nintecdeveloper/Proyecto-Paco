@@ -425,6 +425,41 @@
 
             <div class="tab-pane fade" id="data">
                 <h4 class="fw-bold text-white fs-5 mb-3">Informes Técnicos Completados</h4>
+                
+                <!-- Filtros de informes -->
+                <div class="card bg-dark border-secondary mb-3">
+                    <div class="card-body py-2">
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-4">
+                                <label class="form-label text-white small mb-1"><i class="bi bi-person me-1"></i>Cliente</label>
+                                <input type="text" id="reportFilterClient" class="form-control form-control-sm bg-black text-white border-secondary"
+                                    placeholder="Buscar cliente..." oninput="loadReports()">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label text-white small mb-1"><i class="bi bi-calendar me-1"></i>Desde</label>
+                                <input type="date" id="reportFilterFrom" class="form-control form-control-sm bg-black text-white border-secondary"
+                                    onchange="loadReports()">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label text-white small mb-1"><i class="bi bi-calendar me-1"></i>Hasta</label>
+                                <input type="date" id="reportFilterTo" class="form-control form-control-sm bg-black text-white border-secondary"
+                                    onchange="loadReports()">
+                            </div>
+                            <div class="col-md-2 d-flex gap-1">
+                                <button class="btn btn-sm btn-outline-warning flex-fill" onclick="loadReports()">
+                                    <i class="bi bi-search"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary flex-fill" onclick="clearReportFilters()">
+                                    <i class="bi bi-x"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="mt-1">
+                            <small id="reportResultCount" class="text-muted"></small>
+                        </div>
+                    </div>
+                </div>
+                
                 <div class="table-responsive">
                     <table class="table table-dark table-sm">
                         <thead>
@@ -439,9 +474,9 @@
                                 <th>Acción</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody id="reportsTbody">
                             {% for r in informes %}
-                            <tr>
+                            <tr data-report-id="{{ r.id }}" data-client="{{ r.client_name|lower }}" data-date="{{ r.date.strftime('%Y-%m-%d') }}">
                                 <td>{{ r.id }}</td>
                                 <td>{{ r.client_name }}</td>
                                 <td>{{ r.service_type.name if r.service_type is not string else r.service_type }}</td>
@@ -449,18 +484,7 @@
                                 <td>{{ r.tech.username if r.tech else 'Sin técnico' }}</td>
                                 <td>
                                     {% if r.work_duration %}
-                                        <span style="
-                                            font-family: 'Courier New', monospace;
-                                            font-size: 0.85rem;
-                                            font-weight: 700;
-                                            color: #f37021;
-                                            background: #1a0d00;
-                                            border: 1px solid #f37021;
-                                            border-radius: 6px;
-                                            padding: 3px 8px;
-                                            letter-spacing: 1px;
-                                            white-space: nowrap;
-                                        ">{{ r.work_duration }}</span>
+                                        <span style="font-family:'Courier New',monospace;font-size:0.85rem;font-weight:700;color:#f37021;background:#1a0d00;border:1px solid #f37021;border-radius:6px;padding:3px 8px;letter-spacing:1px;white-space:nowrap;">{{ r.work_duration }}</span>
                                     {% else %}
                                         <span class="text-muted small">—</span>
                                     {% endif %}
@@ -469,8 +493,7 @@
                                     {% if r.attachments %}
                                     {% set att_list = r.attachments|from_json %}
                                     {% if att_list and att_list|length > 0 %}
-                                    <button class="btn btn-sm btn-outline-info"
-                                        onclick="showAttachmentsModal({{ r.id }}, '{{ r.client_name }}')">
+                                    <button class="btn btn-sm btn-outline-info" onclick="showAttachmentsModal({{ r.id }}, '{{ r.client_name }}')">
                                         <i class="bi bi-paperclip"></i> {{ att_list|length }}
                                     </button>
                                     {% else %}
@@ -481,8 +504,7 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <a href="/print_report/{{ r.id }}" target="_blank"
-                                        class="btn btn-sm btn-outline-warning">
+                                    <a href="/print_report/{{ r.id }}" target="_blank" class="btn btn-sm btn-outline-warning">
                                         <i class="bi bi-printer-fill"></i> Imprimir
                                     </a>
                                 </td>
@@ -708,6 +730,17 @@
                                     <i class="bi bi-sticky-fill me-1"></i>{{ c.notes|truncate(60) }}
                                 </div>
                                 {% endif %}
+                                
+                                <!-- Horas de trabajo este mes -->
+                                <div class="border-top border-secondary pt-2 mt-2">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <small class="text-muted"><i class="bi bi-stopwatch me-1"></i>Horas este mes:</small>
+                                        <button class="btn btn-xs btn-outline-info py-0 px-1 ms-1" style="font-size:0.7rem;"
+                                            onclick="showClientWorkHours({{ c.id }}, '{{ c.name }}')">
+                                            <span id="clientHours_{{ c.id }}">Ver</span>
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
 
                             <div class="card-footer bg-black border-secondary">
@@ -753,7 +786,22 @@
                     <span class="text-muted small" id="pagosTotalCount"></span>
                 </div>
 
-                <!-- Filtros y búsqueda -->
+                <!-- Buscador para añadir clientes sin pago -->
+                <div class="card bg-dark border-secondary mb-3">
+                    <div class="card-body py-2">
+                        <div class="d-flex gap-2 align-items-center flex-wrap">
+                            <div class="flex-fill position-relative" style="max-width:350px;">
+                                <input type="text" id="payAddClientSearch" class="form-control form-control-sm bg-black text-white border-secondary"
+                                    placeholder="🔍 Buscar cliente para añadir a pagos..." autocomplete="off"
+                                    oninput="searchClientForPayment()">
+                                <div id="payAddClientList" class="suggestions-list" style="z-index:9999;"></div>
+                            </div>
+                            <small class="text-muted">Solo aparecen clientes con pagos. Usa el buscador para añadir otros.</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filtros -->
                 <div class="d-flex gap-2 mb-3 flex-wrap align-items-center">
                     <button class="btn btn-sm btn-outline-light" id="payFilterAll" onclick="filterPayments('all')">
                         <i class="bi bi-list me-1"></i>Todos
@@ -1594,13 +1642,21 @@
                 </div>
                 <form method="POST" action="/schedule_appointment">
                     <div class="modal-body">
-                        <label class="form-label">Técnico</label>
-                        <select name="tech_id" class="form-select mb-2" required>
+                        <label class="form-label">Técnicos <span class="text-warning small">(selecciona uno o más)</span></label>
+                        <div class="border border-secondary rounded p-2 mb-2" style="max-height:130px;overflow-y:auto;background:#111;">
                             {% for u in empleados %}
-                            <option value="{{ u.id }}">{{ u.username }}</option>
+                            <div class="form-check">
+                                <input class="form-check-input tech-checkbox" type="checkbox"
+                                    name="tech_ids[]" value="{{ u.id }}"
+                                    id="schedTech{{ u.id }}">
+                                <label class="form-check-label text-white" for="schedTech{{ u.id }}">
+                                    {{ u.username }}
+                                </label>
+                            </div>
                             {% endfor %}
-                        </select>
-                        <label class="form-label">Cliente</label>
+                        </div>
+                        <small class="text-danger d-none" id="techCheckboxError">Selecciona al menos un técnico</small>
+                        <label class="form-label mt-1">Cliente</label>
                         <div class="position-relative mb-2">
                             <input type="text" name="client_name" id="scheduleClientInput" class="form-control" required
                                 autocomplete="off">
@@ -1620,7 +1676,7 @@
                         <textarea name="notes" class="form-control" rows="3"></textarea>
                     </div>
                     <div class="modal-footer border-secondary">
-                        <button type="submit" class="btn btn-warning">Agendar</button>
+                        <button type="submit" class="btn btn-warning" onclick="return validateTechSelection()">Agendar</button>
                     </div>
                 </form>
             </div>
@@ -1862,6 +1918,31 @@
                     <div id="attachmentsListContainer">
                         <div class="text-center text-muted py-3">
                             <i class="bi bi-hourglass-split"></i> Cargando archivos...
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Horas de trabajo del cliente este mes -->
+    <div class="modal fade" id="modalClientWorkHours" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">
+                        <i class="bi bi-stopwatch me-2 text-warning"></i>
+                        Registro de horas — <span id="workHoursClientName"></span>
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="workHoursContent">
+                        <div class="text-center text-muted py-3">
+                            <i class="bi bi-hourglass-split"></i> Cargando...
                         </div>
                     </div>
                 </div>
@@ -2657,7 +2738,10 @@
 
             // Prellenar el modal con la fecha seleccionada y el empleado actual
             document.getElementById('scheduleClientInput').value = '';
-            document.querySelector('#modalScheduleAppointment select[name="tech_id"]').value = currentEmployeeId;
+            // Desmarcar todos los checkboxes y marcar el del empleado actual
+            document.querySelectorAll('#modalScheduleAppointment .tech-checkbox').forEach(function(cb) {
+                cb.checked = (cb.value == currentEmployeeId);
+            });
             document.querySelector('#modalScheduleAppointment input[name="date"]').value = info.dateStr;
 
             // Abrir el modal de nueva cita
@@ -2668,6 +2752,7 @@
         function handleAdminDateClickGlobal(info) {
             // Prellenar el modal con la fecha seleccionada
             document.getElementById('scheduleClientInput').value = '';
+            document.querySelectorAll('#modalScheduleAppointment .tech-checkbox').forEach(function(cb) { cb.checked = false; });
             document.querySelector('#modalScheduleAppointment input[name="date"]').value = info.dateStr;
 
             // Abrir el modal de nueva cita
@@ -4094,20 +4179,27 @@
         function renderPaymentList() {
             var container = document.getElementById('paymentsListContainer');
             if (!container) return;
-            if (!_paymentsLoaded) return; // Evitar renderizar antes de que cargue
+            if (!_paymentsLoaded) return;
 
-            var searchVal = (document.getElementById('paySearchInput') ? document.getElementById('paySearchInput').value : '').toLowerCase();
+            var searchVal = (document.getElementById('paySearchInput') ? document.getElementById('paySearchInput').value : '').toLowerCase().trim();
+            var hasSearch = searchVal.length > 0;
 
+            // Sin búsqueda: solo clientes con pagos (paid/pending). Con búsqueda: todos los clientes
             var filtered = _allPaymentsData.filter(function(c) {
                 var nameMatch = c.name.toLowerCase().indexOf(searchVal) >= 0 || c.phone.indexOf(searchVal) >= 0;
-                var statusMatch = _currentPayFilter === 'all' ? true :
-                    (_currentPayFilter === 'paid' ? c.status === 'paid' :
-                    (_currentPayFilter === 'pending' ? c.status === 'pending' : true));
-                return nameMatch && statusMatch;
+                if (!nameMatch) return false;
+                if (!hasSearch && c.status === 'none') return false; // Ocultar sin pagos si no hay búsqueda
+                if (_currentPayFilter === 'all') return true;
+                return c.status === _currentPayFilter;
             });
 
+            var countEl = document.getElementById('pagosTotalCount');
+            if (countEl) countEl.innerText = filtered.length + (hasSearch ? ' cliente(s)' : ' cliente(s) con pagos');
+
             if (filtered.length === 0) {
-                container.innerHTML = '<div class="col-12 text-center text-muted py-5"><i class="bi bi-search me-2"></i>No hay clientes que coincidan con los filtros</div>';
+                container.innerHTML = hasSearch 
+                    ? '<div class="col-12 text-center text-muted py-5"><i class="bi bi-search me-2"></i>No se encontraron clientes con "' + searchVal + '"</div>'
+                    : '<div class="col-12 text-center text-muted py-5"><i class="bi bi-search me-2"></i>No hay clientes con pagos registrados. Usa el buscador para añadir uno.</div>';
                 return;
             }
 
@@ -4161,6 +4253,52 @@
                 container.appendChild(col);
             });
         }
+
+        // Buscar clientes sin pago para añadirlos al apartado de pagos
+        function searchClientForPayment() {
+            var q = document.getElementById('payAddClientSearch').value.trim();
+            var listEl = document.getElementById('payAddClientList');
+            if (q.length < 2) { listEl.style.display = 'none'; return; }
+            
+            fetch('/api/clients_search?q=' + encodeURIComponent(q))
+                .then(r => r.json())
+                .then(clients => {
+                    listEl.innerHTML = '';
+                    if (clients.length === 0) {
+                        listEl.style.display = 'none';
+                        return;
+                    }
+                    clients.forEach(function(c) {
+                        var div = document.createElement('div');
+                        div.className = 'suggestion-item';
+                        div.innerHTML = '<i class="bi bi-building me-1 text-warning"></i><b>' + _esc(c.name) + '</b> <small class="text-muted">— ' + _esc(c.phone) + '</small>';
+                        div.addEventListener('click', function() {
+                            listEl.style.display = 'none';
+                            document.getElementById('payAddClientSearch').value = '';
+                            // Abrir directamente el modal de pagos para este cliente
+                            openPaymentModal(c.id);
+                            // Añadir a la lista local para que aparezca en pagos
+                            var existing = _allPaymentsData.find(function(p) { return p.id === c.id; });
+                            if (!existing) {
+                                _allPaymentsData.push({
+                                    id: c.id, name: c.name, phone: c.phone,
+                                    has_support: c.has_support, total_amount: 0,
+                                    budget_number: '', total_paid: 0, pending: 0, status: 'pending'
+                                });
+                            }
+                        });
+                        listEl.appendChild(div);
+                    });
+                    listEl.style.display = 'block';
+                });
+        }
+        
+        document.addEventListener('click', function(e) {
+            var list = document.getElementById('payAddClientList');
+            if (list && !list.contains(e.target) && e.target.id !== 'payAddClientSearch') {
+                list.style.display = 'none';
+            }
+        });
 
         function _esc(str) {
             if (!str) return '';
@@ -4430,7 +4568,238 @@
                 });
             }
         });
+
         // =====================================================================
+        // INFORMES — Filtrado por cliente y fecha (client-side)
+        // =====================================================================
+        function loadReports() {
+            filterInformes();
+        }
+
+        function clearReportFilters() {
+            var f = document.getElementById('reportFilterClient');
+            var d1 = document.getElementById('reportFilterFrom');
+            var d2 = document.getElementById('reportFilterTo');
+            if(f) f.value = '';
+            if(d1) d1.value = '';
+            if(d2) d2.value = '';
+            filterInformes();
+        }
+
+        function filterInformes() {
+            var clientVal = (document.getElementById('reportFilterClient') || document.getElementById('informeFilterCliente'));
+            var desdeEl = (document.getElementById('reportFilterFrom') || document.getElementById('informeFilterDesde'));
+            var hastaEl = (document.getElementById('reportFilterTo') || document.getElementById('informeFilterHasta'));
+
+            var clientFilter = clientVal ? clientVal.value.toLowerCase().trim() : '';
+            var desdeFilter = desdeEl ? desdeEl.value : '';
+            var hastaFilter = hastaEl ? hastaEl.value : '';
+
+            var tbody = document.getElementById('reportsTbody') || document.getElementById('informesTbody');
+            if (!tbody) return;
+
+            var rows = tbody.querySelectorAll('tr');
+            var visible = 0;
+
+            rows.forEach(function(row) {
+                var clientData = (row.getAttribute('data-client') || '').toLowerCase();
+                var dateData = row.getAttribute('data-date') || '';
+
+                var clientMatch = !clientFilter || clientData.indexOf(clientFilter) >= 0;
+                var desdeMatch = !desdeFilter || dateData >= desdeFilter;
+                var hastaMatch = !hastaFilter || dateData <= hastaFilter;
+
+                if (clientMatch && desdeMatch && hastaMatch) {
+                    row.style.display = '';
+                    visible++;
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+
+            var countEl = document.getElementById('reportResultCount') || document.getElementById('informeFilterCount');
+            if (countEl) {
+                var total = rows.length;
+                countEl.textContent = visible < total ? ('Mostrando ' + visible + ' de ' + total + ' informes') : (total + ' informes');
+            }
+        }
+
+        // =====================================================================
+        // PAGOS — Clientes con pagos (paid/pending) visibles por defecto
+        // =====================================================================
+        // Override renderPaymentList so by default only paid/pending appear
+        // When user types in search, all clients matching search are shown
+        var _origRenderPaymentList = renderPaymentList;
+        window._renderPaymentListOverridden = false;
+        // Patch is already handled by modified renderPaymentList below, see _currentPayFilter usage
+        // The button "Todos" now means "todos con pagos" and search shows "sin pagos" too
+
+        // =====================================================================
+        // TÉCNICOS — Validar al menos uno seleccionado en modal de cita
+        // =====================================================================
+        function validateTechSelection() {
+            var checked = document.querySelectorAll('#modalScheduleAppointment .tech-checkbox:checked');
+            var errEl = document.getElementById('techCheckboxError');
+            if (checked.length === 0) {
+                if (errEl) { errEl.classList.remove('d-none'); }
+                return false;
+            }
+            if (errEl) { errEl.classList.add('d-none'); }
+            return true;
+        }
+
+        // =====================================================================
+        // HORAS DE TRABAJO DEL CLIENTE — Modal mensual
+        // =====================================================================
+        function openClientWorkHours(clientId, clientName) {
+            document.getElementById('workHoursClientName').textContent = clientName || 'Cliente';
+            document.getElementById('workHoursContent').innerHTML = '<div class="text-center text-muted py-3"><i class="bi bi-hourglass-split"></i> Cargando...</div>';
+            new bootstrap.Modal(document.getElementById('modalClientWorkHours')).show();
+
+            fetch('/api/client/' + clientId + '/monthly_hours')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (!data.success) throw new Error(data.msg || 'Error');
+                    var d = data;
+                    var entriesHtml = '';
+                    if (d.entries && d.entries.length > 0) {
+                        entriesHtml = '<div class="table-responsive mt-3"><table class="table table-dark table-sm table-bordered">' +
+                            '<thead><tr><th>Fecha</th><th>Técnico</th><th>Servicio</th><th>Duración</th></tr></thead><tbody>';
+                        d.entries.forEach(function(e) {
+                            entriesHtml += '<tr>' +
+                                '<td>' + e.date + '</td>' +
+                                '<td>' + _esc(e.tech) + '</td>' +
+                                '<td>' + _esc(e.service) + '</td>' +
+                                '<td><span style="font-family:monospace;color:#f37021;">' + e.duration + '</span></td>' +
+                                '</tr>';
+                        });
+                        entriesHtml += '</tbody></table></div>';
+                    } else {
+                        entriesHtml = '<div class="alert alert-secondary">No hay visitas registradas este mes.</div>';
+                    }
+
+                    document.getElementById('workHoursContent').innerHTML =
+                        '<div class="row g-3 mb-3">' +
+                        '<div class="col-md-4"><div class="card bg-black border-warning text-center p-3">' +
+                        '<h2 style="color:#f37021;">' + d.total_formatted + '</h2>' +
+                        '<small class="text-muted">Total este mes (' + d.month + ')</small></div></div>' +
+                        '<div class="col-md-4"><div class="card bg-black border-secondary text-center p-3">' +
+                        '<h2 class="text-white">' + d.num_visits + '</h2>' +
+                        '<small class="text-muted">Visitas realizadas</small></div></div>' +
+                        '</div>' + entriesHtml;
+                })
+                .catch(function(err) {
+                    document.getElementById('workHoursContent').innerHTML = '<div class="alert alert-danger">Error al cargar: ' + err.message + '</div>';
+                });
+        }
+        // =====================================================================
+
+        // ==================== FILTROS DE INFORMES ====================
+        function loadReports() {
+            var client = (document.getElementById('reportFilterClient') || {}).value || '';
+            var dateFrom = (document.getElementById('reportFilterFrom') || {}).value || '';
+            var dateTo = (document.getElementById('reportFilterTo') || {}).value || '';
+            
+            var params = new URLSearchParams();
+            if (client) params.append('client', client);
+            if (dateFrom) params.append('date_from', dateFrom);
+            if (dateTo) params.append('date_to', dateTo);
+
+            fetch('/api/reports?' + params.toString())
+                .then(r => r.json())
+                .then(function(data) {
+                    if (!data.success) return;
+                    var tbody = document.getElementById('reportsTbody');
+                    if (!tbody) return;
+                    
+                    var countEl = document.getElementById('reportResultCount');
+                    if (countEl) countEl.textContent = data.total + ' informes encontrados';
+
+                    if (data.data.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4"><i class="bi bi-search me-2"></i>No hay informes que coincidan con los filtros</td></tr>';
+                        return;
+                    }
+
+                    tbody.innerHTML = '';
+                    data.data.forEach(function(r) {
+                        var durationHtml = r.work_duration
+                            ? '<span style="font-family:\'Courier New\',monospace;font-size:0.85rem;font-weight:700;color:#f37021;background:#1a0d00;border:1px solid #f37021;border-radius:6px;padding:3px 8px;letter-spacing:1px;white-space:nowrap;">' + r.work_duration + '</span>'
+                            : '<span class="text-muted small">—</span>';
+                        var attachHtml = r.has_attachments
+                            ? '<button class="btn btn-sm btn-outline-info" onclick="showAttachmentsModal(' + r.id + ', \'' + r.client_name.replace(/'/g,"\'") + '\')"><i class="bi bi-paperclip"></i> ' + r.attachments_count + '</button>'
+                            : '<span class="text-muted small">Sin archivos</span>';
+                        var tr = document.createElement('tr');
+                        tr.innerHTML = '<td>' + r.id + '</td><td>' + r.client_name + '</td><td>' + r.service_type + '</td><td>' + r.date + '</td><td>' + r.tech + '</td><td>' + durationHtml + '</td><td>' + attachHtml + '</td><td><a href="/print_report/' + r.id + '" target="_blank" class="btn btn-sm btn-outline-warning"><i class="bi bi-printer-fill"></i> Imprimir</a></td>';
+                        tbody.appendChild(tr);
+                    });
+                })
+                .catch(function(e) { console.error('Error loading reports:', e); });
+        }
+
+        function clearReportFilters() {
+            var el;
+            if ((el = document.getElementById('reportFilterClient'))) el.value = '';
+            if ((el = document.getElementById('reportFilterFrom'))) el.value = '';
+            if ((el = document.getElementById('reportFilterTo'))) el.value = '';
+            var countEl = document.getElementById('reportResultCount');
+            if (countEl) countEl.textContent = '';
+            // Reset tbody to original template rows
+            var tbody = document.getElementById('reportsTbody');
+            if (tbody) {
+                // Reload via API without filters
+                loadReports();
+            }
+        }
+
+        // ==================== HORAS TRABAJO CLIENTE ====================
+        function showClientWorkHours(clientId, clientName) {
+            document.getElementById('workHoursClientName').textContent = clientName;
+            document.getElementById('workHoursContent').innerHTML = '<div class="text-center text-muted py-3"><div class="spinner-border spinner-border-sm me-2"></div>Cargando...</div>';
+            new bootstrap.Modal(document.getElementById('modalClientWorkHours')).show();
+            
+            fetch('/api/client_work_hours/' + clientId)
+                .then(r => r.json())
+                .then(function(data) {
+                    if (!data.success) {
+                        document.getElementById('workHoursContent').innerHTML = '<div class="text-danger">Error al cargar datos</div>';
+                        return;
+                    }
+                    var btn = document.getElementById('clientHours_' + clientId);
+                    if (btn) btn.textContent = data.total_hours;
+
+                    var html = '<div class="d-flex align-items-center gap-3 mb-3 p-3 rounded" style="background:#1a1a1a;">';
+                    html += '<div class="text-center"><div style="font-size:2rem;font-weight:700;color:#f37021;font-family:\'Courier New\',monospace;">' + data.total_hours + '</div>';
+                    html += '<small class="text-muted">Total ' + data.month + '</small></div>';
+                    html += '<div class="flex-fill"><small class="text-muted">Servicios completados: <b class="text-white">' + data.tasks.length + '</b></small></div>';
+                    html += '</div>';
+
+                    if (data.tasks.length === 0) {
+                        html += '<div class="text-center text-muted py-3"><i class="bi bi-calendar-x me-2"></i>Sin servicios este mes</div>';
+                    } else {
+                        html += '<table class="table table-dark table-sm table-hover"><thead><tr><th>Fecha</th><th>Técnico</th><th>Servicio</th><th>Duración</th></tr></thead><tbody>';
+                        data.tasks.forEach(function(t) {
+                            html += '<tr><td>' + t.date + '</td><td>' + t.tech + '</td><td>' + t.service + '</td><td><span style="font-family:\'Courier New\',monospace;color:#f37021;">' + t.duration + '</span></td></tr>';
+                        });
+                        html += '</tbody></table>';
+                    }
+                    document.getElementById('workHoursContent').innerHTML = html;
+                })
+                .catch(function(e) {
+                    document.getElementById('workHoursContent').innerHTML = '<div class="text-danger">Error de conexión</div>';
+                });
+        }
+
+        // ==================== VALIDAR TÉCNICOS EN MODAL CITA ====================
+        function validateTechSelection() {
+            var checkboxes = document.querySelectorAll('#modalScheduleAppointment .tech-checkbox:checked');
+            var err = document.getElementById('techCheckboxError');
+            if (checkboxes.length === 0) {
+                if (err) { err.classList.remove('d-none'); }
+                return false;
+            }
+            if (err) { err.classList.add('d-none'); }
+            return true;
+        }
 
     </script>
 
