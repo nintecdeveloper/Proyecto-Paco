@@ -1640,7 +1640,7 @@
                     <h5 class="modal-title">Agendar Nueva Cita</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <form method="POST" action="/schedule_appointment">
+                <form id="formScheduleAppointment">
                     <div class="modal-body">
                         <label class="form-label">Técnicos <span class="text-warning small">(selecciona uno o más)</span></label>
                         <div class="border border-secondary rounded p-2 mb-2" style="max-height:130px;overflow-y:auto;background:#111;">
@@ -1666,6 +1666,8 @@
                         <input type="date" name="date" class="form-control mb-2" required>
                         <label class="form-label">Hora</label>
                         <input type="time" name="time" class="form-control mb-2" required>
+                        <label class="form-label">Hora Fin (opcional)</label>
+                        <input type="time" name="end_time" class="form-control mb-2">
                         <label class="form-label">Tipo de Servicio</label>
                         <select name="service_type" class="form-select mb-2" required>
                             {% for svc in all_service_types %}
@@ -1676,7 +1678,8 @@
                         <textarea name="notes" class="form-control" rows="3"></textarea>
                     </div>
                     <div class="modal-footer border-secondary">
-                        <button type="submit" class="btn btn-warning" onclick="return validateTechSelection()">Agendar</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn btn-warning" onclick="submitScheduleForm()" id="scheduleSubmitBtn">Agendar</button>
                     </div>
                 </form>
             </div>
@@ -4637,6 +4640,62 @@
         // =====================================================================
         // TÉCNICOS — Validar al menos uno seleccionado en modal de cita
         // =====================================================================
+        // ✅ NUEVA: Enviar formulario de cita por AJAX
+        function submitScheduleForm() {
+            // Validar que hay al menos un técnico
+            const checkedTechs = document.querySelectorAll('#formScheduleAppointment .tech-checkbox:checked');
+            if (checkedTechs.length === 0) {
+                document.getElementById('techCheckboxError').classList.remove('d-none');
+                return false;
+            }
+            
+            const submitBtn = document.getElementById('scheduleSubmitBtn');
+            const originalText = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i> Agendando...';
+            
+            const formData = new FormData(document.getElementById('formScheduleAppointment'));
+            
+            fetch('/schedule_appointment', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+                
+                if (data.success) {
+                    // Cerrar modal
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('modalScheduleAppointment'));
+                    if (modal) modal.hide();
+                    
+                    // Mostrar mensaje de éxito
+                    alert('✅ ' + data.msg);
+                    
+                    // ✅ SINCRONIZACIÓN: Refrescar calendarios automáticamente
+                    setTimeout(() => {
+                        if (calendar) calendar.refetchEvents();
+                        if (calendarGlobalInstance) calendarGlobalInstance.refetchEvents();
+                    }, 300);
+                    
+                    // Limpiar formulario
+                    document.getElementById('formScheduleAppointment').reset();
+                    document.querySelectorAll('#formScheduleAppointment .tech-checkbox').forEach(cb => cb.checked = false);
+                } else {
+                    alert('❌ Error: ' + (data.msg || 'No se pudo agendar la cita'));
+                }
+            })
+            .catch(err => {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+                console.error('Error:', err);
+                alert('❌ Error de conexión. Por favor, intenta de nuevo.');
+            });
+            
+            return false;
+        }
+
         function validateTechSelection() {
             var checked = document.querySelectorAll('#modalScheduleAppointment .tech-checkbox:checked');
             var errEl = document.getElementById('techCheckboxError');
@@ -4790,6 +4849,62 @@
         }
 
         // ==================== VALIDAR TÉCNICOS EN MODAL CITA ====================
+        // ✅ NUEVA: Enviar formulario de cita por AJAX
+        function submitScheduleForm() {
+            // Validar que hay al menos un técnico
+            const checkedTechs = document.querySelectorAll('#formScheduleAppointment .tech-checkbox:checked');
+            if (checkedTechs.length === 0) {
+                document.getElementById('techCheckboxError').classList.remove('d-none');
+                return false;
+            }
+            
+            const submitBtn = document.getElementById('scheduleSubmitBtn');
+            const originalText = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i> Agendando...';
+            
+            const formData = new FormData(document.getElementById('formScheduleAppointment'));
+            
+            fetch('/schedule_appointment', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+                
+                if (data.success) {
+                    // Cerrar modal
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('modalScheduleAppointment'));
+                    if (modal) modal.hide();
+                    
+                    // Mostrar mensaje de éxito
+                    alert('✅ ' + data.msg);
+                    
+                    // ✅ SINCRONIZACIÓN: Refrescar calendarios automáticamente
+                    setTimeout(() => {
+                        if (calendar) calendar.refetchEvents();
+                        if (calendarGlobalInstance) calendarGlobalInstance.refetchEvents();
+                    }, 300);
+                    
+                    // Limpiar formulario
+                    document.getElementById('formScheduleAppointment').reset();
+                    document.querySelectorAll('#formScheduleAppointment .tech-checkbox').forEach(cb => cb.checked = false);
+                } else {
+                    alert('❌ Error: ' + (data.msg || 'No se pudo agendar la cita'));
+                }
+            })
+            .catch(err => {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+                console.error('Error:', err);
+                alert('❌ Error de conexión. Por favor, intenta de nuevo.');
+            });
+            
+            return false;
+        }
+
         function validateTechSelection() {
             var checkboxes = document.querySelectorAll('#modalScheduleAppointment .tech-checkbox:checked');
             var err = document.getElementById('techCheckboxError');

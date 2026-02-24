@@ -126,11 +126,15 @@ class Task(db.Model):
     work_end_time = db.Column(db.DateTime)
     # Duración total medida por el cronómetro del técnico (formato HH:MM:SS)
     work_duration = db.Column(db.String(20), nullable=True)
+    
+    # ✅ NUEVO: Campo para registrar quién creó la tarea (admin que la agendó)
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
 
     tech = db.relationship('User', backref='tasks')
     client = db.relationship('Client', backref='tasks')
     service_type = db.relationship('ServiceType', backref='tasks')
     stock_item = db.relationship('Stock', backref='tasks')
+    creator = db.relationship('User', foreign_keys=[created_by])
 
 class TaskTechnician(db.Model):
     """Tabla auxiliar para múltiples técnicos en una misma cita"""
@@ -2069,16 +2073,18 @@ def admin_all_tasks():
         service_type = ServiceType.query.get(task.service_type_id) if task.service_type_id else None
         service_color = service_type.color if service_type else '#6c757d'
         
-        # Color del técnico para el calendario global
+        # Color del técnico para el calendario global (del técnico principal)
         tech_color = tech_color_map.get(task.tech_id, '#6c757d')
         text_color = get_contrast_color(tech_color)
         
+        # ✅ MEJORADO: Obtener todos los técnicos (principal + secundarios)
         all_tech_names = []
         if task.tech:
             all_tech_names.append(task.tech.username)
-        for t in task.technicians:
-            if t.id != task.tech_id:
-                all_tech_names.append(t.username)
+        # Añadir técnicos secundarios desde TaskTechnician
+        for task_tech in task.extra_technicians:
+            if task_tech.user and task_tech.user.id != task.tech_id:
+                all_tech_names.append(task_tech.user.username)
         
         events.append({
             'id': task.id,
@@ -2116,6 +2122,50 @@ def admin_tech_tasks(tech_id):
     events = []
     
     for task in tasks:
+        service_type = ServiceType.query.get(task.service_type_id) if task.service_type_id else None
+        color = service_type.color if service_type else '#6c757d'
+        
+        events.append({
+            'id': task.id,
+            'title': f"{task.client_name}",
+            'start': f"{task.date}T{task.start_time}:00" if task.start_time else str(task.date),
+            'end': f"{task.date}T{task.end_time}:00" if task.end_time else str(task.date),
+            'backgroundColor': color,
+            'borderColor': color,
+            'extendedProps': {
+                'client': task.client_name,
+                'service_type': service_type.name if service_type else 'Sin tipo',
+                'status': task.status,
+                'desc': task.description or ''
+            }
+        })
+    
+    return jsonify(events)
+
+@app.route('/api/tech/my_tasks')
+@login_required
+def get_tech_tasks():
+    """
+    API para obtener tareas del técnico actual (incluyendo las que es técnico secundario).
+    Usado por el panel técnico para sincronizar su calendario.
+    """
+    if current_user.role != 'tech':
+        return jsonify([]), 403
+    
+    # Tareas donde es técnico principal
+    primary_tasks = Task.query.filter_by(tech_id=current_user.id).all()
+    
+    # Tareas donde es técnico secundario
+    secondary_task_ids = db.session.query(TaskTechnician.task_id).filter_by(user_id=current_user.id).all()
+    secondary_task_ids = [r[0] for r in secondary_task_ids]
+    secondary_tasks = Task.query.filter(Task.id.in_(secondary_task_ids)).all() if secondary_task_ids else []
+    
+    # Combinar (sin duplicados)
+    task_ids = set([t.id for t in primary_tasks] + [t.id for t in secondary_tasks])
+    all_tasks = Task.query.filter(Task.id.in_(task_ids)).all() if task_ids else []
+    
+    events = []
+    for task in all_tasks:
         service_type = ServiceType.query.get(task.service_type_id) if task.service_type_id else None
         color = service_type.color if service_type else '#6c757d'
         
@@ -2259,11 +2309,17 @@ def edit_appointment(task_id):
 @app.route('/schedule_appointment', methods=['POST'])
 @login_required
 def schedule_appointment():
-    """Endpoint para agendar nueva cita desde el panel admin"""
+    """Endpoint para agendar nueva cita desde el panel admin
+    
+    CAMBIOS:
+    - Crea 1 sola Task (con el primer técnico asignado)
+    - Otros técnicos se añaden vía TaskTechnician como técnicos secundarios
+    - Registra al admin en created_by
+    - Retorna JSON para sincronización automática de calendarios
+    """
     try:
         if current_user.role != 'admin':
-            flash('Solo administradores pueden agendar citas', 'danger')
-            return redirect(url_for('dashboard'))
+            return jsonify({'success': False, 'msg': 'Solo administradores pueden agendar citas'}), 403
         
         # Soportar múltiples técnicos (select múltiple envía tech_ids[])
         tech_ids = request.form.getlist('tech_ids[]')
@@ -2282,8 +2338,7 @@ def schedule_appointment():
         
         # Validaciones
         if not all([tech_ids, client_name, date_str, time_str, service_type_name]):
-            flash('Todos los campos son obligatorios', 'danger')
-            return redirect(url_for('dashboard'))
+            return jsonify({'success': False, 'msg': 'Todos los campos son obligatorios'}), 400
         
         # Buscar cliente
         client = Client.query.filter_by(name=client_name).first()
@@ -2292,54 +2347,57 @@ def schedule_appointment():
         # Buscar tipo de servicio
         service_type = ServiceType.query.filter_by(name=service_type_name).first()
         if not service_type:
-            flash('Tipo de servicio no válido', 'danger')
-            return redirect(url_for('dashboard'))
+            return jsonify({'success': False, 'msg': 'Tipo de servicio no válido'}), 400
         
         # Convertir fecha
         task_date = datetime.strptime(date_str, '%Y-%m-%d').date()
         
-        # Crear una tarea por cada técnico seleccionado
-        created_tasks = []
-        for tech_id in tech_ids:
-            new_task = Task(
-                tech_id=int(tech_id),
-                client_id=client_id,
-                client_name=client_name,
-                description=notes,
-                date=task_date,
-                start_time=time_str,
-                end_time=end_time_str if end_time_str else None,
-                service_type_id=service_type.id,
-                status='Pendiente'
+        # ✅ CAMBIO ESTRUCTURAL: Crear UNA SOLA TAREA con el primer técnico
+        # Los demás técnicos se añaden como técnicos secundarios
+        primary_tech_id = int(tech_ids[0])
+        
+        new_task = Task(
+            tech_id=primary_tech_id,
+            client_id=client_id,
+            client_name=client_name,
+            description=notes,
+            date=task_date,
+            start_time=time_str,
+            end_time=end_time_str if end_time_str else None,
+            service_type_id=service_type.id,
+            status='Pendiente',
+            created_by=current_user.id  # ✅ NUEVO: Registrar quién creó la tarea
+        )
+        
+        db.session.add(new_task)
+        db.session.flush()  # Obtener ID de la nueva tarea
+        
+        # ✅ NUEVO: Añadir técnicos adicionales como técnicos secundarios
+        # (No crear tareas adicionales, solo registrar la relación)
+        for i in range(1, len(tech_ids)):
+            extra_tech_id = int(tech_ids[i])
+            task_tech = TaskTechnician(
+                task_id=new_task.id,
+                user_id=extra_tech_id
             )
-            db.session.add(new_task)
-            created_tasks.append(new_task)
+            db.session.add(task_tech)
         
         db.session.commit()
         
-        # Si hay más de un técnico, registrar los técnicos secundarios en TaskTechnician
-        # (cada task del segundo técnico en adelante referencia al primero como "vinculada")
-        if len(created_tasks) > 1:
-            primary_task = created_tasks[0]
-            for extra_task in created_tasks[1:]:
-                # Añadir el técnico principal como extra al técnico secundario
-                db.session.add(TaskTechnician(task_id=primary_task.id, user_id=extra_task.tech_id))
-                # Y el secundario como extra al primero
-                db.session.add(TaskTechnician(task_id=extra_task.id, user_id=primary_task.tech_id))
-            db.session.commit()
+        print(f"✅ Cita agendada: Task ID {new_task.id} | Tech primario: {primary_tech_id} | Técnicos secundarios: {len(tech_ids)-1} | Creada por: {current_user.username}")
         
+        # Retornar JSON para que el frontend actualice sin recargar
         num_techs = len(tech_ids)
-        if num_techs > 1:
-            flash(f'Cita agendada para {num_techs} técnicos correctamente', 'success')
-        else:
-            flash('Cita agendada correctamente', 'success')
-        return redirect(url_for('dashboard'))
+        return jsonify({
+            'success': True,
+            'task_id': new_task.id,
+            'msg': f'Cita agendada para {num_techs} técnico{"s" if num_techs > 1 else ""} correctamente'
+        })
         
     except Exception as e:
         print(f"Error scheduling appointment: {str(e)}")
         db.session.rollback()
-        flash('Error al agendar la cita', 'danger')
-        return redirect(url_for('dashboard'))
+        return jsonify({'success': False, 'msg': f'Error al agendar la cita: {str(e)}'}), 500
 
 @app.route('/edit_stock_item/<int:item_id>', methods=['POST'])
 @login_required
@@ -2899,6 +2957,23 @@ with app.app_context():
             print("✓ Tabla 'task_technician' creada")
     except Exception as e:
         print(f"Nota: Migración 'task_technician': {e}")
+
+    # ✅ MIGRACIÓN: Añadir columna 'created_by' a Task
+    try:
+        inspector = inspect(db.engine)
+        task_cols = [col['name'] for col in inspector.get_columns('task')]
+        if 'created_by' not in task_cols:
+            with db.engine.connect() as conn:
+                conn.execute(db.text('ALTER TABLE task ADD COLUMN created_by INTEGER'))
+                try:
+                    conn.execute(db.text('ALTER TABLE task ADD FOREIGN KEY (created_by) REFERENCES user(id)'))
+                except Exception:
+                    # Algunas bases de datos ya lo hacen implícitamente
+                    pass
+                conn.commit()
+                print("✓ Columna 'created_by' añadida a Task")
+    except Exception as e:
+        print(f"Nota: Migración 'created_by': {e}")
 
     # Usuarios de prueba
     if not User.query.filter_by(username='admin').first():
