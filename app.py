@@ -130,11 +130,11 @@ class Task(db.Model):
     # ✅ NUEVO: Campo para registrar quién creó la tarea (admin que la agendó)
     created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
 
-    tech = db.relationship('User', backref='tasks')
+    tech = db.relationship('User', foreign_keys=[tech_id], backref='tasks')
     client = db.relationship('Client', backref='tasks')
     service_type = db.relationship('ServiceType', backref='tasks')
     stock_item = db.relationship('Stock', backref='tasks')
-    creator = db.relationship('User', foreign_keys=[created_by])
+    creator = db.relationship('User', foreign_keys=[created_by], backref='created_tasks')
 
 class TaskTechnician(db.Model):
     """Tabla auxiliar para múltiples técnicos en una misma cita"""
