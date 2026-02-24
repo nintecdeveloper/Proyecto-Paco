@@ -234,19 +234,25 @@ def check_low_stock():
 def inject_globals():
     try:
         unread_alarms = 0
-        if current_user.is_authenticated and current_user.role == 'admin':
-            unread_alarms = Alarm.query.filter_by(is_read=False).count()
+        employees = []
         
-        employees = User.query.filter_by(role='tech').all() if current_user.is_authenticated and current_user.role == 'admin' else []
+        try:
+            if current_user.is_authenticated and current_user.role == 'admin':
+                unread_alarms = Alarm.query.filter_by(is_read=False).count()
+                employees = User.query.filter_by(role='tech').all()
+        except Exception as e:
+            print(f"Error en context_processor: {e}")
+            unread_alarms = 0
+            employees = []
         
         return {
-            'all_service_types': ServiceType.query.order_by(ServiceType.name).all(),
+            'all_service_types': ServiceType.query.order_by(ServiceType.name).all() if ServiceType.query.count() > 0 else [],
             'unread_alarms_count': unread_alarms,
             'employees': employees,
             'now': datetime.now  # ✅ Añadir función now para templates
         }
     except Exception as e:
-        print("ERROR context_processor:", e)
+        print(f"ERROR context_processor: {e}")
         return {
             'all_service_types': [],
             'unread_alarms_count': 0,
@@ -1149,52 +1155,105 @@ def upload_task_file(task_id):
 @app.route('/api/tasks')
 @login_required
 def get_all_tasks():
-    """Obtener todas las tareas para el calendario"""
-    if current_user.role == 'admin':
-        tech_id = request.args.get('tech_id')
-        if tech_id:
-            tasks = Task.query.filter_by(tech_id=int(tech_id)).all()
+    """Obtener todas las tareas para el calendario - CON MANEJO ROBUSTO DE ERRORES"""
+    try:
+        if current_user.role == 'admin':
+            tech_id = request.args.get('tech_id')
+            if tech_id:
+                try:
+                    tasks = Task.query.filter_by(tech_id=int(tech_id)).all()
+                except Exception as e:
+                    print(f"Error filtrando tareas por técnico: {e}")
+                    tasks = []
+            else:
+                try:
+                    tasks = Task.query.all()
+                except Exception as e:
+                    print(f"Error cargando todas las tareas: {e}")
+                    tasks = []
         else:
-            tasks = Task.query.all()
-    else:
-        # Incluir tareas donde el usuario es técnico principal O secundario
-        primary_tasks = Task.query.filter_by(tech_id=current_user.id).all()
-        extra_task_ids = db.session.query(TaskTechnician.task_id).filter_by(user_id=current_user.id).all()
-        extra_task_ids = [r[0] for r in extra_task_ids]
-        extra_tasks = Task.query.filter(Task.id.in_(extra_task_ids), Task.tech_id != current_user.id).all() if extra_task_ids else []
-        tasks = primary_tasks + extra_tasks
-    
-    events = []
-    for task in tasks:
-        service_type = ServiceType.query.get(task.service_type_id) if task.service_type_id else None
-        color = service_type.color if service_type else '#6c757d'
+            # Incluir tareas donde el usuario es técnico principal O secundario
+            try:
+                primary_tasks = Task.query.filter_by(tech_id=current_user.id).all()
+            except Exception as e:
+                print(f"Error cargando tareas primarias: {e}")
+                primary_tasks = []
+            
+            try:
+                extra_task_ids = db.session.query(TaskTechnician.task_id).filter_by(user_id=current_user.id).all()
+                extra_task_ids = [r[0] for r in extra_task_ids]
+                extra_tasks = Task.query.filter(Task.id.in_(extra_task_ids), Task.tech_id != current_user.id).all() if extra_task_ids else []
+            except Exception as e:
+                print(f"Error cargando tareas secundarias: {e}")
+                extra_tasks = []
+            
+            tasks = primary_tasks + extra_tasks
         
-        # Obtener todos los técnicos de la cita
-        extra_techs = [tt.user.username for tt in task.extra_technicians if tt.user]
-        all_tech_names = (task.tech.username if task.tech else 'Sin asignar')
-        if extra_techs:
-            all_tech_names += ', ' + ', '.join(extra_techs)
+        events = []
+        for task in tasks:
+            try:
+                # Obtener tipo de servicio
+                service_type = None
+                try:
+                    if task.service_type_id:
+                        service_type = ServiceType.query.get(task.service_type_id)
+                except Exception as e:
+                    print(f"Error cargando servicio de tarea {task.id}: {e}")
+                
+                color = service_type.color if service_type else '#6c757d'
+                
+                # Obtener todos los técnicos de la cita
+                extra_techs = []
+                try:
+                    if hasattr(task, 'extra_technicians'):
+                        extra_techs = [tt.user.username for tt in task.extra_technicians if tt.user]
+                except Exception as e:
+                    print(f"Error cargando técnicos secundarios de tarea {task.id}: {e}")
+                
+                # Técnico principal
+                tech_name = 'Sin asignar'
+                try:
+                    if task.tech:
+                        tech_name = task.tech.username
+                except Exception as e:
+                    print(f"Error cargando técnico principal de tarea {task.id}: {e}")
+                
+                all_tech_names = tech_name
+                if extra_techs:
+                    all_tech_names += ', ' + ', '.join(extra_techs)
+                
+                # Construir evento
+                event = {
+                    'id': task.id,
+                    'title': f"{task.client_name if task.client_name else 'Sin cliente'} - {service_type.name if service_type else 'Sin tipo'}",
+                    'start': f"{task.date}T{task.start_time}:00" if (task.date and task.start_time) else str(task.date) if task.date else '',
+                    'end': f"{task.date}T{task.end_time}:00" if (task.date and task.end_time) else str(task.date) if task.date else '',
+                    'backgroundColor': color,
+                    'borderColor': color,
+                    'extendedProps': {
+                        'client': task.client_name or 'Sin cliente',
+                        'client_id': task.client_id,
+                        'service_type': service_type.name if service_type else 'Sin tipo',
+                        'status': task.status or 'Pendiente',
+                        'tech_id': task.tech_id,
+                        'tech_name': all_tech_names,
+                        'desc': task.description or '',
+                        'has_signature': bool(task.signature_data)
+                    }
+                }
+                events.append(event)
+                
+            except Exception as e:
+                print(f"Error procesando tarea {task.id}: {e}")
+                continue
         
-        events.append({
-            'id': task.id,
-            'title': f"{task.client_name} - {service_type.name if service_type else 'Sin tipo'}",
-            'start': f"{task.date}T{task.start_time}:00" if task.start_time else str(task.date),
-            'end': f"{task.date}T{task.end_time}:00" if task.end_time else str(task.date),
-            'backgroundColor': color,
-            'borderColor': color,
-            'extendedProps': {
-                'client': task.client_name,
-                'client_id': task.client_id,
-                'service_type': service_type.name if service_type else 'Sin tipo',
-                'status': task.status,
-                'tech_id': task.tech_id,
-                'tech_name': all_tech_names,
-                'desc': task.description or '',
-                'has_signature': bool(task.signature_data)
-            }
-        })
-    
-    return jsonify(events)
+        return jsonify(events)
+        
+    except Exception as e:
+        print(f"Error CRÍTICO en get_all_tasks: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Error cargando tareas: {str(e)}'}), 500
 
 @app.route('/api/clients_search')
 @login_required
@@ -2032,84 +2091,130 @@ def get_tech_colors():
 @app.route('/api/admin/all_tasks')
 @login_required
 def admin_all_tasks():
-    """Endpoint para calendario global del admin"""
-    if current_user.role != 'admin':
-        return jsonify([])
-    
-    tasks = Task.query.all()
-    events = []
-    
-    # Paleta de colores para diferenciar técnicos
-    TECH_COLORS = [
-        '#3b82f6',  # azul
-        '#22c55e',  # verde
-        '#a855f7',  # morado
-        '#f59e0b',  # ámbar
-        '#ef4444',  # rojo
-        '#06b6d4',  # cian
-        '#ec4899',  # rosa
-        '#84cc16',  # lima
-        '#f97316',  # naranja
-        '#14b8a6',  # teal
-    ]
-
-    def get_contrast_color(hex_color):
-        """Devuelve #000 o #fff para máximo contraste sobre el color de fondo dado."""
+    """Endpoint para calendario global del admin - ROBUSTO CON MANEJO DE ERRORES"""
+    try:
+        if current_user.role != 'admin':
+            return jsonify([])
+        
         try:
-            h = hex_color.lstrip('#')
-            r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
-            luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-            return '#000000' if luminance > 0.5 else '#ffffff'
-        except Exception:
-            return '#ffffff'
-    
-    # Obtener todos los técnicos y asignarles colores
-    techs = User.query.filter_by(role='tech').order_by(User.id).all()
-    tech_color_map = {}
-    for i, tech in enumerate(techs):
-        tech_color_map[tech.id] = TECH_COLORS[i % len(TECH_COLORS)]
-    
-    for task in tasks:
-        service_type = ServiceType.query.get(task.service_type_id) if task.service_type_id else None
-        service_color = service_type.color if service_type else '#6c757d'
+            tasks = Task.query.all()
+        except Exception as e:
+            print(f"Error cargando tareas: {e}")
+            return jsonify({'error': 'Error cargando tareas'}), 500
         
-        # Color del técnico para el calendario global (del técnico principal)
-        tech_color = tech_color_map.get(task.tech_id, '#6c757d')
-        text_color = get_contrast_color(tech_color)
+        events = []
         
-        # ✅ MEJORADO: Obtener todos los técnicos (principal + secundarios)
-        all_tech_names = []
-        if task.tech:
-            all_tech_names.append(task.tech.username)
-        # Añadir técnicos secundarios desde TaskTechnician
-        for task_tech in task.extra_technicians:
-            if task_tech.user and task_tech.user.id != task.tech_id:
-                all_tech_names.append(task_tech.user.username)
+        # Paleta de colores para diferenciar técnicos
+        TECH_COLORS = [
+            '#3b82f6',  # azul
+            '#22c55e',  # verde
+            '#a855f7',  # morado
+            '#f59e0b',  # ámbar
+            '#ef4444',  # rojo
+            '#06b6d4',  # cian
+            '#ec4899',  # rosa
+            '#84cc16',  # lima
+            '#f97316',  # naranja
+            '#14b8a6',  # teal
+        ]
+
+        def get_contrast_color(hex_color):
+            """Devuelve #000 o #fff para máximo contraste sobre el color de fondo dado."""
+            try:
+                h = hex_color.lstrip('#')
+                if len(h) < 6:
+                    return '#ffffff'
+                r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+                luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+                return '#000000' if luminance > 0.5 else '#ffffff'
+            except Exception:
+                return '#ffffff'
         
-        events.append({
-            'id': task.id,
-            'title': f"{task.client_name}",
-            'start': f"{task.date}T{task.start_time}:00" if task.start_time else str(task.date),
-            'end': f"{task.date}T{task.end_time}:00" if task.end_time else str(task.date),
-            'backgroundColor': tech_color,
-            'borderColor': tech_color,
-            'textColor': text_color,
-            'extendedProps': {
-                'client': task.client_name,
-                'tech_id': task.tech_id,
-                'tech_name': ' + '.join(all_tech_names) if all_tech_names else 'Sin asignar',
-                'all_tech_names': all_tech_names,
-                'tech_color': tech_color,
-                'text_color': text_color,
-                'service_type': service_type.name if service_type else 'Sin tipo',
-                'service_color': service_color,
-                'status': task.status,
-                'desc': task.description or '',
-                'has_attachments': bool(task.attachments)
-            }
-        })
-    
-    return jsonify(events)
+        # Obtener todos los técnicos y asignarles colores
+        try:
+            techs = User.query.filter_by(role='tech').order_by(User.id).all()
+            tech_color_map = {}
+            for i, tech in enumerate(techs):
+                tech_color_map[tech.id] = TECH_COLORS[i % len(TECH_COLORS)]
+        except Exception as e:
+            print(f"Error cargando técnicos: {e}")
+            tech_color_map = {}
+        
+        # Procesar cada tarea
+        for task in tasks:
+            try:
+                # Obtener tipo de servicio
+                service_type = None
+                try:
+                    if task.service_type_id:
+                        service_type = ServiceType.query.get(task.service_type_id)
+                except Exception as e:
+                    print(f"Error cargando servicio para tarea {task.id}: {e}")
+                
+                service_color = service_type.color if service_type else '#6c757d'
+                
+                # Color del técnico para el calendario global (del técnico principal)
+                tech_color = tech_color_map.get(task.tech_id, '#6c757d')
+                text_color = get_contrast_color(tech_color)
+                
+                # Obtener todos los técnicos (principal + secundarios)
+                all_tech_names = []
+                
+                # Técnico principal
+                try:
+                    if task.tech:
+                        all_tech_names.append(task.tech.username)
+                except Exception as e:
+                    print(f"Error cargando técnico principal de tarea {task.id}: {e}")
+                
+                # Técnicos secundarios
+                try:
+                    if hasattr(task, 'extra_technicians'):
+                        for task_tech in task.extra_technicians:
+                            try:
+                                if task_tech.user and task_tech.user.id != task.tech_id:
+                                    all_tech_names.append(task_tech.user.username)
+                            except Exception as e:
+                                print(f"Error procesando técnico secundario de tarea {task.id}: {e}")
+                except Exception as e:
+                    print(f"Error cargando técnicos secundarios de tarea {task.id}: {e}")
+                
+                # Construir evento
+                event = {
+                    'id': task.id,
+                    'title': f"{task.client_name}" if task.client_name else "Sin cliente",
+                    'start': f"{task.date}T{task.start_time}:00" if (task.date and task.start_time) else str(task.date),
+                    'end': f"{task.date}T{task.end_time}:00" if (task.date and task.end_time) else str(task.date),
+                    'backgroundColor': tech_color,
+                    'borderColor': tech_color,
+                    'textColor': text_color,
+                    'extendedProps': {
+                        'client': task.client_name or 'Sin cliente',
+                        'tech_id': task.tech_id,
+                        'tech_name': ' + '.join(all_tech_names) if all_tech_names else 'Sin asignar',
+                        'all_tech_names': all_tech_names,
+                        'tech_color': tech_color,
+                        'text_color': text_color,
+                        'service_type': service_type.name if service_type else 'Sin tipo',
+                        'service_color': service_color,
+                        'status': task.status or 'Pendiente',
+                        'desc': task.description or '',
+                        'has_attachments': bool(task.attachments)
+                    }
+                }
+                events.append(event)
+                
+            except Exception as e:
+                print(f"Error procesando tarea {task.id}: {e}")
+                continue
+        
+        return jsonify(events)
+        
+    except Exception as e:
+        print(f"Error CRÍTICO en admin_all_tasks: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Error en agenda: {str(e)}'}), 500
 
 @app.route('/api/admin/tasks/<int:tech_id>')
 @login_required
@@ -2147,44 +2252,75 @@ def admin_tech_tasks(tech_id):
 def get_tech_tasks():
     """
     API para obtener tareas del técnico actual (incluyendo las que es técnico secundario).
-    Usado por el panel técnico para sincronizar su calendario.
+    Usado por el panel técnico para sincronizar su calendario - CON MANEJO ROBUSTO DE ERRORES
     """
-    if current_user.role != 'tech':
-        return jsonify([]), 403
-    
-    # Tareas donde es técnico principal
-    primary_tasks = Task.query.filter_by(tech_id=current_user.id).all()
-    
-    # Tareas donde es técnico secundario
-    secondary_task_ids = db.session.query(TaskTechnician.task_id).filter_by(user_id=current_user.id).all()
-    secondary_task_ids = [r[0] for r in secondary_task_ids]
-    secondary_tasks = Task.query.filter(Task.id.in_(secondary_task_ids)).all() if secondary_task_ids else []
-    
-    # Combinar (sin duplicados)
-    task_ids = set([t.id for t in primary_tasks] + [t.id for t in secondary_tasks])
-    all_tasks = Task.query.filter(Task.id.in_(task_ids)).all() if task_ids else []
-    
-    events = []
-    for task in all_tasks:
-        service_type = ServiceType.query.get(task.service_type_id) if task.service_type_id else None
-        color = service_type.color if service_type else '#6c757d'
+    try:
+        if current_user.role != 'tech':
+            return jsonify([]), 403
         
-        events.append({
-            'id': task.id,
-            'title': f"{task.client_name}",
-            'start': f"{task.date}T{task.start_time}:00" if task.start_time else str(task.date),
-            'end': f"{task.date}T{task.end_time}:00" if task.end_time else str(task.date),
-            'backgroundColor': color,
-            'borderColor': color,
-            'extendedProps': {
-                'client': task.client_name,
-                'service_type': service_type.name if service_type else 'Sin tipo',
-                'status': task.status,
-                'desc': task.description or ''
-            }
-        })
-    
-    return jsonify(events)
+        # Tareas donde es técnico principal
+        try:
+            primary_tasks = Task.query.filter_by(tech_id=current_user.id).all()
+        except Exception as e:
+            print(f"Error cargando tareas primarias del técnico {current_user.id}: {e}")
+            primary_tasks = []
+        
+        # Tareas donde es técnico secundario
+        try:
+            secondary_task_ids = db.session.query(TaskTechnician.task_id).filter_by(user_id=current_user.id).all()
+            secondary_task_ids = [r[0] for r in secondary_task_ids]
+            secondary_tasks = Task.query.filter(Task.id.in_(secondary_task_ids)).all() if secondary_task_ids else []
+        except Exception as e:
+            print(f"Error cargando tareas secundarias del técnico {current_user.id}: {e}")
+            secondary_tasks = []
+        
+        # Combinar (sin duplicados)
+        task_ids = set([t.id for t in primary_tasks] + [t.id for t in secondary_tasks])
+        try:
+            all_tasks = Task.query.filter(Task.id.in_(task_ids)).all() if task_ids else []
+        except Exception as e:
+            print(f"Error cargando tareas combinadas del técnico {current_user.id}: {e}")
+            all_tasks = []
+        
+        events = []
+        for task in all_tasks:
+            try:
+                service_type = None
+                try:
+                    if task.service_type_id:
+                        service_type = ServiceType.query.get(task.service_type_id)
+                except Exception as e:
+                    print(f"Error cargando servicio de tarea {task.id}: {e}")
+                
+                color = service_type.color if service_type else '#6c757d'
+                
+                event = {
+                    'id': task.id,
+                    'title': f"{task.client_name if task.client_name else 'Sin cliente'}",
+                    'start': f"{task.date}T{task.start_time}:00" if (task.date and task.start_time) else str(task.date) if task.date else '',
+                    'end': f"{task.date}T{task.end_time}:00" if (task.date and task.end_time) else str(task.date) if task.date else '',
+                    'backgroundColor': color,
+                    'borderColor': color,
+                    'extendedProps': {
+                        'client': task.client_name or 'Sin cliente',
+                        'service_type': service_type.name if service_type else 'Sin tipo',
+                        'status': task.status or 'Pendiente',
+                        'desc': task.description or ''
+                    }
+                }
+                events.append(event)
+                
+            except Exception as e:
+                print(f"Error procesando tarea {task.id} para técnico {current_user.id}: {e}")
+                continue
+        
+        return jsonify(events)
+        
+    except Exception as e:
+        print(f"Error CRÍTICO en get_tech_tasks para técnico {current_user.id}: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Error cargando tus tareas: {str(e)}'}), 500
 
 @app.route('/create_appointment', methods=['POST'])
 @login_required
