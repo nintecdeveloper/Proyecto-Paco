@@ -3094,22 +3094,52 @@ with app.app_context():
     except Exception as e:
         print(f"Nota: Migración 'task_technician': {e}")
 
-    # ✅ MIGRACIÓN: Añadir columna 'created_by' a Task
+    # ✅ MIGRACIÓN: Añadir columna 'created_by' a Task (VERSIÓN MEJORADA)
     try:
         inspector = inspect(db.engine)
-        task_cols = [col['name'] for col in inspector.get_columns('task')]
-        if 'created_by' not in task_cols:
-            with db.engine.connect() as conn:
-                conn.execute(db.text('ALTER TABLE task ADD COLUMN created_by INTEGER'))
-                try:
-                    conn.execute(db.text('ALTER TABLE task ADD FOREIGN KEY (created_by) REFERENCES user(id)'))
-                except Exception:
-                    # Algunas bases de datos ya lo hacen implícitamente
-                    pass
-                conn.commit()
-                print("✓ Columna 'created_by' añadida a Task")
+        if 'task' in inspector.get_table_names():
+            task_cols = [col['name'] for col in inspector.get_columns('task')]
+            if 'created_by' not in task_cols:
+                with db.engine.connect() as conn:
+                    try:
+                        # Intentar con DEFAULT NULL para PostgreSQL
+                        conn.execute(db.text('ALTER TABLE task ADD COLUMN created_by INTEGER DEFAULT NULL'))
+                        conn.commit()
+                        print("✓ Columna 'created_by' añadida a Task")
+                    except Exception as e1:
+                        print(f"⚠️  Nota: Intento 1 fallido - {e1}")
+                        try:
+                            conn.rollback()
+                        except:
+                            pass
+                        
+                        # Intento 2: Sin DEFAULT
+                        try:
+                            conn.execute(db.text('ALTER TABLE task ADD COLUMN created_by INTEGER'))
+                            conn.commit()
+                            print("✓ Columna 'created_by' añadida a Task (sin DEFAULT)")
+                        except Exception as e2:
+                            print(f"⚠️  Nota: Intento 2 fallido - {e2}")
+                            try:
+                                conn.rollback()
+                            except:
+                                pass
+                    
+                    # Intento de agregar FK
+                    try:
+                        conn.execute(db.text('ALTER TABLE task ADD CONSTRAINT fk_task_created_by FOREIGN KEY (created_by) REFERENCES "user"(id) ON DELETE SET NULL'))
+                        conn.commit()
+                        print("✓ FK 'created_by' añadida a Task")
+                    except Exception as e3:
+                        print(f"⚠️  Nota: FK no se pudo agregar - {e3}")
+                        try:
+                            conn.rollback()
+                        except:
+                            pass
+            else:
+                print("ℹ️  Columna 'created_by' ya existe en Task")
     except Exception as e:
-        print(f"Nota: Migración 'created_by': {e}")
+        print(f"⚠️  Nota: Error en migración de 'created_by': {e}")
 
     # Usuarios de prueba
     if not User.query.filter_by(username='admin').first():
