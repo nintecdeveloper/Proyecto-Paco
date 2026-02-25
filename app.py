@@ -449,8 +449,19 @@ def dashboard():
         else:
             extra_pending = []
         
+        # Incluir tareas sin técnico asignado (cualquier técnico puede verlas y completarlas)
+        unassigned_pending = Task.query.filter(
+            Task.tech_id == None,
+            Task.status == 'Sin asignar',
+            Task.date >= yesterday,
+            Task.date <= three_days_ahead
+        ).order_by(Task.date.asc()).all()
+
         # Combinar y ordenar
-        pending_tasks_all = sorted(primary_pending + extra_pending, key=lambda t: (t.date, t.start_time or ''))
+        pending_tasks_all = sorted(
+            primary_pending + extra_pending + unassigned_pending,
+            key=lambda t: (t.date, t.start_time or '')
+        )
         
         stock_items = Stock.query.filter(Stock.quantity > 0).order_by(Stock.name).all()
         stock_categories = StockCategory.query.filter_by(parent_id=None).order_by(StockCategory.name).all()
@@ -985,7 +996,22 @@ def save_report():
         # Si hay una cita vinculada, actualizar esa tarea
         if linked_task_id and linked_task_id != 'none':
             task = Task.query.get(int(linked_task_id))
-            if task and task.tech_id == current_user.id:
+            # Permitir completar si: técnico asignado, técnico secundario, admin, o tarea sin asignar
+            _is_extra = task and db.session.query(TaskTechnician).filter_by(
+                task_id=task.id, user_id=current_user.id).first()
+            _can_complete = (
+                task and (
+                    current_user.role == 'admin'
+                    or task.tech_id == current_user.id
+                    or bool(_is_extra)
+                    or task.tech_id is None
+                )
+            )
+            if _can_complete:
+                # Si la tarea estaba sin asignar, registrar al técnico que la completa
+                if task.tech_id is None and current_user.role == 'tech':
+                    task.tech_id = current_user.id
+                    task.status = 'Pendiente'  # normalizar antes de poner Completado
                 # Actualizar la tarea existente
                 task.description = description
                 task.parts_text = parts_text
@@ -1293,8 +1319,12 @@ def get_task_full(task_id):
     """
     task = Task.query.get_or_404(task_id)
     
-    # Verificar permisos
-    if current_user.role != 'admin' and current_user.id != task.tech_id:
+    # Verificar permisos: admin, técnico asignado, técnico secundario, o tarea sin asignar
+    _extra = db.session.query(TaskTechnician).filter_by(task_id=task_id, user_id=current_user.id).first()
+    if (current_user.role != 'admin'
+            and current_user.id != task.tech_id
+            and not _extra
+            and task.tech_id is not None):
         return jsonify({'success': False, 'msg': 'No autorizado'}), 403
     
     service_type = ServiceType.query.get(task.service_type_id) if task.service_type_id else None
@@ -1791,24 +1821,42 @@ def task_action(task_id, action):
     """Endpoint para acciones sobre tareas (completar, eliminar, cancelar, toggle)"""
     task = Task.query.get_or_404(task_id)
     
-    # Verificar permisos
-    if current_user.role != 'admin' and task.tech_id != current_user.id:
+    # Verificar permisos:
+    # - Admin: acceso total
+    # - Técnico asignado o secundario: acceso a sus tareas
+    # - Técnico con tarea sin asignar (tech_id=None): puede ver, completar y hacer toggle
+    # - Ningún otro rol puede actuar
+    _is_extra_tech = (current_user.role == 'tech' and
+                      db.session.query(TaskTechnician).filter_by(
+                          task_id=task_id, user_id=current_user.id).first() is not None)
+    _is_unassigned = (task.tech_id is None)
+    _tech_allowed = (current_user.role == 'tech' and
+                     (task.tech_id == current_user.id or _is_extra_tech or _is_unassigned))
+
+    if current_user.role != 'admin' and not _tech_allowed:
         return jsonify({'success': False, 'msg': 'No autorizado'}), 403
-    
+
     try:
         if action == 'complete':
+            # Si la tarea estaba sin asignar, asignarla al técnico que la completa
+            if _is_unassigned and current_user.role == 'tech':
+                task.tech_id = current_user.id
             task.status = 'Completado'
             if not task.work_end_time:
                 task.work_end_time = datetime.now()
             db.session.commit()
             return jsonify({'success': True, 'msg': 'Tarea completada', 'status': task.status})
-        
+
         elif action == 'toggle':
-            # Toggle entre Completado y Pendiente
+            # Toggle entre Completado y Pendiente/Sin asignar
             if task.status == 'Completado':
-                task.status = 'Pendiente'
+                # Descompletar: volver al estado anterior según si tiene técnico
+                task.status = 'Pendiente' if task.tech_id else 'Sin asignar'
                 task.work_end_time = None
             else:
+                # Completar: si sin asignar, registrar técnico
+                if _is_unassigned and current_user.role == 'tech':
+                    task.tech_id = current_user.id
                 task.status = 'Completado'
                 if not task.work_end_time:
                     task.work_end_time = datetime.now()
@@ -2276,6 +2324,15 @@ def get_tech_tasks():
         
         # Combinar (sin duplicados)
         task_ids = set([t.id for t in primary_tasks] + [t.id for t in secondary_tasks])
+
+        # Incluir tareas sin técnico asignado para que cualquier técnico las vea
+        try:
+            unassigned_ids = [t.id for t in Task.query.filter(
+                Task.tech_id == None, Task.status == 'Sin asignar').all()]
+            task_ids.update(unassigned_ids)
+        except Exception as e:
+            print(f"Error cargando tareas sin asignar: {e}")
+
         try:
             all_tasks = Task.query.filter(Task.id.in_(task_ids)).all() if task_ids else []
         except Exception as e:
@@ -2472,9 +2529,9 @@ def schedule_appointment():
         service_type_name = request.form.get('service_type')
         notes = request.form.get('notes', '')
         
-        # Validaciones
-        if not all([tech_ids, client_name, date_str, time_str, service_type_name]):
-            return jsonify({'success': False, 'msg': 'Todos los campos son obligatorios'}), 400
+        # Validaciones — técnico es OPCIONAL; sin técnico la tarea queda "Sin asignar"
+        if not all([client_name, date_str, time_str, service_type_name]):
+            return jsonify({'success': False, 'msg': 'Faltan campos obligatorios: cliente, fecha, hora y tipo de servicio'}), 400
         
         # Buscar cliente
         client = Client.query.filter_by(name=client_name).first()
@@ -2488,10 +2545,10 @@ def schedule_appointment():
         # Convertir fecha
         task_date = datetime.strptime(date_str, '%Y-%m-%d').date()
         
-        # ✅ CAMBIO ESTRUCTURAL: Crear UNA SOLA TAREA con el primer técnico
-        # Los demás técnicos se añaden como técnicos secundarios
-        primary_tech_id = int(tech_ids[0])
-        
+        # Técnico principal — puede ser None si el admin no seleccionó ninguno
+        primary_tech_id = int(tech_ids[0]) if tech_ids else None
+        task_status = 'Pendiente' if primary_tech_id else 'Sin asignar'
+
         new_task = Task(
             tech_id=primary_tech_id,
             client_id=client_id,
@@ -2501,8 +2558,8 @@ def schedule_appointment():
             start_time=time_str,
             end_time=end_time_str if end_time_str else None,
             service_type_id=service_type.id,
-            status='Pendiente',
-            created_by=current_user.id  # ✅ NUEVO: Registrar quién creó la tarea
+            status=task_status,
+            created_by=current_user.id  # Registrar quién creó la tarea
         )
         
         db.session.add(new_task)
@@ -2520,14 +2577,18 @@ def schedule_appointment():
         
         db.session.commit()
         
-        print(f"✅ Cita agendada: Task ID {new_task.id} | Tech primario: {primary_tech_id} | Técnicos secundarios: {len(tech_ids)-1} | Creada por: {current_user.username}")
-        
-        # Retornar JSON para que el frontend actualice sin recargar
-        num_techs = len(tech_ids)
+        if primary_tech_id:
+            num_techs = len(tech_ids)
+            msg = f'Cita agendada para {num_techs} técnico{"s" if num_techs > 1 else ""} correctamente'
+            print(f"✅ Cita agendada: Task ID {new_task.id} | Tech: {primary_tech_id} | Creada por: {current_user.username}")
+        else:
+            msg = 'Cita creada sin técnico asignado (estado: Sin asignar)'
+            print(f"✅ Cita sin asignar: Task ID {new_task.id} | Creada por: {current_user.username}")
+
         return jsonify({
             'success': True,
             'task_id': new_task.id,
-            'msg': f'Cita agendada para {num_techs} técnico{"s" if num_techs > 1 else ""} correctamente'
+            'msg': msg
         })
         
     except Exception as e:

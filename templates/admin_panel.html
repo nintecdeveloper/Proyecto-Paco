@@ -1642,7 +1642,7 @@
                 </div>
                 <form id="formScheduleAppointment">
                     <div class="modal-body">
-                        <label class="form-label">Técnicos <span class="text-warning small">(selecciona uno o más)</span></label>
+                        <label class="form-label">Técnicos <span class="text-muted small">(opcional)</span></label>
                         <div class="border border-secondary rounded p-2 mb-2" style="max-height:130px;overflow-y:auto;background:#111;">
                             {% for u in empleados %}
                             <div class="form-check">
@@ -1655,7 +1655,10 @@
                             </div>
                             {% endfor %}
                         </div>
-                        <small class="text-danger d-none" id="techCheckboxError">Selecciona al menos un técnico</small>
+                        <small class="text-info d-block mb-1">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Sin técnico: la cita queda como <strong>Sin asignar</strong> y cualquier técnico puede completarla.
+                        </small>
                         <label class="form-label mt-1">Cliente</label>
                         <div class="position-relative mb-2">
                             <input type="text" name="client_name" id="scheduleClientInput" class="form-control" required
@@ -2065,7 +2068,7 @@
                         return {
                             id: e.id,
                             title: e.title,
-                            start: e.start ? e.start.toISOString() : '',
+                            start: e.start ? e.start.toISOString().split("T")[0] + "T" + (e.extendedProps.start_time || "00:00") : "",  // ✅ FIX: Hora sin conversión timezone
                             color: e.backgroundColor || '#6c757d',
                             extendedProps: {
                                 status: e.extendedProps.status,
@@ -2190,10 +2193,18 @@
                 
                 eventsSet: function (events) {
                     cachedGlobalTasks = events.map(function(e) {
+                        // ✅ FIX TIMEZONE: toISOString() convierte a UTC restando el offset (+1h en España).
+                        // Usamos hora local directamente para evitar el desfase de -1h.
+                        function _localISO(d) {
+                            if (!d) return '';
+                            var pad = function(n) { return n < 10 ? '0'+n : ''+n; };
+                            return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())
+                                   +'T'+pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
+                        }
                         return {
                             id: e.id,
                             title: e.title,
-                            start: e.start ? e.start.toISOString() : '',
+                            start: _localISO(e.start),
                             color: e.backgroundColor || '#6c757d',
                             extendedProps: {
                                 status: e.extendedProps.status,
@@ -2775,7 +2786,7 @@
                         // Rellenar información básica
                         document.getElementById('detailClient').textContent = task.client_name;
                         document.getElementById('detailTech').textContent = task.tech_name;
-                        document.getElementById('detailDate').textContent = new Date(task.date).toLocaleDateString('es-ES');
+                        document.getElementById('detailDate').textContent = task.date || 'N/A';  // ✅ FIX: Mostrar fecha sin conversión timezone
                         document.getElementById('detailStartTime').textContent = task.start_time || 'N/A';
                         document.getElementById('detailEndTime').textContent = task.end_time || 'N/A';
                         document.getElementById('detailService').textContent = task.service_type;
@@ -4642,13 +4653,7 @@
         // =====================================================================
         // ✅ NUEVA: Enviar formulario de cita por AJAX
         function submitScheduleForm() {
-            // Validar que hay al menos un técnico
-            const checkedTechs = document.querySelectorAll('#formScheduleAppointment .tech-checkbox:checked');
-            if (checkedTechs.length === 0) {
-                document.getElementById('techCheckboxError').classList.remove('d-none');
-                return false;
-            }
-            
+            // Técnico opcional — sin selección la tarea quedará "Sin asignar"
             const submitBtn = document.getElementById('scheduleSubmitBtn');
             const originalText = submitBtn.innerHTML;
             submitBtn.disabled = true;
@@ -4697,13 +4702,7 @@
         }
 
         function validateTechSelection() {
-            var checked = document.querySelectorAll('#modalScheduleAppointment .tech-checkbox:checked');
-            var errEl = document.getElementById('techCheckboxError');
-            if (checked.length === 0) {
-                if (errEl) { errEl.classList.remove('d-none'); }
-                return false;
-            }
-            if (errEl) { errEl.classList.add('d-none'); }
+            // Técnico opcional — siempre válido
             return true;
         }
 
@@ -4851,13 +4850,7 @@
         // ==================== VALIDAR TÉCNICOS EN MODAL CITA ====================
         // ✅ NUEVA: Enviar formulario de cita por AJAX
         function submitScheduleForm() {
-            // Validar que hay al menos un técnico
-            const checkedTechs = document.querySelectorAll('#formScheduleAppointment .tech-checkbox:checked');
-            if (checkedTechs.length === 0) {
-                document.getElementById('techCheckboxError').classList.remove('d-none');
-                return false;
-            }
-            
+            // Técnico opcional — sin selección la tarea quedará "Sin asignar"
             const submitBtn = document.getElementById('scheduleSubmitBtn');
             const originalText = submitBtn.innerHTML;
             submitBtn.disabled = true;
@@ -4906,13 +4899,7 @@
         }
 
         function validateTechSelection() {
-            var checkboxes = document.querySelectorAll('#modalScheduleAppointment .tech-checkbox:checked');
-            var err = document.getElementById('techCheckboxError');
-            if (checkboxes.length === 0) {
-                if (err) { err.classList.remove('d-none'); }
-                return false;
-            }
-            if (err) { err.classList.add('d-none'); }
+            // Técnico opcional — siempre válido
             return true;
         }
 
