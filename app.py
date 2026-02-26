@@ -95,12 +95,12 @@ class Stock(db.Model):
 
 class Task(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    tech_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    tech_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     client_id = db.Column(db.Integer, db.ForeignKey('client.id'), nullable=True)
     client_name = db.Column(db.String(100))
     description = db.Column(db.Text)
     
-    date = db.Column(db.Date, default=date.today)
+    date = db.Column(db.Date, nullable=True)
     start_time = db.Column(db.String(10)) 
     end_time = db.Column(db.String(10))   
     
@@ -111,7 +111,7 @@ class Task(db.Model):
     stock_quantity_used = db.Column(db.Integer, default=0)
     stock_action = db.Column(db.String(20))
 
-    status = db.Column(db.String(20), default='Pendiente')  # Pendiente o Completado
+    status = db.Column(db.String(20), default='Pendiente')  # Pendiente, Completado o Sin asignar
     
     # Campos para firma digital
     signature_data = db.Column(db.Text)
@@ -2139,6 +2139,140 @@ def get_tech_colors():
 @app.route('/api/admin/all_tasks')
 @login_required
 def admin_all_tasks():
+    """API para obtener todas las tareas (admin) con opciones de filtrado"""
+    if current_user.role != 'admin':
+        return jsonify({'success': False}), 403
+    
+    try:
+        # Parámetros de filtro
+        filter_completed = request.args.get('completed') == 'true'
+        
+        # Query base
+        if filter_completed:
+            # SOLO tareas completadas
+            query = Task.query.filter_by(status='Completado')
+        else:
+            # SOLO tareas pendientes y sin asignar
+            query = Task.query.filter(Task.status.in_(['Pendiente', 'Sin asignar']))
+        
+        tasks_list = query.order_by(Task.date.desc(), Task.start_time.desc()).all()
+        
+        result = []
+        for task in tasks_list:
+            result.append({
+                'id': task.id,
+                'client_name': task.client_name,
+                'date': task.date.isoformat() if task.date else None,
+                'start_time': task.start_time,
+                'end_time': task.end_time,
+                'tech_name': task.tech.username if task.tech else 'Sin asignar',
+                'tech_id': task.tech_id,
+                'service_type': task.service_type.name if task.service_type else '',
+                'description': task.description,
+                'status': task.status
+            })
+        
+        return jsonify({'success': True, 'data': result})
+    except Exception as e:
+        print(f"Error in admin_all_tasks: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/admin/unassigned_tasks')
+@login_required
+def get_unassigned_tasks():
+    """Obtener tareas sin técnico asignado"""
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'msg': 'No autorizado'}), 403
+    
+    try:
+        tasks = Task.query.filter(
+            Task.tech_id == None,
+            Task.status == 'Sin asignar'
+        ).order_by(Task.id.desc()).all()
+        
+        result = []
+        for task in tasks:
+            result.append({
+                'id': task.id,
+                'client_name': task.client_name,
+                'description': task.description,
+                'service_type_id': task.service_type_id,
+                'service_type_name': task.service_type.name if task.service_type else '',
+                'status': task.status
+            })
+        
+        return jsonify({'success': True, 'data': result})
+    except Exception as e:
+        print(f"Error getting unassigned tasks: {str(e)}")
+        return jsonify({'success': False, 'msg': str(e)}), 500
+
+@app.route('/api/task/<int:task_id>/assign_tech', methods=['POST'])
+@login_required
+def assign_tech_to_task(task_id):
+    """Asignar técnico a una tarea sin técnico"""
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'msg': 'No autorizado'}), 403
+    
+    try:
+        task = Task.query.get(task_id)
+        if not task:
+            return jsonify({'success': False, 'msg': 'Tarea no encontrada'}), 404
+        
+        data = request.get_json()
+        tech_id = data.get('tech_id')
+        date_str = data.get('date')
+        start_time = data.get('start_time')
+        end_time = data.get('end_time', '')
+        
+        if not tech_id or not date_str or not start_time:
+            return jsonify({'success': False, 'msg': 'Técnico, Fecha y hora de inicio son obligatorios'}), 400
+        
+        tech = User.query.get(tech_id)
+        if not tech or tech.role != 'tech':
+            return jsonify({'success': False, 'msg': 'Técnico no encontrado'}), 404
+        
+        # Actualizar tarea
+        task.tech_id = tech_id
+        task.date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        task.start_time = start_time
+        task.end_time = end_time if end_time else None
+        task.status = 'Pendiente'
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'msg': f'Tarea asignada a {tech.username}',
+            'task_id': task.id
+        })
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error assigning tech to task: {str(e)}")
+        return jsonify({'success': False, 'msg': f'Error: {str(e)}'}), 500
+
+@app.route('/api/task/<int:task_id>/delete', methods=['POST'])
+@login_required
+def delete_task(task_id):
+    """Eliminar una tarea (admin o técnico asignado)"""
+    try:
+        task = Task.query.get(task_id)
+        if not task:
+            return jsonify({'success': False, 'msg': 'Tarea no encontrada'}), 404
+        
+        # Verificar permisos: admin o técnico asignado a la tarea
+        if current_user.role != 'admin' and task.tech_id != current_user.id:
+            return jsonify({'success': False, 'msg': 'No tienes permiso para eliminar esta tarea'}), 403
+        
+        db.session.delete(task)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'msg': 'Tarea eliminada'})
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error deleting task: {str(e)}")
+        return jsonify({'success': False, 'msg': f'Error: {str(e)}'}), 500
+
+
     """Endpoint para calendario global del admin - ROBUSTO CON MANEJO DE ERRORES"""
     try:
         if current_user.role != 'admin':
@@ -2464,6 +2598,54 @@ def create_appointment():
         print(f"Error creating appointment: {str(e)}")
         db.session.rollback()
         return jsonify({'success': False, 'msg': f'Error al crear la cita: {str(e)}'}), 500
+
+@app.route('/create_task_unassigned', methods=['POST'])
+@login_required
+def create_task_unassigned():
+    """Crear tarea sin técnico asignado (Solo admin)"""
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'msg': 'No autorizado'}), 403
+    
+    try:
+        data = request.get_json()
+        client_name = data.get('client_name', '').strip()
+        service_type_id = data.get('service_type_id')
+        description = data.get('description', '').strip()
+        
+        if not client_name or not service_type_id:
+            return jsonify({'success': False, 'msg': 'Cliente y Tipo de servicio son obligatorios'}), 400
+        
+        # Buscar cliente
+        client = Client.query.filter_by(name=client_name).first()
+        client_id = client.id if client else None
+        
+        # Crear tarea sin técnico (sin fecha ni hora)
+        new_task = Task(
+            tech_id=None,
+            client_id=client_id,
+            client_name=client_name,
+            description=description,
+            date=None,
+            start_time=None,
+            end_time=None,
+            service_type_id=int(service_type_id),
+            status='Sin asignar',
+            created_by=current_user.id
+        )
+        
+        db.session.add(new_task)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'msg': 'Tarea sin asignar creada correctamente',
+            'task_id': new_task.id
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error creating unassigned task: {str(e)}")
+        return jsonify({'success': False, 'msg': f'Error: {str(e)}'}), 500
 
 @app.route('/edit_appointment/<int:task_id>', methods=['POST'])
 @login_required

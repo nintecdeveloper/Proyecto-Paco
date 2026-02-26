@@ -728,12 +728,12 @@
             </div>
 
             <div class="row g-3">
-                <div class="col-12 col-lg-9">
+                <div class="col-12 col-lg-9" id="calendarCol">
                     <div id="calendarSection">
                         <div id="calendar"></div>
                     </div>
                 </div>
-                <div class="col-12 col-lg-3">
+                <div class="col-12 col-lg-3" id="taskListCol" style="display:none;">
                     <div class="card bg-dark border-secondary p-2">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <h6 class="text-white fw-bold m-0 small">Mis Tareas</h6>
@@ -756,6 +756,13 @@
                         <div id="taskListContainer" class="task-list-container"></div>
                     </div>
                 </div>
+            </div>
+            
+            <!-- Toggle Button para Mostrar/Ocultar Lista -->
+            <div class="mt-2 text-center">
+                <button class="btn btn-sm btn-outline-info" onclick="toggleTaskList()" id="toggleTaskListBtn">
+                    <i class="bi bi-list me-1"></i>Mostrar Lista de Tareas
+                </button>
             </div>
         </div>
 
@@ -1641,9 +1648,12 @@
             // Usar allTasksCache (todos los eventos) en lugar de cachedTasks (solo rango visible)
             const source = allTasksCache.length > 0 ? allTasksCache : cachedTasks;
 
-            // 1. Filtrar por estado Y por tipo activo
+            // ✅ CAMBIO: Si showCompleted está ACTIVADO, mostrar SOLO completadas
+            // Si está desactivado, mostrar SOLO pendientes
             let filtered = source.filter(t => {
-                const statusOk = showCompleted ? true : t.extendedProps.status !== 'Completado';
+                const statusOk = showCompleted 
+                    ? t.extendedProps.status === 'Completado'  // SOLO completadas
+                    : t.extendedProps.status !== 'Completado';  // SOLO pendientes
                 const typeOk = activeTypes.length === 0 || activeTypes.includes(t.extendedProps.service_type);
                 return statusOk && typeOk;
             });
@@ -1659,8 +1669,9 @@
 
             // 3. Renderizar HTML
             container.innerHTML = '';
+            const statusLabel = showCompleted ? 'completadas' : 'pendientes';
             if (filtered.length === 0) {
-                container.innerHTML = '<div class="text-muted text-center py-3">No hay tareas pendientes.</div>';
+                container.innerHTML = `<div class="text-muted text-center py-3">No hay tareas ${statusLabel}.</div>`;
                 return;
             }
 
@@ -1703,6 +1714,26 @@
             `;
                 container.appendChild(div);
             });
+        }
+
+        // ✅ FUNCIÓN: Toggle mostrar/ocultar lista de tareas
+        function toggleTaskList() {
+            const taskListCol = document.getElementById('taskListCol');
+            const calendarCol = document.getElementById('calendarCol');
+            const toggleBtn = document.getElementById('toggleTaskListBtn');
+            
+            if (taskListCol.style.display === 'none') {
+                // Mostrar lista
+                taskListCol.style.display = 'block';
+                calendarCol.className = 'col-12 col-lg-9';
+                toggleBtn.innerHTML = '<i class="bi bi-list me-1"></i>Ocultar Lista de Tareas';
+                renderTaskList();
+            } else {
+                // Ocultar lista
+                taskListCol.style.display = 'none';
+                calendarCol.className = 'col-12';
+                toggleBtn.innerHTML = '<i class="bi bi-list me-1"></i>Mostrar Lista de Tareas';
+            }
         }
         
         // ✅ FUNCIÓN: Toggle estado de tarea completada/pendiente

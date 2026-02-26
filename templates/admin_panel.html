@@ -369,6 +369,11 @@
                             data-bs-target="#modalScheduleAppointment">
                             <i class="bi bi-calendar-plus-fill me-1"></i> Nueva Cita
                         </button>
+                        <button class="btn btn-danger btn-sm fw-bold" data-bs-toggle="modal"
+                            data-bs-target="#modalCreateUnassignedTask"
+                            title="Crear tarea sin técnico asignado">
+                            <i class="bi bi-exclamation-circle-fill me-1"></i> Tarea Pendiente
+                        </button>
                     </div>
                 </div>
 
@@ -417,6 +422,22 @@
                                 <div id="globalTaskListContainer" class="task-list-container" style="max-height: 580px; overflow-y: auto;">
                                     <div class="text-center text-muted py-3">Cargando...</div>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECCIÓN: Tareas Pendientes sin Asignar -->
+                <div class="card bg-dark border-danger border-2 mt-4">
+                    <div class="card-header bg-danger bg-opacity-20 border-danger">
+                        <h5 class="card-title text-danger mb-0">
+                            <i class="bi bi-exclamation-circle-fill me-2"></i>Tareas Pendientes por Asignar
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="unassignedTasksList" style="max-height: 400px; overflow-y: auto;">
+                            <div class="text-muted text-center py-3">
+                                <i class="bi bi-inbox me-2"></i>Cargando tareas sin asignar...
                             </div>
                         </div>
                     </div>
@@ -536,11 +557,20 @@
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label text-white fw-bold">Período</label>
-                                <select id="statsFilterPeriod" class="form-select bg-black text-white border-secondary">
+                                <select id="statsFilterPeriod" class="form-select bg-black text-white border-secondary" onchange="toggleCustomDateFields()">
                                     <option value="all">Todo el historial</option>
                                     <option value="month">Último mes</option>
                                     <option value="week">Última semana</option>
+                                    <option value="custom">Fecha personalizada</option>
                                 </select>
+                            </div>
+                            <div class="col-md-2" id="customDateFromField" style="display:none;">
+                                <label class="form-label text-white fw-bold">Desde</label>
+                                <input type="date" id="statsDateFrom" class="form-control bg-black text-white border-secondary">
+                            </div>
+                            <div class="col-md-2" id="customDateToField" style="display:none;">
+                                <label class="form-label text-white fw-bold">Hasta</label>
+                                <input type="date" id="statsDateTo" class="form-control bg-black text-white border-secondary">
                             </div>
                             <div class="col-md-4 d-flex align-items-end">
                                 <button class="btn btn-info w-100" onclick="loadAdminStatistics()">
@@ -1689,7 +1719,45 @@
         </div>
     </div>
 
-    <!-- Modal: Editar Cita desde Admin -->
+    <!-- Modal: Crear Tarea Sin Técnico -->
+    <div class="modal fade" id="modalCreateUnassignedTask" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary bg-danger bg-opacity-10">
+                    <h5 class="modal-title"><i class="bi bi-exclamation-circle me-2"></i>Crear Tarea Pendiente por Asignar</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="formCreateUnassignedTask">
+                    <div class="modal-body">
+                        <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Esta tarea <strong>no tendrá fecha ni técnico asignado</strong>. Deberá ser asignada desde el apartado de tareas pendientes.
+                        </div>
+                        <label class="form-label">Cliente</label>
+                        <div class="position-relative mb-2">
+                            <input type="text" name="client_name" id="unassignedClientInput" class="form-control" required autocomplete="off">
+                            <div id="unassignedClientList" class="suggestions-list"></div>
+                        </div>
+                        <label class="form-label">Tipo de Servicio</label>
+                        <select name="service_type_id" id="unassignedServiceType" class="form-select mb-2" required>
+                            <option value="">-- Seleccionar --</option>
+                            {% for svc in all_service_types %}
+                            <option value="{{ svc.id }}">{{ svc.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <label class="form-label">Descripción/Notas</label>
+                        <textarea name="description" id="unassignedDescription" class="form-control" rows="3" placeholder="Describa el trabajo a realizar..."></textarea>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn btn-danger" onclick="submitUnassignedTaskForm()" id="unassignedSubmitBtn">Crear Tarea</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+
     <div class="modal fade" id="modalEditAppointmentAdmin" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content bg-dark text-white">
@@ -2108,11 +2176,13 @@
             if (calendarGlobalInstance) {
                 calendarGlobalInstance.render();
                 updateGlobalFilters();
+                loadUnassignedTasks();  // ✅ Cargar tareas sin técnico
                 return;
             }
             
             // Cargar leyenda de técnicos
             loadTechLegend();
+            loadUnassignedTasks();  // ✅ Cargar tareas sin técnico
 
             var calendarEl = document.getElementById('calendarGlobal');
             var isMobile = window.innerWidth < 768;
@@ -3479,13 +3549,38 @@
 
         let taskTypesPieChart = null;
 
+        function toggleCustomDateFields() {
+            const period = document.getElementById('statsFilterPeriod').value;
+            const fromField = document.getElementById('customDateFromField');
+            const toField = document.getElementById('customDateToField');
+            
+            if (period === 'custom') {
+                fromField.style.display = 'block';
+                toField.style.display = 'block';
+            } else {
+                fromField.style.display = 'none';
+                toField.style.display = 'none';
+            }
+        }
+
         function loadAdminStatistics() {
             const techId = document.getElementById('statsFilterTech').value;
             const period = document.getElementById('statsFilterPeriod').value;
 
             let url = '/api/admin_analytics?';
             if (techId) url += `tech_id=${techId}&`;
-            if (period) url += `period=${period}`;
+            if (period && period !== 'custom') {
+                url += `period=${period}`;
+            } else if (period === 'custom') {
+                const dateFrom = document.getElementById('statsDateFrom').value;
+                const dateTo = document.getElementById('statsDateTo').value;
+                if (dateFrom && dateTo) {
+                    url = `/api/admin_analytics?tech_id=${techId || ''}&period=custom&from=${dateFrom}&to=${dateTo}`;
+                } else {
+                    alert('⚠️ Por favor selecciona ambas fechas');
+                    return;
+                }
+            }
 
             fetch(url)
                 .then(res => res.json())
@@ -4847,7 +4942,206 @@
                 });
         }
 
+        // ==================== TAREAS SIN TÉCNICO ====================
+        function submitUnassignedTaskForm() {
+            const submitBtn = document.getElementById('unassignedSubmitBtn');
+            const originalText = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i> Creando...';
+            
+            const clientName = document.getElementById('unassignedClientInput').value.trim();
+            const serviceTypeId = document.getElementById('unassignedServiceType').value;
+            const description = document.getElementById('unassignedDescription').value.trim();
+            
+            if (!clientName || !serviceTypeId) {
+                alert('⚠️ Por favor completa los campos requeridos');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+                return false;
+            }
+            
+            fetch('/create_task_unassigned', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    client_name: clientName,
+                    service_type_id: parseInt(serviceTypeId),
+                    description: description
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+                
+                if (data.success) {
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('modalCreateUnassignedTask'));
+                    if (modal) modal.hide();
+                    alert('✅ Tarea creada correctamente');
+                    
+                    // Cargar tareas sin técnico
+                    loadUnassignedTasks();
+                    
+                    // Limpiar formulario
+                    document.getElementById('formCreateUnassignedTask').reset();
+                } else {
+                    alert('❌ Error: ' + (data.msg || 'No se pudo crear la tarea'));
+                }
+            })
+            .catch(err => {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+                console.error('Error:', err);
+                alert('❌ Error de conexión');
+            });
+            
+            return false;
+        }
+
+        function loadUnassignedTasks() {
+            fetch('/api/admin/unassigned_tasks')
+            .then(res => res.json())
+            .then(data => {
+                const container = document.getElementById('unassignedTasksList');
+                if (!data.success || data.data.length === 0) {
+                    container.innerHTML = '<div class="text-muted text-center py-3"><i class="bi bi-check-circle me-2"></i>No hay tareas pendientes por asignar</div>';
+                    return;
+                }
+                
+                let html = '';
+                data.data.forEach(task => {
+                    html += `
+                        <div class="card bg-dark border-danger mb-2">
+                            <div class="card-body p-2">
+                                <div class="d-flex justify-content-between align-items-start mb-1">
+                                    <strong class="text-danger">${task.client_name}</strong>
+                                    <small class="badge bg-danger">${task.service_type_name}</small>
+                                </div>
+                                <small class="text-muted d-block mb-2">${task.description || '(sin descripción)'}</small>
+                                <button class="btn btn-sm btn-warning" onclick="openAssignTechModal(${task.id}, '${task.client_name}')">
+                                    <i class="bi bi-person-plus me-1"></i> Asignar Técnico
+                                </button>
+                                <button class="btn btn-sm btn-danger" onclick="deleteTask(${task.id})">
+                                    <i class="bi bi-trash me-1"></i> Eliminar
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+                container.innerHTML = html;
+            })
+            .catch(err => {
+                console.error('Error loading unassigned tasks:', err);
+                document.getElementById('unassignedTasksList').innerHTML = '<div class="text-danger">Error al cargar tareas</div>';
+            });
+        }
+
+        function openAssignTechModal(taskId, clientName) {
+            // Crear modal dinámicamente para asignar técnico
+            let html = `
+                <div class="modal fade" id="modalAssignTech" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content bg-dark text-white">
+                            <div class="modal-header border-secondary">
+                                <h5 class="modal-title">Asignar Técnico a ${clientName}</h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                            <form id="formAssignTech">
+                                <div class="modal-body">
+                                    <input type="hidden" id="assignTaskId" value="${taskId}">
+                                    <label class="form-label">Técnico</label>
+                                    <select id="assignTechId" class="form-select mb-2" required>
+                                        <option value="">-- Seleccionar --</option>
+                                        {% for emp in empleados %}
+                                        <option value="{{ emp.id }}">{{ emp.username }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <label class="form-label">Fecha</label>
+                                    <input type="date" id="assignDate" class="form-control mb-2" required>
+                                    <label class="form-label">Hora Inicio</label>
+                                    <input type="time" id="assignStartTime" class="form-control mb-2" required>
+                                    <label class="form-label">Hora Fin (opcional)</label>
+                                    <input type="time" id="assignEndTime" class="form-control">
+                                </div>
+                                <div class="modal-footer border-secondary">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                    <button type="button" class="btn btn-warning" onclick="submitAssignTech()">Asignar</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Remover modal anterior si existe
+            const oldModal = document.getElementById('modalAssignTech');
+            if (oldModal) oldModal.remove();
+            
+            document.body.insertAdjacentHTML('beforeend', html);
+            new bootstrap.Modal(document.getElementById('modalAssignTech')).show();
+        }
+
+        function submitAssignTech() {
+            const taskId = document.getElementById('assignTaskId').value;
+            const techId = document.getElementById('assignTechId').value;
+            const date = document.getElementById('assignDate').value;
+            const startTime = document.getElementById('assignStartTime').value;
+            const endTime = document.getElementById('assignEndTime').value;
+            
+            if (!techId || !date || !startTime) {
+                alert('⚠️ Complete los campos requeridos');
+                return;
+            }
+            
+            fetch(`/api/task/${taskId}/assign_tech`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    tech_id: parseInt(techId),
+                    date: date,
+                    start_time: startTime,
+                    end_time: endTime
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('modalAssignTech'));
+                    if (modal) modal.hide();
+                    alert('✅ Técnico asignado correctamente');
+                    loadUnassignedTasks();
+                    if (calendarGlobalInstance) calendarGlobalInstance.refetchEvents();
+                } else {
+                    alert('❌ Error: ' + (data.msg || 'No se pudo asignar'));
+                }
+            })
+            .catch(err => {
+                console.error('Error:', err);
+                alert('❌ Error de conexión');
+            });
+        }
+
+        function deleteTask(taskId) {
+            if (!confirm('¿Eliminar esta tarea?')) return;
+            
+            fetch(`/api/task/${taskId}/delete`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert('✅ Tarea eliminada');
+                    loadUnassignedTasks();
+                } else {
+                    alert('❌ Error: ' + (data.msg || 'No se pudo eliminar'));
+                }
+            })
+            .catch(err => console.error('Error:', err));
+        }
+
         // ==================== VALIDAR TÉCNICOS EN MODAL CITA ====================
+
         // ✅ NUEVA: Enviar formulario de cita por AJAX
         function submitScheduleForm() {
             // Técnico opcional — sin selección la tarea quedará "Sin asignar"
