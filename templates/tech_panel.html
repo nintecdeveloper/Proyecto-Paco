@@ -2876,7 +2876,6 @@
         let timerRunning   = false;
         let timerStartEpoch = null;   // epoch ms del momento en que se inició
         let timerElapsed   = 0;       // segundos acumulados al detener
-        let timerSessionId = null;    // ID de la sesión en servidor (NUEVO para persistencia)
 
         function toggleTimer() {
             if (!timerRunning) {
@@ -2886,6 +2885,7 @@
                 timerInterval   = setInterval(tickTimer, 500);
 
                 // ✅ Hora de ENTRADA = hora exacta del sistema al pulsar "Iniciar trabajo"
+                // Se escribe siempre (sobrescribe cualquier valor previo) para garantizar coherencia.
                 try {
                     const entryF = document.getElementById('fieldEntryTime');
                     if (entryF) {
@@ -2903,9 +2903,6 @@
                 document.getElementById('timerDisplay').style.borderColor = '#f37021';
                 document.getElementById('workTimerBlock').style.borderColor = '#f37021';
                 document.getElementById('timerSummary').style.display     = 'none';
-                
-                // ✅ GUARDAR INMEDIATAMENTE EN SERVIDOR
-                saveTimerToServer();
 
             } else {
                 // ── DETENER ──
@@ -2939,6 +2936,7 @@
                 document.getElementById('timerSummaryText').textContent      = readable.trim();
 
                 // ✅ Hora de SALIDA = hora exacta del sistema al pulsar "Finalizar trabajo"
+                // La hora de entrada ya fue fijada al iniciar; aquí solo actualizamos la salida.
                 try {
                     const endDt  = new Date(timerStartEpoch + timerElapsed * 1000);
                     const toHM   = dt => pad2(dt.getHours()) + ':' + pad2(dt.getMinutes());
@@ -2946,13 +2944,9 @@
                     if (exitF)   exitF.value = toHM(endDt);
                 } catch(e) {}
 
-                // ✅ DETENER EN SERVIDOR
-                stopTimerInServer();
-
                 // Siguiente pulsación = reinicio completo
                 timerElapsed    = 0;
                 timerStartEpoch = null;
-                timerSessionId  = null;
             }
         }
 
@@ -2966,124 +2960,11 @@
 
         function pad2(n) { return String(n).padStart(2, '0'); }
 
-        // ✅ NUEVO: Funciones robustas para persistencia de cronómetros
-        function saveTimerToServer() {
-            """Guardar estado del cronómetro en servidor (se llama automáticamente)"""
-            if (!timerRunning || !timerStartEpoch) return;
-            
-            const elapsed = Math.floor((Date.now() - timerStartEpoch) / 1000);
-            
-            fetch('/api/timer/save', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    timer_type: 'work',
-                    elapsed_seconds: elapsed,
-                    is_active: true
-                })
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success && data.timer_id) {
-                    timerSessionId = data.timer_id;
-                }
-            })
-            .catch(err => console.log('⚠️ Timer save error (se reintentará):', err));
-        }
-
-        function stopTimerInServer() {
-            """Detener cronómetro en servidor"""
-            if (!timerSessionId || timerElapsed === undefined) return;
-            
-            fetch(`/api/timer/${timerSessionId}/stop`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    elapsed_seconds: timerElapsed
-                })
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    console.log('✅ Cronómetro detenido en servidor');
-                    timerSessionId = null;
-                }
-            })
-            .catch(err => console.log('⚠️ Timer stop error:', err));
-        }
-
-        function restoreTimerFromServer() {
-            """Restaurar cronómetro al cargar página"""
-            fetch('/api/timer/restore?type=work')
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success && data.elapsed_seconds > 0) {
-                        // El cronómetro estaba activo, reanudarlo
-                        console.log('✅ Restaurando cronómetro:', data.elapsed_seconds, 'segundos');
-                        
-                        timerRunning = true;
-                        timerStartEpoch = Date.now() - (data.elapsed_seconds * 1000);
-                        timerSessionId = data.timer_id;
-                        timerInterval = setInterval(tickTimer, 500);
-                        
-                        // Actualizar UI a estado "en marcha"
-                        document.getElementById('timerBtn').style.background = '#dc3545';
-                        document.getElementById('timerIcon').className = 'bi bi-stop-fill me-1';
-                        document.getElementById('timerBtnText').textContent = 'Finalizar trabajo';
-                        document.getElementById('timerStatus').textContent = 'En marcha...';
-                        document.getElementById('timerStatus').style.color = '#28a745';
-                        document.getElementById('timerDisplay').style.color = '#f37021';
-                        document.getElementById('timerDisplay').style.borderColor = '#f37021';
-                        document.getElementById('workTimerBlock').style.borderColor = '#f37021';
-                        document.getElementById('timerSummary').style.display = 'none';
-                        
-                        // Actualizar el display con el tiempo restaurado
-                        tickTimer();
-                    }
-                })
-                .catch(err => console.log('⚠️ Timer restore error:', err));
-        }
-
-        // ✅ Guardar cronómetro cada 5 segundos mientras está activo
-        setInterval(() => {
-            if (timerRunning && timerStartEpoch) {
-                saveTimerToServer();
-            }
-        }, 5000);
-
-        // ✅ Guardar cronómetro antes de cerrar la página (IMPORTANTE)
-        window.addEventListener('beforeunload', (e) => {
-            if (timerRunning && timerStartEpoch) {
-                // Guardar de forma síncrona
-                const elapsed = Math.floor((Date.now() - timerStartEpoch) / 1000);
-                navigator.sendBeacon('/api/timer/save', JSON.stringify({
-                    timer_type: 'work',
-                    elapsed_seconds: elapsed,
-                    is_active: true
-                }));
-            }
-        });
-
-        // ✅ Restaurar cronómetro al cargar la página
-        document.addEventListener('DOMContentLoaded', () => {
-            setTimeout(() => {
-                restoreTimerFromServer();
-            }, 300);
-        });
-
-        // Si DOMContentLoaded ya se ejecutó, restaurar directamente
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', restoreTimerFromServer);
-        } else {
-            setTimeout(restoreTimerFromServer, 300);
-        }
-
         // ==================== CRONÓMETRO DE TRAYECTO ====================
         let travelTimerInterval  = null;
         let travelTimerRunning   = false;
         let travelTimerStartEpoch = null;
         let travelTimerElapsed   = 0;
-        let travelTimerSessionId = null;  // ✅ NUEVO: Para persistencia
 
         function toggleTravelTimer() {
             if (!travelTimerRunning) {
@@ -3101,9 +2982,6 @@
                 document.getElementById('travelTimerDisplay').style.borderColor = '#0dcaf0';
                 document.getElementById('travelTimerBlock').style.borderColor   = '#0dcaf0';
                 document.getElementById('travelTimerSummary').style.display     = 'none';
-                
-                // ✅ Guardar en servidor
-                saveTravelTimerToServer();
             } else {
                 // DETENER
                 clearInterval(travelTimerInterval);
@@ -3133,12 +3011,8 @@
                 document.getElementById('travelTimerSummary').style.display        = 'block';
                 document.getElementById('travelTimerSummaryText').textContent      = readable.trim();
 
-                // ✅ Detener en servidor
-                stopTravelTimerInServer();
-
                 travelTimerElapsed    = 0;
                 travelTimerStartEpoch = null;
-                travelTimerSessionId  = null;
             }
         }
 
@@ -3148,100 +3022,6 @@
             const m = Math.floor((elapsed % 3600) / 60);
             const s = elapsed % 60;
             document.getElementById('travelTimerDisplay').textContent = `${pad2(h)}:${pad2(m)}:${pad2(s)}`;
-        }
-
-        // ✅ NUEVO: Funciones de persistencia para travelTimer
-        function saveTravelTimerToServer() {
-            if (!travelTimerRunning || !travelTimerStartEpoch) return;
-            const elapsed = Math.floor((Date.now() - travelTimerStartEpoch) / 1000);
-            fetch('/api/timer/save', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    timer_type: 'travel',
-                    elapsed_seconds: elapsed,
-                    is_active: true
-                })
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success && data.timer_id) {
-                    travelTimerSessionId = data.timer_id;
-                }
-            })
-            .catch(err => console.log('⚠️ Travel timer save error:', err));
-        }
-
-        function stopTravelTimerInServer() {
-            if (!travelTimerSessionId || travelTimerElapsed === undefined) return;
-            fetch(`/api/timer/${travelTimerSessionId}/stop`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    elapsed_seconds: travelTimerElapsed
-                })
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    console.log('✅ Travel timer detenido en servidor');
-                    travelTimerSessionId = null;
-                }
-            })
-            .catch(err => console.log('⚠️ Travel timer stop error:', err));
-        }
-
-        function restoreTravelTimerFromServer() {
-            fetch('/api/timer/restore?type=travel')
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success && data.elapsed_seconds > 0) {
-                        console.log('✅ Restaurando travel timer:', data.elapsed_seconds, 'segundos');
-                        travelTimerRunning = true;
-                        travelTimerStartEpoch = Date.now() - (data.elapsed_seconds * 1000);
-                        travelTimerSessionId = data.timer_id;
-                        travelTimerInterval = setInterval(tickTravelTimer, 500);
-                        
-                        document.getElementById('travelTimerBtn').style.background = '#dc3545';
-                        document.getElementById('travelTimerIcon').className = 'bi bi-stop-fill me-1';
-                        document.getElementById('travelTimerBtnText').textContent = 'Finalizar trayecto';
-                        document.getElementById('travelTimerStatus').textContent = 'En marcha...';
-                        document.getElementById('travelTimerStatus').style.color = '#0dcaf0';
-                        document.getElementById('travelTimerDisplay').style.color = '#0dcaf0';
-                        document.getElementById('travelTimerDisplay').style.borderColor = '#0dcaf0';
-                        document.getElementById('travelTimerBlock').style.borderColor = '#0dcaf0';
-                        document.getElementById('travelTimerSummary').style.display = 'none';
-                        tickTravelTimer();
-                    }
-                })
-                .catch(err => console.log('⚠️ Travel timer restore error:', err));
-        }
-
-        // ✅ Guardar travel timer cada 5 segundos
-        setInterval(() => {
-            if (travelTimerRunning && travelTimerStartEpoch) {
-                saveTravelTimerToServer();
-            }
-        }, 5000);
-
-        // ✅ Guardar travel timer antes de cerrar
-        window.addEventListener('beforeunload', (e) => {
-            if (travelTimerRunning && travelTimerStartEpoch) {
-                navigator.sendBeacon('/api/timer/save', JSON.stringify({
-                    timer_type: 'travel',
-                    elapsed_seconds: Math.floor((Date.now() - travelTimerStartEpoch) / 1000),
-                    is_active: true
-                }));
-            }
-        });
-
-        // ✅ Restaurar travel timer al cargar
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', () => {
-                setTimeout(restoreTravelTimerFromServer, 300);
-            });
-        } else {
-            setTimeout(restoreTravelTimerFromServer, 300);
         }
 
         // ==================== INCIDENCIAS ====================
