@@ -113,6 +113,10 @@ class Task(db.Model):
 
     status = db.Column(db.String(20), default='Pendiente')  # Pendiente, Completado o Sin asignar
     
+    # ✅ NUEVO: Campos para asistencia remota
+    is_remote = db.Column(db.Boolean, default=False)  # Es asistencia remota
+    remote_support_hours = db.Column(db.Float, default=0)  # Horas de soporte registradas
+    
     # Campos para firma digital
     signature_data = db.Column(db.Text)
     signature_client_name = db.Column(db.String(100))
@@ -176,6 +180,19 @@ class PaymentRecord(db.Model):
     notes = db.Column(db.Text, nullable=True)
     is_paid = db.Column(db.Boolean, default=False, nullable=False)  # ✅ Estado manual del cobro
     created_at = db.Column(db.DateTime, default=datetime.now)
+
+class TimerSession(db.Model):
+    """✅ NUEVO: Sesión de cronómetro persistente para técnicos"""
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    task_id = db.Column(db.Integer, db.ForeignKey('task.id'), nullable=True)
+    timer_type = db.Column(db.String(20))  # 'work', 'travel', 'remote'
+    start_time = db.Column(db.DateTime, default=datetime.now)
+    elapsed_seconds = db.Column(db.Integer, default=0)
+    is_active = db.Column(db.Boolean, default=True)
+    ended_at = db.Column(db.DateTime, nullable=True)
+    user = db.relationship('User', backref='timer_sessions')
+    task = db.relationship('Task', backref='timer_sessions')
 
 @login_manager.user_loader
 def load_user(id):
@@ -2367,6 +2384,166 @@ def delete_task(task_id):
         print(f"Error deleting task: {str(e)}")
         return jsonify({'success': False, 'msg': f'Error: {str(e)}'}), 500
 
+# ✅ NUEVO: Endpoints para cronómetros persistentes
+@app.route('/api/timer/save', methods=['POST'])
+@login_required
+def save_timer():
+    """Guardar estado del cronómetro en servidor"""
+    try:
+        data = request.get_json()
+        timer_type = data.get('timer_type')  # 'work', 'travel', 'remote'
+        elapsed = data.get('elapsed_seconds', 0)
+        task_id = data.get('task_id')
+        is_active = data.get('is_active', True)
+        
+        # Buscar sesión activa
+        existing = TimerSession.query.filter_by(
+            user_id=current_user.id,
+            timer_type=timer_type,
+            is_active=True
+        ).first()
+        
+        timer_id = None
+        if existing:
+            existing.elapsed_seconds = elapsed
+            existing.is_active = is_active
+            timer_id = existing.id
+        else:
+            timer = TimerSession(
+                user_id=current_user.id,
+                timer_type=timer_type,
+                elapsed_seconds=elapsed,
+                task_id=task_id,
+                is_active=is_active
+            )
+            db.session.add(timer)
+            db.session.flush()
+            timer_id = timer.id
+        
+        db.session.commit()
+        return jsonify({'success': True, 'timer_id': timer_id})
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error saving timer: {str(e)}")
+        return jsonify({'success': False}), 500
+
+@app.route('/api/timer/restore', methods=['GET'])
+@login_required
+def restore_timer():
+    """Restaurar estado del cronómetro al abrir página"""
+    try:
+        timer_type = request.args.get('type')  # 'work', 'travel', 'remote'
+        
+        # Buscar sesión activa
+        timer = TimerSession.query.filter_by(
+            user_id=current_user.id,
+            timer_type=timer_type,
+            is_active=True
+        ).first()
+        
+        if timer:
+            return jsonify({
+                'success': True,
+                'elapsed_seconds': timer.elapsed_seconds,
+                'task_id': timer.task_id,
+                'timer_id': timer.id
+            })
+        return jsonify({'success': False})
+    except Exception as e:
+        print(f"Error restoring timer: {str(e)}")
+        return jsonify({'success': False}), 500
+
+@app.route('/api/timer/<int:timer_id>/stop', methods=['POST'])
+@login_required
+def stop_timer(timer_id):
+    """Detener un cronómetro y registrarlo"""
+    try:
+        data = request.get_json()
+        final_seconds = data.get('elapsed_seconds', 0)
+        
+        timer = TimerSession.query.get(timer_id)
+        if not timer or timer.user_id != current_user.id:
+            return jsonify({'success': False, 'msg': 'No encontrado'}), 404
+        
+        timer.is_active = False
+        timer.ended_at = datetime.now()
+        timer.elapsed_seconds = final_seconds
+        
+        # Si es tarea, actualizar duración
+        if timer.task_id:
+            task = Task.query.get(timer.task_id)
+            if task:
+                hours = final_seconds / 3600
+                if timer.timer_type == 'remote':
+                    task.remote_support_hours = hours
+        
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error stopping timer: {str(e)}")
+        return jsonify({'success': False}), 500
+
+# ✅ NUEVO: Endpoint para asistencia remota
+@app.route('/api/remote_assistance', methods=['POST'])
+@login_required
+def create_remote_assistance():
+    """Crear asistencia remota"""
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'msg': 'No autorizado'}), 403
+    
+    try:
+        data = request.get_json()
+        client_name = data.get('client_name')
+        client_id = data.get('client_id')
+        description = data.get('description', '')
+        
+        if not client_name:
+            return jsonify({'success': False, 'msg': 'Cliente requerido'}), 400
+        
+        task = Task(
+            tech_id=None,
+            client_id=client_id,
+            client_name=client_name,
+            description=description,
+            is_remote=True,
+            status='Sin asignar',
+            created_by=current_user.id
+        )
+        
+        db.session.add(task)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'task_id': task.id})
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error creating remote assistance: {str(e)}")
+        return jsonify({'success': False, 'msg': str(e)}), 500
+
+@app.route('/api/client/<int:client_id>/support_info', methods=['GET'])
+@login_required
+def get_client_support_info(client_id):
+    """Obtener información de soporte de un cliente"""
+    try:
+        client = Client.query.get(client_id)
+        if not client:
+            return jsonify({'success': False}), 404
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'id': client.id,
+                'name': client.name,
+                'phone': client.phone,
+                'email': client.email,
+                'has_support': client.has_support,
+                'support_schedule': client.support_schedule or '',
+                'address': client.address
+            }
+        })
+    except Exception as e:
+        print(f"Error getting client support: {str(e)}")
+        return jsonify({'success': False}), 500
 
     """Endpoint para calendario global del admin - ROBUSTO CON MANEJO DE ERRORES"""
     try:
@@ -3518,6 +3695,41 @@ with app.app_context():
                 print("ℹ️  Columna 'created_by' ya existe en Task")
     except Exception as e:
         print(f"⚠️  Nota: Error en migración de 'created_by': {e}")
+
+    # ✅ MIGRACIÓN: Tabla TimerSession para cronómetros persistentes
+    try:
+        from sqlalchemy import inspect as sa_inspect_timer
+        _inspector_timer = sa_inspect_timer(db.engine)
+        if 'timer_session' not in _inspector_timer.get_table_names():
+            TimerSession.__table__.create(db.engine)
+            print("✓ Tabla 'timer_session' creada")
+    except Exception as e:
+        print(f"Nota: Migración 'timer_session': {e}")
+
+    # ✅ MIGRACIÓN: Añadir columnas is_remote y remote_support_hours a Task
+    try:
+        inspector = inspect(db.engine)
+        if 'task' in inspector.get_table_names():
+            task_cols = [col['name'] for col in inspector.get_columns('task')]
+            if 'is_remote' not in task_cols:
+                with db.engine.connect() as conn:
+                    try:
+                        conn.execute(db.text('ALTER TABLE task ADD COLUMN is_remote BOOLEAN DEFAULT 0'))
+                        conn.commit()
+                        print("✓ Columna 'is_remote' añadida a Task")
+                    except Exception as e:
+                        print(f"Nota: Migración 'is_remote': {e}")
+            
+            if 'remote_support_hours' not in task_cols:
+                with db.engine.connect() as conn:
+                    try:
+                        conn.execute(db.text('ALTER TABLE task ADD COLUMN remote_support_hours FLOAT DEFAULT 0'))
+                        conn.commit()
+                        print("✓ Columna 'remote_support_hours' añadida a Task")
+                    except Exception as e:
+                        print(f"Nota: Migración 'remote_support_hours': {e}")
+    except Exception as e:
+        print(f"Nota: Migración de columnas remotas: {e}")
 
     # Usuarios de prueba
     if not User.query.filter_by(username='admin').first():
