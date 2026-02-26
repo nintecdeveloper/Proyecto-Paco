@@ -1548,18 +1548,32 @@ def get_admin_analytics():
     
     tech_id = request.args.get('tech_id', type=int)
     period = request.args.get('period', 'all')
+    date_from_str = request.args.get('from')
+    date_to_str = request.args.get('to')
     
     query = Task.query
     
     if tech_id:
         query = query.filter_by(tech_id=tech_id)
     
+    # Filtro de período
     if period == 'week':
         week_ago = date.today() - timedelta(days=7)
         query = query.filter(Task.date >= week_ago)
     elif period == 'month':
         month_ago = date.today() - timedelta(days=30)
         query = query.filter(Task.date >= month_ago)
+    elif period == 'custom':
+        # Filtro personalizado por fecha
+        try:
+            if date_from_str:
+                date_from = datetime.strptime(date_from_str, '%Y-%m-%d').date()
+                query = query.filter(Task.date >= date_from)
+            if date_to_str:
+                date_to = datetime.strptime(date_to_str, '%Y-%m-%d').date()
+                query = query.filter(Task.date <= date_to)
+        except Exception as e:
+            print(f"Error parsing custom dates: {e}")
     
     all_tasks = query.all()
     completed_tasks = query.filter_by(status='Completado').all()
@@ -2139,43 +2153,124 @@ def get_tech_colors():
 @app.route('/api/admin/all_tasks')
 @login_required
 def admin_all_tasks():
-    """API para obtener todas las tareas (admin) con opciones de filtrado"""
-    if current_user.role != 'admin':
-        return jsonify({'success': False}), 403
-    
+    """Endpoint para calendario global del admin - retorna eventos en formato FullCalendar"""
     try:
-        # Parámetros de filtro
-        filter_completed = request.args.get('completed') == 'true'
+        if current_user.role != 'admin':
+            return jsonify([])
         
-        # Query base
-        if filter_completed:
-            # SOLO tareas completadas
-            query = Task.query.filter_by(status='Completado')
-        else:
-            # SOLO tareas pendientes y sin asignar
-            query = Task.query.filter(Task.status.in_(['Pendiente', 'Sin asignar']))
+        try:
+            tasks = Task.query.all()
+        except Exception as e:
+            print(f"Error cargando tareas: {e}")
+            return jsonify([]), 500
         
-        tasks_list = query.order_by(Task.date.desc(), Task.start_time.desc()).all()
+        events = []
         
-        result = []
-        for task in tasks_list:
-            result.append({
-                'id': task.id,
-                'client_name': task.client_name,
-                'date': task.date.isoformat() if task.date else None,
-                'start_time': task.start_time,
-                'end_time': task.end_time,
-                'tech_name': task.tech.username if task.tech else 'Sin asignar',
-                'tech_id': task.tech_id,
-                'service_type': task.service_type.name if task.service_type else '',
-                'description': task.description,
-                'status': task.status
-            })
+        # Paleta de colores para diferenciar técnicos
+        TECH_COLORS = [
+            '#3b82f6',  # azul
+            '#22c55e',  # verde
+            '#a855f7',  # morado
+            '#f59e0b',  # ámbar
+            '#ef4444',  # rojo
+            '#06b6d4',  # cian
+            '#ec4899',  # rosa
+            '#84cc16',  # lima
+            '#f97316',  # naranja
+            '#14b8a6',  # teal
+        ]
+
+        def get_contrast_color(hex_color):
+            """Devuelve #000 o #fff para máximo contraste"""
+            try:
+                h = hex_color.lstrip('#')
+                if len(h) < 6:
+                    return '#ffffff'
+                r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+                luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+                return '#000000' if luminance > 0.5 else '#ffffff'
+            except Exception:
+                return '#ffffff'
         
-        return jsonify({'success': True, 'data': result})
+        # Obtener todos los técnicos y asignarles colores
+        try:
+            techs = User.query.filter_by(role='tech').order_by(User.id).all()
+            tech_color_map = {}
+            for i, tech in enumerate(techs):
+                tech_color_map[tech.id] = TECH_COLORS[i % len(TECH_COLORS)]
+        except Exception as e:
+            print(f"Error cargando técnicos: {e}")
+            tech_color_map = {}
+        
+        # Procesar cada tarea
+        for task in tasks:
+            try:
+                # Obtener tipo de servicio
+                service_type = None
+                try:
+                    if task.service_type_id:
+                        service_type = ServiceType.query.get(task.service_type_id)
+                except Exception as e:
+                    print(f"Error cargando servicio para tarea {task.id}: {e}")
+                
+                # Color del técnico
+                tech_color = tech_color_map.get(task.tech_id, '#6c757d')
+                text_color = get_contrast_color(tech_color)
+                
+                # Obtener nombre del técnico
+                tech_name = ''
+                try:
+                    if task.tech:
+                        tech_name = task.tech.username
+                except Exception as e:
+                    print(f"Error cargando técnico para tarea {task.id}: {e}")
+                
+                # Construir datetime para el evento
+                event_start = None
+                if task.date and task.start_time:
+                    try:
+                        # Combinar fecha y hora
+                        dt_str = f"{task.date.isoformat()}T{task.start_time}:00"
+                        event_start = dt_str
+                    except Exception as e:
+                        print(f"Error construyendo fecha para tarea {task.id}: {e}")
+                
+                # Si no hay fecha, usar fecha actual (para tareas sin asignar)
+                if not event_start:
+                    event_start = f"{date.today().isoformat()}T00:00:00"
+                
+                # Construir evento
+                event = {
+                    'id': str(task.id),
+                    'title': task.client_name if task.client_name else 'Sin cliente',
+                    'start': event_start,
+                    'backgroundColor': tech_color,
+                    'borderColor': tech_color,
+                    'textColor': text_color,
+                    'extendedProps': {
+                        'status': task.status,
+                        'client': task.client_name or 'Sin cliente',
+                        'tech_id': task.tech_id,
+                        'tech_name': tech_name or 'Sin asignar',
+                        'tech_color': tech_color,
+                        'text_color': text_color,
+                        'service_type': service_type.name if service_type else 'Sin tipo',
+                        'desc': task.description or '',
+                        'has_attachments': bool(task.attachments)
+                    }
+                }
+                
+                events.append(event)
+                
+            except Exception as e:
+                print(f"Error procesando tarea {task.id}: {e}")
+                continue
+        
+        return jsonify(events)
+        
     except Exception as e:
-        print(f"Error in admin_all_tasks: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        print(f"Error en admin_all_tasks: {e}")
+        return jsonify([]), 500
 
 @app.route('/api/admin/unassigned_tasks')
 @login_required
@@ -3327,7 +3422,47 @@ with app.app_context():
     except Exception as e:
         print(f"Nota: Migración 'is_paid': {e}")
 
-    # ✅ MIGRACIÓN: Tabla task_technician para múltiples técnicos por cita
+    # ✅ MIGRACIÓN: Hacer 'tech_id' nullable en Task
+    try:
+        from sqlalchemy import inspect
+        inspector = inspect(db.engine)
+        if 'task' in inspector.get_table_names():
+            task_cols = {col['name']: col for col in inspector.get_columns('task')}
+            if 'tech_id' in task_cols:
+                tech_id_col = task_cols['tech_id']
+                if not tech_id_col['nullable']:
+                    with db.engine.connect() as conn:
+                        if db.engine.dialect.name == 'postgresql':
+                            conn.execute(db.text('ALTER TABLE task ALTER COLUMN tech_id DROP NOT NULL'))
+                        elif db.engine.dialect.name == 'sqlite':
+                            # SQLite no soporta ALTER COLUMN, se ignora
+                            pass
+                        conn.commit()
+                        print("✓ Columna 'tech_id' en Task ahora es nullable")
+    except Exception as e:
+        print(f"Nota: Migración 'tech_id nullable': {e}")
+
+    # ✅ MIGRACIÓN: Hacer 'date' nullable en Task
+    try:
+        from sqlalchemy import inspect
+        inspector = inspect(db.engine)
+        if 'task' in inspector.get_table_names():
+            task_cols = {col['name']: col for col in inspector.get_columns('task')}
+            if 'date' in task_cols:
+                date_col = task_cols['date']
+                if not date_col['nullable']:
+                    with db.engine.connect() as conn:
+                        if db.engine.dialect.name == 'postgresql':
+                            conn.execute(db.text('ALTER TABLE task ALTER COLUMN date DROP NOT NULL'))
+                        elif db.engine.dialect.name == 'sqlite':
+                            # SQLite no soporta ALTER COLUMN, se ignora
+                            pass
+                        conn.commit()
+                        print("✓ Columna 'date' en Task ahora es nullable")
+    except Exception as e:
+        print(f"Nota: Migración 'date nullable': {e}")
+
+
     try:
         from sqlalchemy import inspect as sa_inspect3
         _inspector3 = sa_inspect3(db.engine)
