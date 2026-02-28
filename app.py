@@ -130,7 +130,13 @@ class Task(db.Model):
     work_end_time = db.Column(db.DateTime)
     # Duración total medida por el cronómetro del técnico (formato HH:MM:SS)
     work_duration = db.Column(db.String(20), nullable=True)
-    
+
+    # ✅ Timestamps del parte v2 (HH:MM registrado al pulsar botón)
+    parte_transport_start = db.Column(db.String(10), nullable=True)  # Inicio transporte
+    parte_arrival         = db.Column(db.String(10), nullable=True)  # Hora llegada
+    parte_work_start      = db.Column(db.String(10), nullable=True)  # Inicio trabajo
+    parte_work_end        = db.Column(db.String(10), nullable=True)  # Fin trabajo
+
     # ✅ NUEVO: Campo para registrar quién creó la tarea (admin que la agendó)
     created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
 
@@ -946,15 +952,25 @@ def save_report():
         linked_task_id = request.form.get('linked_task_id')
         client_name = request.form.get('client_name')
         service_type_name = request.form.get('service_type')
-        task_date = datetime.strptime(request.form.get('date'), '%Y-%m-%d').date()
-        entry_time = request.form.get('entry_time')
-        exit_time = request.form.get('exit_time')
+        date_str = request.form.get('date', '')
+        task_date = datetime.strptime(date_str, '%Y-%m-%d').date() if date_str else None
+
+        # Nuevos timestamps del parte v2
+        parte_transport_start = request.form.get('parte_transport_start', '').strip() or None
+        parte_arrival         = request.form.get('parte_arrival', '').strip() or None
+        parte_work_start      = request.form.get('parte_work_start', '').strip() or None
+        parte_work_end        = request.form.get('parte_work_end', '').strip() or None
+
+        # Compatibilidad: entry_time = parte_work_start, exit_time = parte_work_end
+        entry_time = parte_work_start or request.form.get('entry_time', '').strip() or None
+        exit_time  = parte_work_end   or request.form.get('exit_time', '').strip()  or None
+
         description = request.form.get('description')
         parts_text = request.form.get('parts_text', '')
-        
-        # ✅ VALIDACIÓN: Campos obligatorios
-        if not client_name or not entry_time or not exit_time:
-            flash('⚠️ El nombre del cliente, hora de entrada y hora de salida son obligatorios', 'danger')
+
+        # ✅ VALIDACIÓN: Solo cliente es obligatorio
+        if not client_name:
+            flash('⚠️ El nombre del cliente es obligatorio', 'danger')
             return redirect(url_for('dashboard'))
         
         # Stock - Ahora soporta múltiples items con diferentes acciones
@@ -1039,6 +1055,11 @@ def save_report():
                 task.work_end_time = datetime.now()
                 if work_duration:
                     task.work_duration = work_duration
+                # Guardar timestamps v2
+                if parte_transport_start: task.parte_transport_start = parte_transport_start
+                if parte_arrival:         task.parte_arrival         = parte_arrival
+                if parte_work_start:      task.parte_work_start      = parte_work_start
+                if parte_work_end:        task.parte_work_end        = parte_work_end
                 
                 # Guardar items de stock
                 if stock_items_used:
@@ -1095,7 +1116,7 @@ def save_report():
             date=task_date,
             start_time=entry_time,
             end_time=exit_time,
-            service_type_id=service_type.id,
+            service_type_id=service_type.id if service_type else None,
             description=description,
             parts_text=parts_text,
             signature_data=signature_data,
@@ -1103,7 +1124,11 @@ def save_report():
             signature_timestamp=datetime.now(),
             status='Completado',
             work_end_time=datetime.now(),
-            work_duration=work_duration
+            work_duration=work_duration,
+            parte_transport_start=parte_transport_start,
+            parte_arrival=parte_arrival,
+            parte_work_start=parte_work_start,
+            parte_work_end=parte_work_end,
         )
         
         # Guardar items de stock
@@ -1193,6 +1218,41 @@ def upload_task_file(task_id):
         })
     
     return jsonify({'success': False, 'msg': 'Tipo de archivo no permitido'}), 400
+
+@app.route('/api/parte/draft', methods=['GET', 'POST', 'DELETE'])
+@login_required
+def parte_draft():
+    """API para borrador de parte – persiste en fichero JSON por usuario"""
+    draft_dir = os.path.join(basedir, 'parte_drafts')
+    os.makedirs(draft_dir, exist_ok=True)
+    draft_path = os.path.join(draft_dir, f'draft_{current_user.id}.json')
+
+    if request.method == 'GET':
+        if os.path.exists(draft_path):
+            try:
+                with open(draft_path, 'r', encoding='utf-8') as f:
+                    return jsonify({'success': True, 'draft': json.load(f)})
+            except Exception:
+                pass
+        return jsonify({'success': True, 'draft': None})
+
+    elif request.method == 'POST':
+        try:
+            data = request.get_json(force=True) or {}
+            data['saved_at'] = datetime.now().isoformat()
+            with open(draft_path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False)
+            return jsonify({'success': True})
+        except Exception as e:
+            return jsonify({'success': False, 'msg': str(e)})
+
+    elif request.method == 'DELETE':
+        try:
+            if os.path.exists(draft_path):
+                os.remove(draft_path)
+            return jsonify({'success': True})
+        except Exception as e:
+            return jsonify({'success': False, 'msg': str(e)})
 
 # --- API ENDPOINTS ---
 @app.route('/api/tasks')
@@ -1297,6 +1357,21 @@ def get_all_tasks():
         import traceback
         traceback.print_exc()
         return jsonify({'error': f'Error cargando tareas: {str(e)}'}), 500
+
+@app.route('/api/stock_search')
+@login_required
+def stock_search():
+    """API para buscador de piezas/stock por nombre"""
+    q = request.args.get('q', '').strip()
+    if len(q) < 1:
+        return jsonify([])
+    items = Stock.query.filter(Stock.name.ilike(f'%{q}%')).order_by(Stock.name).limit(15).all()
+    return jsonify([{
+        'id': item.id,
+        'name': item.name,
+        'quantity': item.quantity,
+        'category': item.category.name if item.category else None
+    } for item in items])
 
 @app.route('/api/clients_search')
 @login_required
@@ -2222,6 +2297,10 @@ def admin_all_tasks():
         # Procesar cada tarea
         for task in tasks:
             try:
+                # ✅ Excluir tareas sin técnico del calendario (solo aparecen en lista inferior)
+                if task.tech_id is None:
+                    continue
+
                 # Obtener tipo de servicio
                 service_type = None
                 try:
@@ -3730,6 +3809,25 @@ with app.app_context():
                         print(f"Nota: Migración 'remote_support_hours': {e}")
     except Exception as e:
         print(f"Nota: Migración de columnas remotas: {e}")
+
+    # ✅ MIGRACIÓN: Columnas de timestamps del parte v2
+    try:
+        from sqlalchemy import inspect as _ins_v2
+        _inspector_v2 = _ins_v2(db.engine)
+        if 'task' in _inspector_v2.get_table_names():
+            _existing_cols = [c['name'] for c in _inspector_v2.get_columns('task')]
+            _new_cols_v2 = ['parte_transport_start', 'parte_arrival', 'parte_work_start', 'parte_work_end']
+            for _col in _new_cols_v2:
+                if _col not in _existing_cols:
+                    with db.engine.connect() as _conn:
+                        try:
+                            _conn.execute(db.text(f'ALTER TABLE task ADD COLUMN {_col} VARCHAR(10)'))
+                            _conn.commit()
+                            print(f"✓ Columna '{_col}' añadida a Task")
+                        except Exception as _e:
+                            print(f"Nota: Migración '{_col}': {_e}")
+    except Exception as e:
+        print(f"Nota: Migración timestamps parte v2: {e}")
 
     # Usuarios de prueba
     if not User.query.filter_by(username='admin').first():

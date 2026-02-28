@@ -355,6 +355,22 @@
         {% endwith %}
 
         <div id="home-menu" class="row g-3 justify-content-center" style="max-width: 900px; margin: auto;">
+
+            <!-- ✅ Aviso de parte en proceso -->
+            <div id="draft-notice" class="col-12 d-none">
+                <div class="alert mb-0 d-flex align-items-center justify-content-between gap-2"
+                     style="background:#1a1a1a; border:2px solid var(--osla-orange); border-radius:12px;">
+                    <div>
+                        <i class="bi bi-pencil-square me-2" style="color:var(--osla-orange);"></i>
+                        <strong style="color:var(--osla-orange);">Parte en proceso</strong>
+                        <span class="text-white ms-2 small">Tienes un parte sin enviar.</span>
+                    </div>
+                    <button class="btn btn-sm fw-bold" style="background:var(--osla-orange);color:#fff;"
+                            onclick="showSection('section-parte')">
+                        <i class="bi bi-arrow-right me-1"></i>Continuar
+                    </button>
+                </div>
+            </div>
             <div class="col-12 col-md-6" onclick="showSection('section-parte')">
                 <div class="menu-card">
                     <i class="bi bi-clipboard-check-fill fs-1 text-warning mb-2 d-block"></i>
@@ -408,96 +424,117 @@
                     </select>
                 </div>
 
-                <!-- ===== CRONÓMETRO DE TRABAJO ===== -->
-                <div id="workTimerBlock" class="mb-3 p-3 rounded" style="background: #0d0d0d; border: 2px solid #2a2a2a; transition: border-color 0.4s;">
-                    <label class="form-label fw-bold mb-3 small d-flex align-items-center gap-2" style="color: #888; letter-spacing: 1px; text-transform: uppercase;">
-                        <i class="bi bi-stopwatch"></i> Cronómetro de trabajo
-                    </label>
-                    <div class="d-flex flex-wrap align-items-center gap-3">
-                        <div id="timerDisplay" style="
-                            font-family: 'Courier New', monospace;
-                            font-size: 2.4rem;
-                            font-weight: 700;
-                            color: #555;
-                            letter-spacing: 4px;
-                            min-width: 160px;
-                            text-align: center;
-                            background: #000;
-                            border: 2px solid #222;
-                            border-radius: 8px;
-                            padding: 6px 18px;
-                            transition: color 0.4s, border-color 0.4s;
-                        ">00:00:00</div>
-                        <button type="button" id="timerBtn" onclick="toggleTimer()" style="
-                            background: var(--osla-orange);
-                            color: #fff;
-                            border: none;
-                            border-radius: 8px;
-                            font-weight: 700;
-                            font-size: 1rem;
-                            min-width: 160px;
-                            padding: 11px 0;
-                            transition: background 0.3s;
-                            cursor: pointer;
-                        ">
-                            <i class="bi bi-play-fill me-1" id="timerIcon"></i>
-                            <span id="timerBtnText">Iniciar trabajo</span>
-                        </button>
-                        <span id="timerStatus" class="small" style="color: #555;">Detenido</span>
+                <!-- ===== REGISTRO DE TIEMPOS (4 HITOS) ===== -->
+                <div class="mb-3 p-3 rounded" style="background:#0d0d0d; border:2px solid #333;">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <label class="form-label fw-bold mb-0 small d-flex align-items-center gap-2"
+                               style="color:var(--osla-orange); letter-spacing:1px; text-transform:uppercase;">
+                            <i class="bi bi-clock-history"></i> Registro de Tiempos
+                        </label>
+                        <small id="draft-save-status" class="text-muted" style="font-size:0.72rem;"></small>
                     </div>
-                    <div id="timerSummary" class="mt-2 small" style="display:none; color: #aaa;">
-                        <i class="bi bi-check-circle-fill text-success me-1"></i>
-                        Tiempo registrado: <strong id="timerSummaryText" style="color:#fff;"></strong>
+                    <div class="row g-2">
+                        <!-- 1. Inicio transporte -->
+                        <div class="col-6 col-md-3">
+                            <div class="p-2 rounded text-center" style="background:#161616; border:1px solid #0dcaf0;">
+                                <small class="d-block fw-bold mb-2" style="color:#0dcaf0; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.5px;">
+                                    <i class="bi bi-car-front-fill me-1"></i>Inicio Transporte
+                                </small>
+                                <div id="ts-display-1" class="fw-bold mb-2"
+                                     style="font-family:'Courier New',monospace; font-size:1.6rem; color:#555; letter-spacing:3px; min-height:38px;">
+                                    --:--
+                                </div>
+                                <button type="button" class="btn btn-sm w-100 fw-bold"
+                                        style="background:#0dcaf0; color:#000; font-size:0.78rem;"
+                                        onclick="stampTime('parte_transport_start','ts-display-1')">
+                                    <i class="bi bi-stopwatch me-1"></i>Registrar
+                                </button>
+                                <input type="hidden" name="parte_transport_start" id="parte_transport_start">
+                            </div>
+                        </div>
+                        <!-- 2. Hora llegada -->
+                        <div class="col-6 col-md-3">
+                            <div class="p-2 rounded text-center" style="background:#161616; border:1px solid #6f42c1;">
+                                <small class="d-block fw-bold mb-2" style="color:#a78bfa; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.5px;">
+                                    <i class="bi bi-geo-alt-fill me-1"></i>Hora de Llegada
+                                </small>
+                                <div id="ts-display-2" class="fw-bold mb-2"
+                                     style="font-family:'Courier New',monospace; font-size:1.6rem; color:#555; letter-spacing:3px; min-height:38px;">
+                                    --:--
+                                </div>
+                                <button type="button" class="btn btn-sm w-100 fw-bold"
+                                        style="background:#6f42c1; color:#fff; font-size:0.78rem;"
+                                        onclick="stampTime('parte_arrival','ts-display-2')">
+                                    <i class="bi bi-stopwatch me-1"></i>Registrar
+                                </button>
+                                <input type="hidden" name="parte_arrival" id="parte_arrival">
+                            </div>
+                        </div>
+                        <!-- 3. Inicio trabajo -->
+                        <div class="col-6 col-md-3">
+                            <div class="p-2 rounded text-center" style="background:#161616; border:1px solid var(--osla-orange);">
+                                <small class="d-block fw-bold mb-2" style="color:var(--osla-orange); font-size:0.68rem; text-transform:uppercase; letter-spacing:0.5px;">
+                                    <i class="bi bi-tools me-1"></i>Inicio Trabajo
+                                </small>
+                                <div id="ts-display-3" class="fw-bold mb-2"
+                                     style="font-family:'Courier New',monospace; font-size:1.6rem; color:#555; letter-spacing:3px; min-height:38px;">
+                                    --:--
+                                </div>
+                                <button type="button" class="btn btn-sm w-100 fw-bold"
+                                        style="background:var(--osla-orange); color:#fff; font-size:0.78rem;"
+                                        onclick="stampTime('parte_work_start','ts-display-3')">
+                                    <i class="bi bi-stopwatch me-1"></i>Registrar
+                                </button>
+                                <input type="hidden" name="parte_work_start" id="parte_work_start">
+                            </div>
+                        </div>
+                        <!-- 4. Fin trabajo -->
+                        <div class="col-6 col-md-3">
+                            <div class="p-2 rounded text-center" style="background:#161616; border:1px solid #198754;">
+                                <small class="d-block fw-bold mb-2" style="color:#5cb85c; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.5px;">
+                                    <i class="bi bi-check-circle-fill me-1"></i>Fin Trabajo
+                                </small>
+                                <div id="ts-display-4" class="fw-bold mb-2"
+                                     style="font-family:'Courier New',monospace; font-size:1.6rem; color:#555; letter-spacing:3px; min-height:38px;">
+                                    --:--
+                                </div>
+                                <button type="button" class="btn btn-sm w-100 fw-bold"
+                                        style="background:#198754; color:#fff; font-size:0.78rem;"
+                                        onclick="stampTime('parte_work_end','ts-display-4')">
+                                    <i class="bi bi-stopwatch me-1"></i>Registrar
+                                </button>
+                                <input type="hidden" name="parte_work_end" id="parte_work_end">
+                            </div>
+                        </div>
                     </div>
-                    <!-- Campo oculto: se envía con el formulario POST -->
-                    <input type="hidden" name="work_duration" id="workDurationInput" value="">
+                    <!-- Hidden compat fields para save_report -->
+                    <input type="hidden" name="entry_time" id="fieldEntryTime">
+                    <input type="hidden" name="exit_time" id="fieldExitTime">
+                    <input type="hidden" name="work_duration" id="workDurationInput">
                 </div>
-                <!-- ===== FIN CRONÓMETRO ===== -->
+                <!-- ===== FIN REGISTRO DE TIEMPOS =====-->
 
-                <!-- ===== CRONÓMETRO DE TRAYECTO / UBICACIÓN ===== -->
-                <div id="travelTimerBlock" class="mb-3 p-3 rounded" style="background: #0d0d0d; border: 2px solid #2a2a2a; transition: border-color 0.4s;">
-                    <label class="form-label fw-bold mb-3 small d-flex align-items-center gap-2" style="color: #888; letter-spacing: 1px; text-transform: uppercase;">
-                        <i class="bi bi-car-front-fill text-info"></i> Cronómetro de trayecto
-                    </label>
-                    <div class="d-flex flex-wrap align-items-center gap-3">
-                        <div id="travelTimerDisplay" style="
-                            font-family: 'Courier New', monospace;
-                            font-size: 2.4rem;
-                            font-weight: 700;
-                            color: #555;
-                            letter-spacing: 4px;
-                            min-width: 160px;
-                            text-align: center;
-                            background: #000;
-                            border: 2px solid #222;
-                            border-radius: 8px;
-                            padding: 6px 18px;
-                            transition: color 0.4s, border-color 0.4s;
-                        ">00:00:00</div>
-                        <button type="button" id="travelTimerBtn" onclick="toggleTravelTimer()" style="
-                            background: #0d6efd;
-                            color: #fff;
-                            border: none;
-                            border-radius: 8px;
-                            font-weight: 700;
-                            font-size: 1rem;
-                            min-width: 160px;
-                            padding: 11px 0;
-                            transition: background 0.3s;
-                            cursor: pointer;
-                        ">
-                            <i class="bi bi-play-fill me-1" id="travelTimerIcon"></i>
-                            <span id="travelTimerBtnText">Iniciar trayecto</span>
-                        </button>
-                        <span id="travelTimerStatus" class="small" style="color: #555;">Detenido</span>
+                <!-- ===== INFO CITA VINCULADA (auto-fill, no editable) ===== -->
+                <div id="linked-cita-header" class="d-none mb-3 p-3 rounded"
+                     style="background:#111; border-left:4px solid var(--osla-orange);">
+                    <div class="small fw-bold text-warning mb-2" style="text-transform:uppercase; letter-spacing:1px;">
+                        <i class="bi bi-link-45deg me-1"></i>Cita vinculada
                     </div>
-                    <div id="travelTimerSummary" class="mt-2 small" style="display:none; color: #aaa;">
-                        <i class="bi bi-check-circle-fill text-info me-1"></i>
-                        Trayecto registrado: <strong id="travelTimerSummaryText" style="color:#06b6d4;"></strong>
+                    <div class="row g-2">
+                        <div class="col-12 col-sm-4">
+                            <div class="small text-muted mb-1">Cliente</div>
+                            <div class="fw-bold text-white" id="lch-client">—</div>
+                        </div>
+                        <div class="col-12 col-sm-4">
+                            <div class="small text-muted mb-1">Tipo de Servicio</div>
+                            <div class="fw-bold" style="color:var(--osla-orange);" id="lch-service">—</div>
+                        </div>
+                        <div class="col-12 col-sm-4">
+                            <div class="small text-muted mb-1">Fecha</div>
+                            <div class="fw-bold text-info" id="lch-date">—</div>
+                        </div>
                     </div>
-                    <input type="hidden" name="travel_duration" id="travelDurationInput" value="">
                 </div>
-                <!-- ===== FIN CRONÓMETRO TRAYECTO ===== -->
 
                 <div class="row g-3 mb-3">
                     <div class="col-12 col-md-8 position-relative">
@@ -522,14 +559,6 @@
                         <input type="date" name="date" id="fieldDate" class="form-control" value="{{ today_date }}"
                             required>
                     </div>
-                    <div class="col-6 col-md-4">
-                        <label class="form-label">INICIO TRABAJO</label>
-                        <input type="time" name="entry_time" id="fieldEntryTime" class="form-control" required>
-                    </div>
-                    <div class="col-6 col-md-4">
-                        <label class="form-label">FIN TRABAJO</label>
-                        <input type="time" name="exit_time" id="fieldExitTime" class="form-control" required>
-                    </div>
                 </div>
 
                 <div class="mb-3">
@@ -545,56 +574,13 @@
                     <div id="stockItemsContainer">
                         <div class="row g-2 mb-2 stock-item-row">
                             <div class="col-5">
-                                <select name="stock_item_id[]" class="form-select">
-                                    <option value="">Sin artículo de stock</option>
-                                    {% if stock_categories %}
-                                        {% for cat in stock_categories %}
-                                            {% if cat.subcategories %}
-                                                {% for subcat in cat.subcategories %}
-                                                    {% set subcat_items = stock_items | selectattr('category_id', 'equalto', subcat.id) | list %}
-                                                    {% if subcat_items %}
-                                                    <optgroup label="{{ cat.name }} › {{ subcat.name }}">
-                                                        {% for item in subcat_items %}
-                                                        <option value="{{ item.id }}">{{ item.name }} ({{ item.quantity }} disponibles)</option>
-                                                        {% endfor %}
-                                                    </optgroup>
-                                                    {% endif %}
-                                                {% endfor %}
-                                                {# Items directamente en la categoría padre #}
-                                                {% set cat_items = stock_items | selectattr('category_id', 'equalto', cat.id) | list %}
-                                                {% if cat_items %}
-                                                <optgroup label="{{ cat.name }}">
-                                                    {% for item in cat_items %}
-                                                    <option value="{{ item.id }}">{{ item.name }} ({{ item.quantity }} disponibles)</option>
-                                                    {% endfor %}
-                                                </optgroup>
-                                                {% endif %}
-                                            {% else %}
-                                                {% set cat_items = stock_items | selectattr('category_id', 'equalto', cat.id) | list %}
-                                                {% if cat_items %}
-                                                <optgroup label="{{ cat.name }}">
-                                                    {% for item in cat_items %}
-                                                    <option value="{{ item.id }}">{{ item.name }} ({{ item.quantity }} disponibles)</option>
-                                                    {% endfor %}
-                                                </optgroup>
-                                                {% endif %}
-                                            {% endif %}
-                                        {% endfor %}
-                                        {# Items sin categoría #}
-                                        {% set uncategorized = stock_items | selectattr('category_id', 'none') | list %}
-                                        {% if uncategorized %}
-                                        <optgroup label="Sin categoría">
-                                            {% for item in uncategorized %}
-                                            <option value="{{ item.id }}">{{ item.name }} ({{ item.quantity }} disponibles)</option>
-                                            {% endfor %}
-                                        </optgroup>
-                                        {% endif %}
-                                    {% else %}
-                                        {% for item in stock_items %}
-                                        <option value="{{ item.id }}">{{ item.name }} ({{ item.quantity }} disponibles)</option>
-                                        {% endfor %}
-                                    {% endif %}
-                                </select>
+                                <div class="stock-search-wrapper position-relative">
+                                    <input type="text" class="form-control stock-search-input"
+                                           placeholder="Buscar pieza..." autocomplete="off">
+                                    <input type="hidden" name="stock_item_id[]" class="stock-id-input" value="">
+                                    <div class="stock-suggestions-list suggestions-list"></div>
+                                    <small class="stock-selected-name text-success d-block mt-1" style="min-height:1rem;"></small>
+                                </div>
                             </div>
                             <div class="col-2">
                                 <input type="number" name="stock_quantity[]" class="form-control" min="0" value="0"
@@ -688,9 +674,15 @@
                     </div>
                 </div>
 
-                <button type="submit" class="btn-osla">
-                    <i class="bi bi-check-circle-fill me-2"></i>GUARDAR PARTE
-                </button>
+                <div class="d-flex gap-2 mt-2">
+                    <button type="button" class="btn btn-outline-warning flex-fill fw-bold"
+                            onclick="saveDraft(true)">
+                        <i class="bi bi-floppy me-2"></i>Guardar borrador
+                    </button>
+                    <button type="submit" class="btn-osla flex-fill" style="width:auto; padding:12px 20px;">
+                        <i class="bi bi-send-fill me-2"></i>Enviar parte
+                    </button>
+                </div>
             </form>
         </div>
 
@@ -1252,6 +1244,7 @@
         let allTasksCache = [];     // TODOS los eventos del técnico (para la lista lateral)
         let currentSort = 'date';   // 'date' | 'alpha'
         let selectedFiles = [];     // Array para almacenar archivos seleccionados
+        let _partePreloaded = false; // Flag: true cuando el parte se pre-rellena desde una cita del calendario
 
         // Carga TODOS los eventos (no solo el rango visible) para la lista lateral
         function loadAllTasksForList() {
@@ -1291,24 +1284,25 @@
                 if (!calendar) {
                     setTimeout(() => initCalendar(), 100);
                 } else {
-                    // Ya existe: forzar re-render por si el contenedor cambió de tamaño
                     setTimeout(() => {
                         try { calendar.updateSize(); calendar.refetchEvents(); } catch(e) {}
                     }, 100);
                 }
             }
 
-            // Inicializar firma cuando se muestra la sección de parte
+            // ✅ Inicializar firma + cargar draft cuando se muestra el parte
             if (id === 'section-parte') {
                 setTimeout(() => { try { mainSignaturePad.init(); } catch(e) {} }, 100);
-                // ✅ Auto-rellenar hora de salida con la hora actual real
-                const exitField = document.getElementById('fieldExitTime');
-                if (exitField && !exitField.value) {
-                    const now = new Date();
-                    const hh = String(now.getHours()).padStart(2, '0');
-                    const mm = String(now.getMinutes()).padStart(2, '0');
-                    exitField.value = `${hh}:${mm}`;
+                // Solo cargar draft si no hay datos pre-cargados desde una cita
+                if (!_partePreloaded) {
+                    setTimeout(() => loadDraft(), 200);
                 }
+                _partePreloaded = false;
+            }
+
+            // ✅ Al volver al menú principal, comprobar si hay borrador
+            if (id === 'home-menu') {
+                checkDraftNotice();
             }
 
             // Cargar analíticas cuando se muestra la sección
@@ -1335,12 +1329,13 @@
                         .then(function(res) { return res.json(); })
                         .then(function(data) {
                             var activeTypes = getTechActiveFilters();
-                            var filtered = activeTypes.length === 0
-                                ? data
-                                : data.filter(function(ev) {
-                                    var stype = ev.extendedProps ? ev.extendedProps.service_type : ev.service_type;
-                                    return activeTypes.includes(stype);
-                                });
+                            var filtered = data.filter(function(ev) {
+                                // ✅ Excluir citas sin técnico del calendario (solo aparecen en la lista)
+                                if (ev.extendedProps && ev.extendedProps.tech_id === null) return false;
+                                if (!ev.extendedProps && ev.tech_id === null) return false;
+                                var stype = ev.extendedProps ? ev.extendedProps.service_type : ev.service_type;
+                                return activeTypes.length === 0 || activeTypes.includes(stype);
+                            });
                             successCallback(filtered);
                         })
                         .catch(failureCallback);
@@ -1840,10 +1835,10 @@
         function performTaskAction(action) {
             const id = document.getElementById('evtId').value;
 
-            // Si la acción es completar, abrir el modal de completar con firma
+            // ✅ Completar: redirigir al parte con la cita pre-rellena
             if (action === 'complete') {
                 modalAction.hide();
-                openCompleteTaskModal(id);
+                openParteFromTask(id);
                 return;
             }
 
@@ -1858,9 +1853,7 @@
 
             fetch(`/api/task_action/${id}/${action}`, { method: 'POST' })
                 .then(res => {
-                    if (!res.ok) {
-                        throw new Error(`HTTP error! status: ${res.status}`);
-                    }
+                    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
                     return res.json();
                 })
                 .then(data => {
@@ -1877,6 +1870,89 @@
                     console.error('Error en performTaskAction:', err);
                     alert('❌ Error de conexión. Por favor, intenta de nuevo.');
                 });
+        }
+
+        // ✅ NUEVA FUNCIÓN: Abrir sección parte con datos de la cita pre-rellenos
+        function openParteFromTask(taskId) {
+            fetch(`/api/get_task_full/${taskId}`)
+                .then(res => res.json())
+                .then(response => {
+                    if (!response.success) {
+                        alert('Error al cargar datos de la cita');
+                        return;
+                    }
+                    const task = response.data;
+
+                    // Ir a la sección parte (loadDraft se llama dentro con delay)
+                    _partePreloaded = true;
+                    showSection('section-parte');
+
+                    // Intentar seleccionar en el dropdown de citas vinculadas
+                    const sel = document.getElementById('linkedTaskSelect');
+                    let foundInDropdown = false;
+                    if (sel) {
+                        for (let opt of sel.options) {
+                            if (opt.value == taskId) {
+                                sel.value = taskId;
+                                foundInDropdown = true;
+                                break;
+                            }
+                        }
+                        if (foundInDropdown) {
+                            // Trigger normal: rellena campos + muestra cabecera + info cliente
+                            fillFromTask(sel);
+                        } else {
+                            // La cita no está en el dropdown (fuera de rango) → rellenar directamente
+                            // Añadir opción temporal para que el backend reciba el linked_task_id correcto
+                            const tmpOpt = document.createElement('option');
+                            tmpOpt.value = taskId;
+                            tmpOpt.textContent = `${task.date || ''} - ${task.client_name || '(sin cliente)'}`;
+                            tmpOpt.selected = true;
+                            sel.appendChild(tmpOpt);
+                            sel.value = taskId;
+                            _fillParteFieldsFromTaskData(task);
+                        }
+                    }
+
+                    // Guardar en draft para persistencia
+                    setTimeout(() => saveDraft(false), 400);
+                    showToast('✓ Cita cargada en el parte', 'info');
+                })
+                .catch(err => {
+                    console.error('Error:', err);
+                    alert('Error al cargar la cita');
+                });
+        }
+
+        // Rellena los campos del parte directamente desde los datos de la tarea
+        function _fillParteFieldsFromTaskData(task) {
+            // Cabecera de cita vinculada
+            const hdr = document.getElementById('linked-cita-header');
+            if (hdr) {
+                hdr.classList.remove('d-none');
+                const fmtDate = task.date ? task.date.split('-').reverse().join('/') : '—';
+                const lchClient  = document.getElementById('lch-client');
+                const lchService = document.getElementById('lch-service');
+                const lchDate    = document.getElementById('lch-date');
+                if (lchClient)  lchClient.textContent  = task.client_name  || '—';
+                if (lchService) lchService.textContent = task.service_type || '—';
+                if (lchDate)    lchDate.textContent    = fmtDate;
+            }
+            // Campos del formulario
+            const fc    = document.getElementById('fieldClient');
+            const fd    = document.getElementById('fieldDate');
+            const fs    = document.getElementById('fieldService');
+            const fdesc = document.getElementById('fieldDescription');
+            if (fc)    fc.value    = task.client_name  || '';
+            if (fd)    fd.value    = task.date         || '';
+            if (fdesc) fdesc.value = task.description  || '';
+            if (fs && task.service_type) {
+                for (let opt of fs.options) {
+                    if (opt.value === task.service_type) { fs.value = task.service_type; break; }
+                }
+            }
+            // Información del cliente
+            if (task.client_info) showClientInfo(task.client_info);
         }
 
         // --- SINCRONIZACIÓN DE DATOS AL SELECCIONAR TAREA ---
@@ -2319,37 +2395,31 @@
             mainSignaturePad.preview();
         }
 
-        // Inicializar firma cuando se muestra la sección de parte
-        // VALIDACIÓN DEL FORMULARIO ANTES DE ENVIAR
         document.addEventListener('DOMContentLoaded', function () {
             const reportForm = document.querySelector('form[action="/save_report"]');
             if (reportForm) {
                 reportForm.addEventListener('submit', function (e) {
-                    // ── Hora de salida: si aún está vacía (no se usó cronómetro), poner la hora actual ──
-                    const entryField = document.getElementById('fieldEntryTime');
-                    const exitField  = document.getElementById('fieldExitTime');
-                    if (exitField && !exitField.value) {
-                        const now = new Date();
-                        exitField.value = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
-                    }
+                    // Sincronizar campos hidden de compatibilidad
+                    const ws = document.getElementById('parte_work_start');
+                    const we = document.getElementById('parte_work_end');
+                    if (ws && ws.value) document.getElementById('fieldEntryTime').value = ws.value;
+                    if (we && we.value) document.getElementById('fieldExitTime').value = we.value;
 
-                    // ✅ work_duration = diferencia entre hora de SALIDA y hora de ENTRADA
-                    // Este es el tiempo que verá el admin, independientemente de si se usó cronómetro o no.
+                    // work_duration = diferencia fin − inicio trabajo
                     try {
-                        const eVal = (entryField && entryField.value) ? entryField.value : null;
-                        const xVal = (exitField  && exitField.value)  ? exitField.value  : null;
+                        const eVal = ws ? ws.value : null;
+                        const xVal = we ? we.value : null;
                         if (eVal && xVal) {
                             const [eh, em] = eVal.split(':').map(Number);
                             const [xh, xm] = xVal.split(':').map(Number);
                             let totalMin = (xh * 60 + xm) - (eh * 60 + em);
-                            if (totalMin < 0) totalMin += 24 * 60; // cruce de medianoche
+                            if (totalMin < 0) totalMin += 24 * 60;
                             const dh = Math.floor(totalMin / 60);
                             const dm = totalMin % 60;
-                            const durationStr = String(dh).padStart(2,'0') + ':' + String(dm).padStart(2,'0') + ':00';
                             const durInput = document.getElementById('workDurationInput');
-                            if (durInput) durInput.value = durationStr;
+                            if (durInput) durInput.value = `${String(dh).padStart(2,'0')}:${String(dm).padStart(2,'0')}:00`;
                         }
-                    } catch(e) {}
+                    } catch(_e) {}
 
                     // Validar nombre del firmante
                     const signatureName = document.getElementById('signatureName').value.trim();
@@ -2363,32 +2433,31 @@
                     // Validar firma digital
                     if (mainSignaturePad.isEmpty()) {
                         e.preventDefault();
-                        alert('⚠️ La firma del cliente es OBLIGATORIA\n\nPor favor, solicita al cliente que firme en el recuadro blanco para confirmar la asistencia y conformidad con el trabajo realizado.');
+                        alert('⚠️ La firma del cliente es OBLIGATORIA\n\nPor favor, solicita al cliente que firme en el recuadro blanco.');
                         return false;
                     }
 
-                    // Capturar firma en base64 y guardarla en el campo oculto
-                    const signatureData = mainSignaturePad.toDataURL();
-                    document.getElementById('signatureDataInput').value = signatureData;
+                    // Capturar firma en base64
+                    document.getElementById('signatureDataInput').value = mainSignaturePad.toDataURL();
 
-                    // Permitir envío del formulario
+                    // ✅ Eliminar borrador al enviar el parte
+                    fetch('/api/parte/draft', { method: 'DELETE' }).catch(() => {});
+
                     return true;
                 });
             }
 
-            // ✅ CORRECCIÓN: Limpiar formulario cuando se cierre el modal
+            // Limpiar formulario al cerrar modal de nueva cita
             const modalNewAppt = document.getElementById('modalNewAppointmentTech');
             if (modalNewAppt) {
                 modalNewAppt.addEventListener('hidden.bs.modal', function () {
                     const form = this.querySelector('form');
                     if (form) {
                         form.reset();
-                        // Limpiar campos explícitamente para mayor seguridad
                         const clientInput = document.getElementById('modalFieldClient');
                         const dateInput = document.getElementById('modalDateInput');
                         const startTimeInput = document.getElementById('modalStartTime');
                         const endTimeInput = document.getElementById('modalEndTime');
-                        
                         if (clientInput) clientInput.value = '';
                         if (dateInput) dateInput.value = '';
                         if (startTimeInput) startTimeInput.value = '';
@@ -2396,6 +2465,9 @@
                     }
                 });
             }
+
+            // ✅ Comprobar borrador al cargar la página
+            checkDraftNotice();
         });
 
         // Firma para el MODAL de completar tarea (mantener código original)
@@ -2677,16 +2749,13 @@
             const selected = selectElement.options[selectElement.selectedIndex];
 
             if (selected.value === 'none') {
+                // Ocultar cabecera de cita vinculada
+                document.getElementById('linked-cita-header').classList.add('d-none');
                 document.getElementById('fieldClient').value = '';
-                document.getElementById('fieldEntryTime').value = '';
-                // Auto-fill exit time with current time when reset
-                const now = new Date();
-                const hh = String(now.getHours()).padStart(2, '0');
-                const mm = String(now.getMinutes()).padStart(2, '0');
-                document.getElementById('fieldExitTime').value = `${hh}:${mm}`;
                 document.getElementById('fieldService').selectedIndex = 0;
                 document.getElementById('fieldDescription').value = '';
                 hideClientInfo();
+                saveDraft(false);
                 return;
             }
 
@@ -2698,14 +2767,19 @@
                     if (response.success) {
                         const task = response.data;
 
+                        // ✅ Mostrar cabecera no-editable
+                        const hdr = document.getElementById('linked-cita-header');
+                        hdr.classList.remove('d-none');
+                        document.getElementById('lch-client').textContent  = task.client_name || '—';
+                        document.getElementById('lch-service').textContent = task.service_type || '—';
+                        const fmtDate = task.date
+                            ? task.date.split('-').reverse().join('/')
+                            : '—';
+                        document.getElementById('lch-date').textContent = fmtDate;
+
+                        // Rellenar campos editables
                         document.getElementById('fieldClient').value = task.client_name;
-                        document.getElementById('fieldDate').value = task.date;
-                        document.getElementById('fieldEntryTime').value = task.start_time;
-                        // ✅ Auto-fill exit_time with current time when linking a task
-                        const now = new Date();
-                        const hh = String(now.getHours()).padStart(2, '0');
-                        const mm = String(now.getMinutes()).padStart(2, '0');
-                        document.getElementById('fieldExitTime').value = `${hh}:${mm}`;
+                        document.getElementById('fieldDate').value   = task.date;
 
                         // Seleccionar tipo de servicio
                         const serviceSelect = document.getElementById('fieldService');
@@ -2716,12 +2790,15 @@
                             }
                         }
 
-                        document.getElementById('fieldDescription').value = task.description;
+                        document.getElementById('fieldDescription').value = task.description || '';
 
                         // Mostrar información del cliente
                         if (task.client_info) {
                             showClientInfo(task.client_info);
                         }
+
+                        // Auto-guardar borrador con cita vinculada
+                        saveDraft(false);
                     }
                 })
                 .catch(err => console.error('Error:', err));
@@ -2843,25 +2920,109 @@
             }
         }
 
+        // ==================== BUSCADOR DE PIEZAS (STOCK SEARCH) ====================
+
+        function initStockSearch(wrapper) {
+            if (!wrapper) return;
+            const input      = wrapper.querySelector('.stock-search-input');
+            const hiddenId   = wrapper.querySelector('.stock-id-input');
+            const suggestions= wrapper.querySelector('.stock-suggestions-list');
+            const selName    = wrapper.querySelector('.stock-selected-name');
+            if (!input || !hiddenId || !suggestions) return;
+
+            // Evitar doble-listener si ya fue inicializado
+            if (wrapper.dataset.searchInit) return;
+            wrapper.dataset.searchInit = '1';
+
+            input.addEventListener('input', function () {
+                const q = this.value.trim();
+                hiddenId.value = '';
+                if (selName) { selName.textContent = ''; }
+                if (q.length < 1) {
+                    suggestions.innerHTML = '';
+                    suggestions.style.display = 'none';
+                    return;
+                }
+                fetch(`/api/stock_search?q=${encodeURIComponent(q)}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        suggestions.innerHTML = '';
+                        if (data.length > 0) {
+                            suggestions.style.display = 'block';
+                            data.forEach(item => {
+                                const div = document.createElement('div');
+                                div.className = 'suggestion-item';
+                                const cat = item.category ? `<span class="badge bg-secondary ms-1" style="font-size:0.65rem;">${item.category}</span>` : '';
+                                const qty = item.quantity > 0
+                                    ? `<small class="text-success ms-1">(${item.quantity} disp.)</small>`
+                                    : `<small class="text-danger ms-1">(sin stock)</small>`;
+                                div.innerHTML = `<strong>${item.name}</strong>${qty}${cat}`;
+                                div.addEventListener('click', () => {
+                                    input.value = item.name;
+                                    hiddenId.value = item.id;
+                                    if (selName) {
+                                        selName.textContent = `✓ ${item.name} — ${item.quantity} disponibles`;
+                                    }
+                                    suggestions.innerHTML = '';
+                                    suggestions.style.display = 'none';
+                                    saveDraft(false);
+                                });
+                                suggestions.appendChild(div);
+                            });
+                        } else {
+                            suggestions.innerHTML = '<div class="suggestion-item text-muted">Sin resultados</div>';
+                            suggestions.style.display = 'block';
+                            setTimeout(() => { suggestions.style.display = 'none'; }, 1500);
+                        }
+                    })
+                    .catch(() => { suggestions.style.display = 'none'; });
+            });
+
+            document.addEventListener('click', function (e) {
+                if (!wrapper.contains(e.target)) {
+                    suggestions.style.display = 'none';
+                }
+            });
+        }
+
+        // Inicializar buscadores de stock existentes al cargar
+        document.querySelectorAll('.stock-search-wrapper').forEach(w => initStockSearch(w));
+
         // Función para añadir más items de stock
         function addStockItem() {
             const container = document.getElementById('stockItemsContainer');
             const firstRow = container.querySelector('.stock-item-row');
             const newRow = firstRow.cloneNode(true);
 
-            // Limpiar valores - ahora hay dos selects: item y acción
-            const selects = newRow.querySelectorAll('select');
-            selects[0].selectedIndex = 0; // Stock item
-            selects[1].selectedIndex = 0; // Stock action
-            newRow.querySelector('input[type="number"]').value = 0;
+            // Resetear campos del buscador
+            const si = newRow.querySelector('.stock-search-input');
+            const hi = newRow.querySelector('.stock-id-input');
+            const sn = newRow.querySelector('.stock-selected-name');
+            const sg = newRow.querySelector('.stock-suggestions-list');
+            if (si) si.value = '';
+            if (hi) hi.value = '';
+            if (sn) sn.textContent = '';
+            if (sg) { sg.innerHTML = ''; sg.style.display = 'none'; }
 
-            // Cambiar botón de + a -
+            // Resetear cantidad y acción
+            newRow.querySelector('input[type="number"]').value = 0;
+            const actionSel = newRow.querySelector('select[name="stock_action[]"]');
+            if (actionSel) actionSel.selectedIndex = 0;
+
+            // Eliminar flag de init para que se reinicialice
+            const wrapper = newRow.querySelector('.stock-search-wrapper');
+            if (wrapper) delete wrapper.dataset.searchInit;
+
+            // Cambiar botón + a -
             const button = newRow.querySelector('button');
             button.className = 'btn btn-danger btn-sm w-100';
             button.innerHTML = '<i class="bi bi-dash-lg"></i>';
             button.setAttribute('onclick', 'removeStockItem(this)');
 
             container.appendChild(newRow);
+
+            // Inicializar el nuevo buscador
+            if (wrapper) initStockSearch(wrapper);
         }
 
         // Función para eliminar item de stock
@@ -2871,160 +3032,168 @@
         }
 
 
-        // ==================== CRONÓMETRO DE TRABAJO ====================
-        let timerInterval  = null;
-        let timerRunning   = false;
-        let timerStartEpoch = null;   // epoch ms del momento en que se inició
-        let timerElapsed   = 0;       // segundos acumulados al detener
-
-        function toggleTimer() {
-            if (!timerRunning) {
-                // ── INICIAR ──
-                timerRunning    = true;
-                timerStartEpoch = Date.now();
-                timerInterval   = setInterval(tickTimer, 500);
-
-                // ✅ Hora de ENTRADA = hora exacta del sistema al pulsar "Iniciar trabajo"
-                // Se escribe siempre (sobrescribe cualquier valor previo) para garantizar coherencia.
-                try {
-                    const entryF = document.getElementById('fieldEntryTime');
-                    if (entryF) {
-                        const now = new Date(timerStartEpoch);
-                        entryF.value = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
-                    }
-                } catch(e) {}
-
-                document.getElementById('timerBtn').style.background     = '#dc3545';
-                document.getElementById('timerIcon').className            = 'bi bi-stop-fill me-1';
-                document.getElementById('timerBtnText').textContent       = 'Finalizar trabajo';
-                document.getElementById('timerStatus').textContent        = 'En marcha...';
-                document.getElementById('timerStatus').style.color        = '#28a745';
-                document.getElementById('timerDisplay').style.color       = '#f37021';
-                document.getElementById('timerDisplay').style.borderColor = '#f37021';
-                document.getElementById('workTimerBlock').style.borderColor = '#f37021';
-                document.getElementById('timerSummary').style.display     = 'none';
-
-            } else {
-                // ── DETENER ──
-                clearInterval(timerInterval);
-                timerRunning = false;
-                timerElapsed = Math.floor((Date.now() - timerStartEpoch) / 1000);
-
-                const h = Math.floor(timerElapsed / 3600);
-                const m = Math.floor((timerElapsed % 3600) / 60);
-                const s = timerElapsed % 60;
-                const hms = `${pad2(h)}:${pad2(m)}:${pad2(s)}`;
-
-                // Guardar en el campo oculto para enviarlo con el POST
-                document.getElementById('workDurationInput').value = hms;
-
-                // Resumen legible
-                let readable = '';
-                if (h > 0) readable += h + 'h ';
-                if (m > 0 || h > 0) readable += m + 'min ';
-                readable += s + 's';
-
-                document.getElementById('timerBtn').style.background        = '#198754';
-                document.getElementById('timerIcon').className               = 'bi bi-check-circle me-1';
-                document.getElementById('timerBtnText').textContent          = 'Reiniciar';
-                document.getElementById('timerStatus').textContent           = 'Finalizado';
-                document.getElementById('timerStatus').style.color           = '#28a745';
-                document.getElementById('timerDisplay').style.color          = '#28a745';
-                document.getElementById('timerDisplay').style.borderColor    = '#28a745';
-                document.getElementById('workTimerBlock').style.borderColor  = '#198754';
-                document.getElementById('timerSummary').style.display        = 'block';
-                document.getElementById('timerSummaryText').textContent      = readable.trim();
-
-                // ✅ Hora de SALIDA = hora exacta del sistema al pulsar "Finalizar trabajo"
-                // La hora de entrada ya fue fijada al iniciar; aquí solo actualizamos la salida.
-                try {
-                    const endDt  = new Date(timerStartEpoch + timerElapsed * 1000);
-                    const toHM   = dt => pad2(dt.getHours()) + ':' + pad2(dt.getMinutes());
-                    const exitF  = document.getElementById('fieldExitTime');
-                    if (exitF)   exitF.value = toHM(endDt);
-                } catch(e) {}
-
-                // Siguiente pulsación = reinicio completo
-                timerElapsed    = 0;
-                timerStartEpoch = null;
-            }
-        }
-
-        function tickTimer() {
-            const elapsed = Math.floor((Date.now() - timerStartEpoch) / 1000);
-            const h = Math.floor(elapsed / 3600);
-            const m = Math.floor((elapsed % 3600) / 60);
-            const s = elapsed % 60;
-            document.getElementById('timerDisplay').textContent = `${pad2(h)}:${pad2(m)}:${pad2(s)}`;
-        }
+        // ==================== TIMESTAMPS DEL PARTE (v2) ====================
 
         function pad2(n) { return String(n).padStart(2, '0'); }
 
-        // ==================== CRONÓMETRO DE TRAYECTO ====================
-        let travelTimerInterval  = null;
-        let travelTimerRunning   = false;
-        let travelTimerStartEpoch = null;
-        let travelTimerElapsed   = 0;
-
-        function toggleTravelTimer() {
-            if (!travelTimerRunning) {
-                // INICIAR
-                travelTimerRunning    = true;
-                travelTimerStartEpoch = Date.now();
-                travelTimerInterval   = setInterval(tickTravelTimer, 500);
-
-                document.getElementById('travelTimerBtn').style.background     = '#dc3545';
-                document.getElementById('travelTimerIcon').className            = 'bi bi-stop-fill me-1';
-                document.getElementById('travelTimerBtnText').textContent       = 'Finalizar trayecto';
-                document.getElementById('travelTimerStatus').textContent        = 'En marcha...';
-                document.getElementById('travelTimerStatus').style.color        = '#0dcaf0';
-                document.getElementById('travelTimerDisplay').style.color       = '#0dcaf0';
-                document.getElementById('travelTimerDisplay').style.borderColor = '#0dcaf0';
-                document.getElementById('travelTimerBlock').style.borderColor   = '#0dcaf0';
-                document.getElementById('travelTimerSummary').style.display     = 'none';
-            } else {
-                // DETENER
-                clearInterval(travelTimerInterval);
-                travelTimerRunning = false;
-                travelTimerElapsed = Math.floor((Date.now() - travelTimerStartEpoch) / 1000);
-
-                const h = Math.floor(travelTimerElapsed / 3600);
-                const m = Math.floor((travelTimerElapsed % 3600) / 60);
-                const s = travelTimerElapsed % 60;
-                const hms = `${pad2(h)}:${pad2(m)}:${pad2(s)}`;
-
-                document.getElementById('travelDurationInput').value = hms;
-
-                let readable = '';
-                if (h > 0) readable += h + 'h ';
-                if (m > 0 || h > 0) readable += m + 'min ';
-                readable += s + 's';
-
-                document.getElementById('travelTimerBtn').style.background        = '#198754';
-                document.getElementById('travelTimerIcon').className               = 'bi bi-check-circle me-1';
-                document.getElementById('travelTimerBtnText').textContent          = 'Reiniciar trayecto';
-                document.getElementById('travelTimerStatus').textContent           = 'Finalizado';
-                document.getElementById('travelTimerStatus').style.color           = '#0dcaf0';
-                document.getElementById('travelTimerDisplay').style.color          = '#0dcaf0';
-                document.getElementById('travelTimerDisplay').style.borderColor    = '#0dcaf0';
-                document.getElementById('travelTimerBlock').style.borderColor      = '#198754';
-                document.getElementById('travelTimerSummary').style.display        = 'block';
-                document.getElementById('travelTimerSummaryText').textContent      = readable.trim();
-
-                travelTimerElapsed    = 0;
-                travelTimerStartEpoch = null;
+        /**
+         * Registra la hora actual en el campo hidden + display visual.
+         */
+        function stampTime(fieldId, displayId) {
+            const now = new Date();
+            const hhmm = pad2(now.getHours()) + ':' + pad2(now.getMinutes());
+            const input = document.getElementById(fieldId);
+            const display = document.getElementById(displayId);
+            if (input)   input.value = hhmm;
+            if (display) {
+                display.textContent = hhmm;
+                display.style.color = '#fff';
+                display.style.transition = 'transform 0.1s';
+                display.style.transform  = 'scale(1.12)';
+                setTimeout(() => { display.style.transform = 'scale(1)'; }, 150);
             }
+            saveDraft(false);
         }
 
-        function tickTravelTimer() {
-            const elapsed = Math.floor((Date.now() - travelTimerStartEpoch) / 1000);
-            const h = Math.floor(elapsed / 3600);
-            const m = Math.floor((elapsed % 3600) / 60);
-            const s = elapsed % 60;
-            document.getElementById('travelTimerDisplay').textContent = `${pad2(h)}:${pad2(m)}:${pad2(s)}`;
+        // ==================== BORRADOR DEL PARTE ====================
+
+        function getDraftData() {
+            return {
+                linked_task_id:        (document.getElementById('linkedTaskSelect')      || {}).value || 'none',
+                client_name:           (document.getElementById('fieldClient')            || {}).value || '',
+                service_type:          (document.getElementById('fieldService')           || {}).value || '',
+                date:                  (document.getElementById('fieldDate')              || {}).value || '',
+                description:           (document.getElementById('fieldDescription')       || {}).value || '',
+                parts_text:            (document.querySelector('input[name="parts_text"]') || {}).value || '',
+                signature_name:        (document.getElementById('signatureName')          || {}).value || '',
+                parte_transport_start: (document.getElementById('parte_transport_start')  || {}).value || '',
+                parte_arrival:         (document.getElementById('parte_arrival')          || {}).value || '',
+                parte_work_start:      (document.getElementById('parte_work_start')       || {}).value || '',
+                parte_work_end:        (document.getElementById('parte_work_end')         || {}).value || '',
+                ts1: (document.getElementById('ts-display-1') || {}).textContent || '--:--',
+                ts2: (document.getElementById('ts-display-2') || {}).textContent || '--:--',
+                ts3: (document.getElementById('ts-display-3') || {}).textContent || '--:--',
+                ts4: (document.getElementById('ts-display-4') || {}).textContent || '--:--',
+            };
         }
 
-        // ==================== INCIDENCIAS ====================
+        function saveDraft(showFeedback) {
+            const data = getDraftData();
+            const hasData = data.client_name || data.linked_task_id !== 'none' ||
+                            data.parte_transport_start || data.parte_arrival ||
+                            data.parte_work_start || data.parte_work_end || data.description ||
+                            data.parts_text;
+            if (!hasData) return;
+
+            fetch('/api/parte/draft', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(r => r.json())
+            .then(res => {
+                if (showFeedback && res.success) {
+                    const st = document.getElementById('draft-save-status');
+                    if (st) {
+                        const t = new Date().toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'});
+                        st.textContent = '✓ Guardado ' + t;
+                        setTimeout(() => { st.textContent = ''; }, 3000);
+                    }
+                    showToast('Borrador guardado', 'info', 1200);
+                }
+            })
+            .catch(() => {});
+        }
+
+        function loadDraft() {
+            fetch('/api/parte/draft')
+                .then(r => r.json())
+                .then(res => {
+                    if (!res.success || !res.draft) return;
+                    const d = res.draft;
+
+                    // Restaurar selector de cita
+                    const sel = document.getElementById('linkedTaskSelect');
+                    if (sel && d.linked_task_id && d.linked_task_id !== 'none') {
+                        for (let opt of sel.options) {
+                            if (opt.value == d.linked_task_id) {
+                                sel.value = d.linked_task_id;
+                                fillFromTask(sel);
+                                break;
+                            }
+                        }
+                    }
+
+                    if (d.client_name && document.getElementById('fieldClient'))
+                        document.getElementById('fieldClient').value = d.client_name;
+                    if (d.service_type && document.getElementById('fieldService'))
+                        document.getElementById('fieldService').value = d.service_type;
+                    if (d.date && document.getElementById('fieldDate'))
+                        document.getElementById('fieldDate').value = d.date;
+                    if (d.description && document.getElementById('fieldDescription'))
+                        document.getElementById('fieldDescription').value = d.description;
+                    if (d.parts_text) {
+                        const ptEl = document.querySelector('input[name="parts_text"]');
+                        if (ptEl) ptEl.value = d.parts_text;
+                    }
+                    if (d.signature_name && document.getElementById('signatureName'))
+                        document.getElementById('signatureName').value = d.signature_name;
+
+                    const tsMap = [
+                        ['parte_transport_start','ts-display-1', d.parte_transport_start, d.ts1],
+                        ['parte_arrival',        'ts-display-2', d.parte_arrival,         d.ts2],
+                        ['parte_work_start',     'ts-display-3', d.parte_work_start,      d.ts3],
+                        ['parte_work_end',       'ts-display-4', d.parte_work_end,        d.ts4],
+                    ];
+                    tsMap.forEach(([fid, did, val, disp]) => {
+                        const inp = document.getElementById(fid);
+                        const dsp = document.getElementById(did);
+                        if (inp && val)  inp.value = val;
+                        if (dsp && disp && disp !== '--:--') {
+                            dsp.textContent = disp;
+                            dsp.style.color = '#fff';
+                        }
+                    });
+                })
+                .catch(() => {});
+        }
+
+        function checkDraftNotice() {
+            fetch('/api/parte/draft')
+                .then(r => r.json())
+                .then(res => {
+                    const notice = document.getElementById('draft-notice');
+                    if (!notice) return;
+                    if (res.success && res.draft) {
+                        const d = res.draft;
+                        const hasData = d.client_name || (d.linked_task_id && d.linked_task_id !== 'none') ||
+                                        d.parte_transport_start || d.parte_arrival ||
+                                        d.parte_work_start || d.parte_work_end || d.description || d.parts_text;
+                        notice.classList.toggle('d-none', !hasData);
+                    } else {
+                        notice.classList.add('d-none');
+                    }
+                })
+                .catch(() => {
+                    const notice = document.getElementById('draft-notice');
+                    if (notice) notice.classList.add('d-none');
+                });
+        }
+
+        // Auto-guardar al cambiar campos clave del parte
+        document.addEventListener('DOMContentLoaded', function () {
+            ['fieldClient','fieldService','fieldDate','fieldDescription'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.addEventListener('change', () => saveDraft(false));
+            });
+            // También auto-guardar parts_text y nombre firmante
+            const ptEl = document.querySelector('input[name="parts_text"]');
+            if (ptEl) ptEl.addEventListener('input', () => saveDraft(false));
+            const snEl = document.getElementById('signatureName');
+            if (snEl) snEl.addEventListener('input', () => saveDraft(false));
+        });
+
+                // ==================== INCIDENCIAS ====================
         function updateIncidenciaEmail() {
             const tipo = document.getElementById('incidencia_tipo').value;
             const emailSpan = document.getElementById('emailDestinatario');

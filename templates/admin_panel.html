@@ -374,6 +374,11 @@
                             title="Crear tarea sin técnico asignado">
                             <i class="bi bi-exclamation-circle-fill me-1"></i> Tarea Pendiente
                         </button>
+                        <button class="btn btn-info btn-sm fw-bold" data-bs-toggle="modal"
+                            data-bs-target="#modalRemoteAssistance"
+                            title="Crear asistencia remota">
+                            <i class="bi bi-telephone-fill me-1"></i> Asistencia Remota
+                        </button>
                     </div>
                 </div>
 
@@ -1757,6 +1762,59 @@
         </div>
     </div>
 
+    <!-- ✅ NUEVO: Modal para Asistencia Remota -->
+    <div class="modal fade" id="modalRemoteAssistance" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary bg-info bg-opacity-10">
+                    <h5 class="modal-title"><i class="bi bi-telephone-fill me-2"></i>Crear Asistencia Remota</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="formRemoteAssistance">
+                    <div class="modal-body">
+                        <div class="alert alert-info alert-dismissible fade show" role="alert">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Búsqueda y creación rápida de asistencia remota para clientes.
+                        </div>
+
+                        <!-- Búsqueda de cliente -->
+                        <label class="form-label fw-bold">Buscar Cliente</label>
+                        <div class="position-relative mb-3">
+                            <input type="text" id="remoteClientSearch" class="form-control" placeholder="Escriba nombre del cliente..." autocomplete="off">
+                            <div id="remoteClientsList" class="suggestions-list"></div>
+                        </div>
+
+                        <!-- Ficha del cliente (se muestra al seleccionar) -->
+                        <div id="remoteClientCard" style="display:none;" class="card bg-secondary bg-opacity-25 border-info mb-3">
+                            <div class="card-body">
+                                <h6 class="card-title text-info" id="remoteClientName">-</h6>
+                                <small class="d-block text-muted">
+                                    <i class="bi bi-telephone me-1"></i><span id="remoteClientPhone">-</span><br>
+                                    <i class="bi bi-envelope me-1"></i><span id="remoteClientEmail">-</span><br>
+                                    <i class="bi bi-house me-1"></i><span id="remoteClientAddress">-</span><br>
+                                    <span class="badge bg-success" id="remoteSupportBadge" style="display:none;">Con Soporte</span>
+                                    <span class="badge bg-danger" id="remoteSupportBadgeNo" style="display:none;">Sin Soporte</span>
+                                </small>
+                            </div>
+                        </div>
+
+                        <input type="hidden" id="remoteSelectedClientId">
+                        <input type="hidden" id="remoteSelectedClientName">
+
+                        <!-- Descripción -->
+                        <label class="form-label">Descripción del trabajo</label>
+                        <textarea id="remoteDescription" class="form-control" rows="3" placeholder="Describa brevemente el trabajo a realizar..."></textarea>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn btn-info" onclick="submitRemoteAssistance()" id="remoteSubmitBtn">
+                            <i class="bi bi-plus-lg me-1"></i>Crear Asistencia
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 
     <div class="modal fade" id="modalEditAppointmentAdmin" tabindex="-1">
         <div class="modal-dialog">
@@ -2214,6 +2272,8 @@
                         .then(function(data) {
                             var activeTypes = getActiveFilters();
                             var filtered = data.filter(function(ev) {
+                                // ✅ Excluir citas sin técnico del calendario (solo en lista inferior)
+                                if (ev.extendedProps && ev.extendedProps.tech_id === null) return false;
                                 var stype = ev.extendedProps ? ev.extendedProps.service_type : ev.service_type;
                                 return activeTypes.length === 0 || activeTypes.includes(stype);
                             });
@@ -5338,3 +5398,121 @@
 </body>
 
 </html>
+<script>
+// ✅ NUEVO: Funciones para Asistencia Remota
+document.addEventListener('DOMContentLoaded', () => {
+    const searchInput = document.getElementById('remoteClientSearch');
+    const clientsList = document.getElementById('remoteClientsList');
+    
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            const val = this.value;
+            if (!val || val.length < 2) {
+                clientsList.innerHTML = '';
+                clientsList.style.display = 'none';
+                return;
+            }
+            
+            fetch(`/api/clients_search?q=${encodeURIComponent(val)}`)
+                .then(res => res.json())
+                .then(data => {
+                    clientsList.innerHTML = '';
+                    if (data.length > 0) {
+                        clientsList.style.display = 'block';
+                        data.forEach(item => {
+                            const div = document.createElement('div');
+                            div.className = 'suggestion-item';
+                            div.innerText = item.name;
+                            div.onclick = function() {
+                                selectRemoteClient(item.id, item.name);
+                            };
+                            clientsList.appendChild(div);
+                        });
+                    }
+                });
+        });
+        
+        document.addEventListener('click', (e) => {
+            if (e.target !== searchInput) {
+                clientsList.style.display = 'none';
+            }
+        });
+    }
+});
+
+function selectRemoteClient(clientId, clientName) {
+    document.getElementById('remoteSelectedClientId').value = clientId;
+    document.getElementById('remoteSelectedClientName').value = clientName;
+    document.getElementById('remoteClientSearch').value = clientName;
+    document.getElementById('remoteClientsList').style.display = 'none';
+    
+    fetch(`/api/client/${clientId}/support_info`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                const client = data.data;
+                document.getElementById('remoteClientName').textContent = client.name;
+                document.getElementById('remoteClientPhone').textContent = client.phone || '-';
+                document.getElementById('remoteClientEmail').textContent = client.email || '-';
+                document.getElementById('remoteClientAddress').textContent = client.address || '-';
+                
+                const supportBadge = document.getElementById('remoteSupportBadge');
+                const supportBadgeNo = document.getElementById('remoteSupportBadgeNo');
+                
+                if (client.has_support) {
+                    supportBadge.style.display = 'inline-block';
+                    supportBadgeNo.style.display = 'none';
+                } else {
+                    supportBadge.style.display = 'none';
+                    supportBadgeNo.style.display = 'inline-block';
+                }
+                
+                document.getElementById('remoteClientCard').style.display = 'block';
+            }
+        })
+        .catch(err => console.log('Error:', err));
+}
+
+function submitRemoteAssistance() {
+    const clientId = document.getElementById('remoteSelectedClientId').value;
+    const clientName = document.getElementById('remoteSelectedClientName').value;
+    const description = document.getElementById('remoteDescription').value.trim();
+    
+    if (!clientId || !clientName) {
+        alert('⚠️ Por favor selecciona un cliente');
+        return;
+    }
+    
+    const submitBtn = document.getElementById('remoteSubmitBtn');
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i> Creando...';
+    
+    fetch('/api/remote_assistance', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({client_id: clientId, client_name: clientName, description: description})
+    })
+    .then(res => res.json())
+    .then(data => {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="bi bi-plus-lg me-1"></i>Crear Asistencia';
+        
+        if (data.success) {
+            alert('✅ Asistencia remota creada');
+            const modal = bootstrap.Modal.getInstance(document.getElementById('modalRemoteAssistance'));
+            if (modal) modal.hide();
+            document.getElementById('remoteClientSearch').value = '';
+            document.getElementById('remoteDescription').value = '';
+            document.getElementById('remoteClientCard').style.display = 'none';
+            if (window.calendarGlobalInstance) window.calendarGlobalInstance.refetchEvents();
+        } else {
+            alert('❌ Error: ' + (data.msg || 'No se pudo crear'));
+        }
+    })
+    .catch(err => {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="bi bi-plus-lg me-1"></i>Crear Asistencia';
+        alert('❌ Error de conexión');
+    });
+}
+</script>
