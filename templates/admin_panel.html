@@ -419,8 +419,14 @@
                             <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
                                 <h6 class="mb-0 small"><i class="bi bi-list-task me-2"></i>Tareas</h6>
                                 <div class="form-check form-switch mb-0">
-                                    <input class="form-check-input" type="checkbox" id="toggleCompletedGlobal" onchange="renderGlobalTaskList()">
-                                    <label class="form-check-label" style="font-size:0.75rem;" for="toggleCompletedGlobal">Completadas</label>
+                                    <div class="btn-group btn-group-sm" role="group" aria-label="Filtro de estado">
+                                        <input type="radio" class="btn-check" name="taskStatusFilter" id="filterTodas" value="todas" checked onchange="renderGlobalTaskList()">
+                                        <label class="btn btn-outline-secondary" for="filterTodas" style="font-size:0.72rem;padding:3px 8px;">Todas</label>
+                                        <input type="radio" class="btn-check" name="taskStatusFilter" id="filterPendientes" value="pendientes" onchange="renderGlobalTaskList()">
+                                        <label class="btn btn-outline-warning" for="filterPendientes" style="font-size:0.72rem;padding:3px 8px;">Pendientes</label>
+                                        <input type="radio" class="btn-check" name="taskStatusFilter" id="filterCompletadas" value="completadas" onchange="renderGlobalTaskList()">
+                                        <label class="btn btn-outline-success" for="filterCompletadas" style="font-size:0.72rem;padding:3px 8px;">Completadas</label>
+                                    </div>
                                 </div>
                             </div>
                             <div class="card-body p-1">
@@ -1767,51 +1773,172 @@
         <div class="modal-dialog modal-lg">
             <div class="modal-content bg-dark text-white">
                 <div class="modal-header border-secondary bg-info bg-opacity-10">
-                    <h5 class="modal-title"><i class="bi bi-telephone-fill me-2"></i>Crear Asistencia Remota</h5>
+                    <h5 class="modal-title"><i class="bi bi-wifi me-2 text-info"></i>Nueva Asistencia Remota</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <form id="formRemoteAssistance">
                     <div class="modal-body">
-                        <div class="alert alert-info alert-dismissible fade show" role="alert">
+                        <div class="alert alert-info py-2 small mb-3">
                             <i class="bi bi-info-circle me-1"></i>
-                            Búsqueda y creación rápida de asistencia remota para clientes.
+                            Las asistencias remotas se registran independientemente y acumulan horas de soporte mensual (límite: 5h/mes).
                         </div>
 
                         <!-- Búsqueda de cliente -->
-                        <label class="form-label fw-bold">Buscar Cliente</label>
-                        <div class="position-relative mb-3">
-                            <input type="text" id="remoteClientSearch" class="form-control" placeholder="Escriba nombre del cliente..." autocomplete="off">
-                            <div id="remoteClientsList" class="suggestions-list"></div>
+                        <div class="row g-2">
+                            <div class="col-12">
+                                <label class="form-label fw-bold small mb-1">Buscar Cliente <span class="text-danger">*</span></label>
+                                <div class="position-relative">
+                                    <input type="text" id="remoteClientSearch" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Escriba nombre del cliente..." autocomplete="off">
+                                    <div id="remoteClientsList" class="suggestions-list"></div>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Ficha del cliente (se muestra al seleccionar) -->
-                        <div id="remoteClientCard" style="display:none;" class="card bg-secondary bg-opacity-25 border-info mb-3">
-                            <div class="card-body">
-                                <h6 class="card-title text-info" id="remoteClientName">-</h6>
-                                <small class="d-block text-muted">
-                                    <i class="bi bi-telephone me-1"></i><span id="remoteClientPhone">-</span><br>
-                                    <i class="bi bi-envelope me-1"></i><span id="remoteClientEmail">-</span><br>
-                                    <i class="bi bi-house me-1"></i><span id="remoteClientAddress">-</span><br>
-                                    <span class="badge bg-success" id="remoteSupportBadge" style="display:none;">Con Soporte</span>
-                                    <span class="badge bg-danger" id="remoteSupportBadgeNo" style="display:none;">Sin Soporte</span>
-                                </small>
+                        <div id="remoteClientCard" style="display:none;" class="card bg-secondary bg-opacity-10 border-info mt-2 mb-2">
+                            <div class="card-body py-2 px-3">
+                                <div class="d-flex align-items-center justify-content-between mb-1">
+                                    <h6 class="card-title text-info mb-0" id="remoteClientName">-</h6>
+                                    <div>
+                                        <span class="badge bg-success" id="remoteSupportBadge" style="display:none;"><i class="bi bi-shield-check me-1"></i>Con Soporte</span>
+                                        <span class="badge bg-danger" id="remoteSupportBadgeNo" style="display:none;"><i class="bi bi-shield-x me-1"></i>Sin Soporte</span>
+                                    </div>
+                                </div>
+                                <div class="small text-muted">
+                                    <i class="bi bi-telephone me-1"></i><span id="remoteClientPhone">-</span>
+                                    &nbsp;·&nbsp;
+                                    <i class="bi bi-envelope me-1"></i><span id="remoteClientEmail">-</span>
+                                </div>
+                                <!-- Barra horas mensuales -->
+                                <div id="remoteHoursSection" style="display:none;" class="mt-2">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <small class="text-muted">Soporte remoto este mes</small>
+                                        <small id="remoteHoursLabel" class="fw-bold">0h / 5h</small>
+                                    </div>
+                                    <div class="progress" style="height:6px;">
+                                        <div id="remoteHoursBar" class="progress-bar" role="progressbar" style="width:0%; background:#06b6d4;"></div>
+                                    </div>
+                                    <div id="remoteHoursWarning" style="display:none;" class="alert alert-warning py-1 px-2 mt-1 small">
+                                        <i class="bi bi-exclamation-triangle me-1"></i>Este cliente ya ha consumido o superado su límite mensual de 5h.
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
                         <input type="hidden" id="remoteSelectedClientId">
                         <input type="hidden" id="remoteSelectedClientName">
 
+                        <!-- Fecha, hora inicio, hora fin, técnico -->
+                        <div class="row g-2 mt-1">
+                            <div class="col-sm-3">
+                                <label class="form-label small mb-1">Fecha</label>
+                                <input type="date" id="remoteDate" class="form-control form-control-sm bg-dark text-white border-secondary">
+                            </div>
+                            <div class="col-sm-3">
+                                <label class="form-label small mb-1">Hora inicio</label>
+                                <input type="time" id="remoteStartTime" class="form-control form-control-sm bg-dark text-white border-secondary">
+                            </div>
+                            <div class="col-sm-3">
+                                <label class="form-label small mb-1">Hora fin</label>
+                                <input type="time" id="remoteEndTime" class="form-control form-control-sm bg-dark text-white border-secondary">
+                            </div>
+                            <div class="col-sm-3">
+                                <label class="form-label small mb-1">Técnico (opcional)</label>
+                                <select id="remoteTechSelect" class="form-select form-select-sm bg-dark text-white border-secondary">
+                                    <option value="">Sin asignar</option>
+                                </select>
+                            </div>
+                        </div>
+
                         <!-- Descripción -->
-                        <label class="form-label">Descripción del trabajo</label>
-                        <textarea id="remoteDescription" class="form-control" rows="3" placeholder="Describa brevemente el trabajo a realizar..."></textarea>
+                        <div class="mt-2">
+                            <label class="form-label small mb-1">Descripción</label>
+                            <textarea id="remoteDescription" class="form-control form-control-sm bg-dark text-white border-secondary" rows="2" placeholder="Describa brevemente el trabajo a realizar..."></textarea>
+                        </div>
                     </div>
                     <div class="modal-footer border-secondary">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                        <button type="button" class="btn btn-info" onclick="submitRemoteAssistance()" id="remoteSubmitBtn">
-                            <i class="bi bi-plus-lg me-1"></i>Crear Asistencia
+                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn btn-info btn-sm" onclick="submitRemoteAssistance()" id="remoteSubmitBtn">
+                            <i class="bi bi-plus-lg me-1"></i>Crear Asistencia Remota
                         </button>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal edición rápida asistencia remota -->
+    <div class="modal fade" id="modalRemoteTaskQuickEdit" tabindex="-1">
+        <div class="modal-dialog modal-md">
+            <div class="modal-content bg-dark text-white border-info">
+                <div class="modal-header border-info bg-info bg-opacity-10 py-2">
+                    <h6 class="modal-title mb-0">
+                        <i class="bi bi-wifi me-2 text-info"></i>
+                        <span id="rqeClientTitle">Asistencia Remota</span>
+                        <span class="badge bg-info text-dark ms-2" style="font-size:0.65rem;">📡 REMOTO</span>
+                    </h6>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="rqeTaskId">
+                    <input type="hidden" id="rqeClientId">
+
+                    <!-- Estado -->
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span id="rqeStatusBadge" class="badge bg-warning text-dark">Pendiente</span>
+                        <small class="text-muted" id="rqeDateLabel"></small>
+                    </div>
+
+                    <!-- Barra de horas mensuales -->
+                    <div id="rqeHoursSection" class="card bg-secondary bg-opacity-10 border-secondary mb-3 p-2">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <small class="text-muted">Horas de soporte este mes</small>
+                            <small class="fw-bold text-info" id="rqeHoursLabel">— / 5h</small>
+                        </div>
+                        <div class="progress" style="height:6px;">
+                            <div id="rqeHoursBar" class="progress-bar" role="progressbar" style="width:0%;"></div>
+                        </div>
+                        <small id="rqeHoursDetail" class="text-muted mt-1 d-block" style="font-size:0.7rem;"></small>
+                    </div>
+
+                    <!-- Registro de tiempo -->
+                    <div class="row g-2 mb-2">
+                        <div class="col-5">
+                            <label class="form-label small mb-1"><i class="bi bi-play-fill text-success me-1"></i>Hora inicio</label>
+                            <input type="time" id="rqeStartTime" class="form-control form-control-sm bg-dark text-white border-secondary" oninput="updateRqeDurationPreview()">
+                        </div>
+                        <div class="col-5">
+                            <label class="form-label small mb-1"><i class="bi bi-stop-fill text-danger me-1"></i>Hora fin</label>
+                            <input type="time" id="rqeEndTime" class="form-control form-control-sm bg-dark text-white border-secondary" oninput="updateRqeDurationPreview()">
+                        </div>
+                        <div class="col-2 d-flex align-items-end">
+                            <div id="rqeDurationPreview" class="text-center text-info small w-100 pb-1">—</div>
+                        </div>
+                    </div>
+
+                    <!-- Descripción -->
+                    <div class="mb-2">
+                        <label class="form-label small mb-1">Descripción</label>
+                        <textarea id="rqeDescription" class="form-control form-control-sm bg-dark text-white border-secondary" rows="2" placeholder="Notas sobre la asistencia..."></textarea>
+                    </div>
+
+                    <!-- Aviso límite -->
+                    <div id="rqeWarningLimit" class="alert alert-warning py-1 px-2 small mb-0" style="display:none;">
+                        <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                        <span id="rqeWarningText">Límite mensual superado.</span>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary py-2">
+                    <button type="button" class="btn btn-outline-danger btn-sm" onclick="deleteRemoteTask()">
+                        <i class="bi bi-trash me-1"></i>Eliminar
+                    </button>
+                    <button type="button" class="btn btn-outline-info btn-sm" onclick="saveRemoteTask(false)">
+                        <i class="bi bi-floppy me-1"></i>Guardar
+                    </button>
+                    <button type="button" class="btn btn-success btn-sm" onclick="saveRemoteTask(true)">
+                        <i class="bi bi-check-lg me-1"></i>Completar
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -2221,12 +2348,18 @@
         }
 
         function handleEventClick(info) {
+            const props = info.event.extendedProps || {};
+            // ── Desviar asistencias remotas al modal rápido ──────────────
+            if (props.is_remote) {
+                openRemoteTaskQuickEdit(info.event.id, props.client, props);
+                return;
+            }
             document.getElementById('evtId').value = info.event.id;
-            document.getElementById('evtClient').innerText = info.event.extendedProps.client;
-            document.getElementById('evtTech').innerText = info.event.extendedProps.tech_name;
-            document.getElementById('evtService').innerText = info.event.extendedProps.service_type;
-            document.getElementById('evtStatus').innerText = info.event.extendedProps.status;
-            document.getElementById('evtDesc').innerText = info.event.extendedProps.desc || '(Sin descripción)';
+            document.getElementById('evtClient').innerText = props.client || '';
+            document.getElementById('evtTech').innerText = props.tech_name || '';
+            document.getElementById('evtService').innerText = props.service_type || '';
+            document.getElementById('evtStatus').innerText = props.status || '';
+            document.getElementById('evtDesc').innerText = props.desc || '(Sin descripción)';
             modalActionAdmin.show();
         }
 
@@ -2479,12 +2612,18 @@
             const container = document.getElementById('globalTaskListContainer');
             if (!container) return;
 
-            const showCompleted = document.getElementById('toggleCompletedGlobal')?.checked || false;
+            // Leer el radio de 3 estados (todas / pendientes / completadas)
+            const selectedFilter = (document.querySelector('input[name="taskStatusFilter"]:checked') || {}).value || 'todas';
             const activeTypes = getActiveFilters();
 
             // Filtrar por estado Y por tipo activo
             let filtered = cachedGlobalTasks.filter(t => {
-                const statusOk = showCompleted ? true : t.extendedProps.status !== 'Completado';
+                const status = (t.extendedProps.status || '').toLowerCase();
+                let statusOk;
+                if      (selectedFilter === 'completadas') statusOk = status === 'completado';
+                else if (selectedFilter === 'pendientes')  statusOk = status !== 'completado';
+                else                                       statusOk = true; // 'todas'
+
                 const typeOk = activeTypes.length === 0 || activeTypes.includes(t.extendedProps.service_type);
                 return statusOk && typeOk;
             });
@@ -2499,33 +2638,48 @@
 
             container.innerHTML = '';
             sorted.forEach(t => {
-                const isDone = t.extendedProps.status === 'Completado';
-                const dateStr = t.start.split('T')[0];
-                const timeStr = t.start.includes('T') ? t.start.split('T')[1].substring(0, 5) : '';
+                const isDone    = (t.extendedProps.status || '').toLowerCase() === 'completado';
+                const isRemote  = t.extendedProps.is_remote || false;
+                const dateStr   = t.start ? t.start.split('T')[0] : '—';
+                const timeStr   = t.start && t.start.includes('T') ? t.start.split('T')[1].substring(0, 5) : '';
                 const techColor = t.extendedProps.tech_color || t.color || '#6c757d';
-                const typeColor = t.color || '#6c757d';
+                const itemColor = isRemote ? '#06b6d4' : (techColor);
 
                 const div = document.createElement('div');
                 div.className = `task-item status-${t.extendedProps.status}`;
-                div.style.borderLeftColor = techColor;
-                if (isDone) div.style.opacity = '0.6';
+                div.style.borderLeftColor = itemColor;
+                div.style.borderLeftWidth = '4px';
+                if (isDone) div.style.opacity = '0.65';
+                if (isRemote) div.style.background = 'rgba(6,182,212,0.08)';
+
+                const remoteBadge = isRemote
+                    ? `<span class="badge bg-info text-dark ms-1" style="font-size:0.6rem;">📡 REMOTO</span>`
+                    : '';
+                const remoteHours = isRemote && t.extendedProps.remote_hours
+                    ? `<span class="ms-1 text-info small"><i class="bi bi-clock me-1"></i>${t.extendedProps.remote_hours}h</span>`
+                    : '';
 
                 div.innerHTML = `
-                    <div class="fw-bold text-white">${t.extendedProps.client || 'Sin cliente'}</div>
+                    <div class="fw-bold text-white">${t.extendedProps.client || 'Sin cliente'}${remoteBadge}</div>
                     <div class="small mb-1">
-                        <span class="badge" style="background:${techColor}; color:#fff;"><i class="bi bi-person-fill me-1"></i>${t.extendedProps.tech_name || 'Sin técnico'}</span>
+                        <span class="badge" style="background:${itemColor}; color:#${isRemote ? '000' : 'fff'};"><i class="bi bi-person-fill me-1"></i>${t.extendedProps.tech_name || 'Sin técnico'}</span>
+                        ${remoteHours}
                     </div>
                     <div class="small text-secondary">
                         <i class="bi bi-calendar-event me-1"></i>${dateStr} ${timeStr ? '| ' + timeStr : ''}
                         <br>
                         <span class="badge ${isDone ? 'bg-success' : 'bg-warning text-dark'}">${t.extendedProps.status}</span>
-                        <span class="badge" style="background:${typeColor}; font-size:0.65rem;">${t.extendedProps.service_type || 'Sin tipo'}</span>
+                        <span class="badge" style="background:${itemColor}; color:#${isRemote ? '000' : 'fff'}; font-size:0.65rem;">${t.extendedProps.service_type || 'Sin tipo'}</span>
                     </div>
                 `;
                 
                 div.onclick = () => {
-                    const evt = calendarGlobalInstance.getEventById(t.id);
-                    if (evt) handleEventClick({ event: evt });
+                    if (isRemote) {
+                        openRemoteTaskQuickEdit(t.id, t.extendedProps.client, t.extendedProps);
+                    } else {
+                        const evt = calendarGlobalInstance.getEventById(t.id);
+                        if (evt) handleEventClick({ event: evt });
+                    }
                 };
 
                 container.appendChild(div);
@@ -2984,21 +3138,30 @@
 
         // Modificar handleEventClick para mostrar indicador de archivos adjuntos
         function handleEventClick(info) {
+            const props = info.event.extendedProps || {};
+            // ── Desviar asistencias remotas al modal rápido ──────────────
+            if (props.is_remote) {
+                openRemoteTaskQuickEdit(info.event.id, props.client, props);
+                return;
+            }
             document.getElementById('evtId').value = info.event.id;
-            document.getElementById('evtClient').innerText = info.event.extendedProps.client;
-            document.getElementById('evtTech').innerText = info.event.extendedProps.tech_name;
-            document.getElementById('evtService').innerText = info.event.extendedProps.service_type;
-            document.getElementById('evtStatus').innerText = info.event.extendedProps.status;
-            document.getElementById('evtDesc').innerText = info.event.extendedProps.desc || 'Sin descripción';
+            document.getElementById('evtClient').innerText = props.client || '';
+            document.getElementById('evtTech').innerText = props.tech_name || '';
+            document.getElementById('evtService').innerText = props.service_type || '';
+            document.getElementById('evtStatus').innerText = props.status || '';
+            document.getElementById('evtDesc').innerText = props.desc || 'Sin descripción';
 
             // Mostrar indicador si hay archivos adjuntos
-            if (info.event.extendedProps.has_attachments) {
+            if (props.has_attachments) {
                 const attachmentsSection = document.getElementById('attachmentsSection');
-                attachmentsSection.style.display = 'block';
-                const attachmentsList = document.getElementById('attachmentsList');
-                attachmentsList.innerHTML = '<div class="alert alert-info small m-0"><i class="bi bi-paperclip me-1"></i> Esta tarea tiene archivos adjuntos. Haz clic en "Ver Detalles Completos" para acceder a ellos.</div>';
+                if (attachmentsSection) {
+                    attachmentsSection.style.display = 'block';
+                    document.getElementById('attachmentsList').innerHTML =
+                        '<div class="alert alert-info small m-0"><i class="bi bi-paperclip me-1"></i> Esta tarea tiene archivos adjuntos. Haz clic en "Ver Detalles Completos" para acceder a ellos.</div>';
+                }
             } else {
-                document.getElementById('attachmentsSection').style.display = 'none';
+                const sec = document.getElementById('attachmentsSection');
+                if (sec) sec.style.display = 'none';
             }
 
             modalActionAdmin.show();
@@ -5399,11 +5562,22 @@
 
 </html>
 <script>
-// ✅ NUEVO: Funciones para Asistencia Remota
+// ============================================================
+// ASISTENCIA REMOTA — Funciones completas
+// ============================================================
+
+// ── Inicialización del buscador de clientes ──────────────────
 document.addEventListener('DOMContentLoaded', () => {
+    // Rellenar selector de técnicos en el modal de creación
+    _loadRemoteTechOptions();
+
+    // Fecha por defecto = hoy
+    const rDate = document.getElementById('remoteDate');
+    if (rDate) rDate.value = new Date().toISOString().split('T')[0];
+
     const searchInput = document.getElementById('remoteClientSearch');
     const clientsList = document.getElementById('remoteClientsList');
-    
+
     if (searchInput) {
         searchInput.addEventListener('input', function() {
             const val = this.value;
@@ -5412,7 +5586,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 clientsList.style.display = 'none';
                 return;
             }
-            
             fetch(`/api/clients_search?q=${encodeURIComponent(val)}`)
                 .then(res => res.json())
                 .then(data => {
@@ -5423,96 +5596,295 @@ document.addEventListener('DOMContentLoaded', () => {
                             const div = document.createElement('div');
                             div.className = 'suggestion-item';
                             div.innerText = item.name;
-                            div.onclick = function() {
-                                selectRemoteClient(item.id, item.name);
-                            };
+                            div.onclick = () => selectRemoteClient(item.id, item.name);
                             clientsList.appendChild(div);
                         });
+                    } else {
+                        clientsList.style.display = 'none';
                     }
-                });
+                })
+                .catch(() => { clientsList.style.display = 'none'; });
         });
-        
+
         document.addEventListener('click', (e) => {
-            if (e.target !== searchInput) {
-                clientsList.style.display = 'none';
-            }
+            if (e.target !== searchInput) clientsList.style.display = 'none';
         });
     }
 });
 
+// ── Cargar técnicos disponibles ──────────────────────────────
+function _loadRemoteTechOptions() {
+    fetch('/api/admin/tech_colors')
+        .then(r => r.json())
+        .then(data => {
+            const sel = document.getElementById('remoteTechSelect');
+            if (!sel || !data.success) return;
+            sel.innerHTML = '<option value="">Sin asignar</option>';
+            data.data.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t.id;
+                opt.textContent = t.username;
+                sel.appendChild(opt);
+            });
+        })
+        .catch(() => {});
+}
+
+// ── Seleccionar cliente y cargar su info + horas mensuales ───
 function selectRemoteClient(clientId, clientName) {
     document.getElementById('remoteSelectedClientId').value = clientId;
     document.getElementById('remoteSelectedClientName').value = clientName;
     document.getElementById('remoteClientSearch').value = clientName;
     document.getElementById('remoteClientsList').style.display = 'none';
-    
+
+    // Info básica del cliente
     fetch(`/api/client/${clientId}/support_info`)
         .then(res => res.json())
         .then(data => {
-            if (data.success) {
-                const client = data.data;
-                document.getElementById('remoteClientName').textContent = client.name;
-                document.getElementById('remoteClientPhone').textContent = client.phone || '-';
-                document.getElementById('remoteClientEmail').textContent = client.email || '-';
-                document.getElementById('remoteClientAddress').textContent = client.address || '-';
-                
-                const supportBadge = document.getElementById('remoteSupportBadge');
-                const supportBadgeNo = document.getElementById('remoteSupportBadgeNo');
-                
-                if (client.has_support) {
-                    supportBadge.style.display = 'inline-block';
-                    supportBadgeNo.style.display = 'none';
-                } else {
-                    supportBadge.style.display = 'none';
-                    supportBadgeNo.style.display = 'inline-block';
-                }
-                
-                document.getElementById('remoteClientCard').style.display = 'block';
+            if (!data.success) return;
+            const c = data.data;
+            document.getElementById('remoteClientName').textContent = c.name;
+            document.getElementById('remoteClientPhone').textContent = c.phone || '-';
+            document.getElementById('remoteClientEmail').textContent = c.email || '-';
+
+            const badge    = document.getElementById('remoteSupportBadge');
+            const badgeNo  = document.getElementById('remoteSupportBadgeNo');
+            if (c.has_support) {
+                badge.style.display   = 'inline-block';
+                badgeNo.style.display = 'none';
+            } else {
+                badge.style.display   = 'none';
+                badgeNo.style.display = 'inline-block';
             }
+            document.getElementById('remoteClientCard').style.display = 'block';
         })
-        .catch(err => console.log('Error:', err));
+        .catch(() => {});
+
+    // Horas mensuales
+    fetch(`/api/client/${clientId}/monthly_remote_hours`)
+        .then(res => res.json())
+        .then(data => {
+            if (!data.success) return;
+            const section = document.getElementById('remoteHoursSection');
+            section.style.display = 'block';
+
+            const pct  = Math.min(100, (data.used_hours / data.limit_hours) * 100);
+            const bar  = document.getElementById('remoteHoursBar');
+            bar.style.width = pct + '%';
+            bar.style.background = pct >= 100 ? '#ef4444' : pct >= 80 ? '#f59e0b' : '#06b6d4';
+
+            document.getElementById('remoteHoursLabel').textContent =
+                `${data.used_hours}h / ${data.limit_hours}h`;
+
+            const warn = document.getElementById('remoteHoursWarning');
+            warn.style.display = data.over_limit ? 'block' : 'none';
+        })
+        .catch(() => {});
 }
 
+// ── Enviar creación de asistencia remota ──────────────────────
 function submitRemoteAssistance() {
-    const clientId = document.getElementById('remoteSelectedClientId').value;
+    const clientId   = document.getElementById('remoteSelectedClientId').value;
     const clientName = document.getElementById('remoteSelectedClientName').value;
     const description = document.getElementById('remoteDescription').value.trim();
-    
+    const dateVal    = document.getElementById('remoteDate')?.value || null;
+    const startTime  = document.getElementById('remoteStartTime')?.value || null;
+    const endTime    = document.getElementById('remoteEndTime')?.value || null;
+    const techId     = document.getElementById('remoteTechSelect')?.value || null;
+
     if (!clientId || !clientName) {
-        alert('⚠️ Por favor selecciona un cliente');
+        _remoteToast('⚠️ Por favor selecciona un cliente', 'warning');
         return;
     }
-    
-    const submitBtn = document.getElementById('remoteSubmitBtn');
-    submitBtn.disabled = true;
-    submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i> Creando...';
-    
+
+    const btn = document.getElementById('remoteSubmitBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i> Creando...';
+
     fetch('/api/remote_assistance', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({client_id: clientId, client_name: clientName, description: description})
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ client_id: clientId, client_name: clientName, description,
+                               date: dateVal, start_time: startTime, end_time: endTime,
+                               tech_id: techId || null })
     })
-    .then(res => res.json())
+    .then(r => r.json())
     .then(data => {
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = '<i class="bi bi-plus-lg me-1"></i>Crear Asistencia';
-        
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-plus-lg me-1"></i>Crear Asistencia Remota';
         if (data.success) {
-            alert('✅ Asistencia remota creada');
+            _remoteToast('✅ Asistencia remota creada', 'success');
             const modal = bootstrap.Modal.getInstance(document.getElementById('modalRemoteAssistance'));
             if (modal) modal.hide();
+            // Reset
             document.getElementById('remoteClientSearch').value = '';
-            document.getElementById('remoteDescription').value = '';
+            document.getElementById('remoteDescription').value  = '';
             document.getElementById('remoteClientCard').style.display = 'none';
+            document.getElementById('remoteHoursSection').style.display = 'none';
+            document.getElementById('remoteSelectedClientId').value = '';
+            document.getElementById('remoteSelectedClientName').value = '';
+            // Refrescar calendarios y lista
             if (window.calendarGlobalInstance) window.calendarGlobalInstance.refetchEvents();
+            if (window.calendarInstance) window.calendarInstance.refetchEvents();
+            setTimeout(() => renderGlobalTaskList && renderGlobalTaskList(), 600);
         } else {
-            alert('❌ Error: ' + (data.msg || 'No se pudo crear'));
+            _remoteToast('❌ ' + (data.msg || 'Error al crear'), 'danger');
         }
     })
-    .catch(err => {
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = '<i class="bi bi-plus-lg me-1"></i>Crear Asistencia';
-        alert('❌ Error de conexión');
+    .catch(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-plus-lg me-1"></i>Crear Asistencia Remota';
+        _remoteToast('❌ Error de conexión', 'danger');
     });
+}
+
+// ── Abrir modal de edición rápida ────────────────────────────
+function openRemoteTaskQuickEdit(taskId, clientName, extProps) {
+    document.getElementById('rqeTaskId').value       = taskId;
+    document.getElementById('rqeClientId').value     = extProps.client_id || '';
+    document.getElementById('rqeClientTitle').textContent = clientName || 'Asistencia Remota';
+
+    // Estado
+    const statusBadge = document.getElementById('rqeStatusBadge');
+    const st = (extProps.status || '').toLowerCase();
+    statusBadge.textContent  = extProps.status || 'Pendiente';
+    statusBadge.className    = 'badge ' + (st === 'completado' ? 'bg-success' : st === 'sin asignar' ? 'bg-secondary' : 'bg-warning text-dark');
+
+    // Fecha
+    document.getElementById('rqeDateLabel').textContent = extProps.date || '';
+
+    // Rellenar campos con datos existentes si los hay
+    document.getElementById('rqeDescription').value = extProps.desc || '';
+    document.getElementById('rqeWarningLimit').style.display = 'none';
+
+    // Cargar datos actualizados de la tarea desde el servidor para rellenar horas
+    fetch(`/api/task/${taskId}`)
+        .then(r => r.json())
+        .then(resp => {
+            const data = resp.data || resp; // compatibilidad
+            if (data.start_time) document.getElementById('rqeStartTime').value = data.start_time.substring(0, 5);
+            else document.getElementById('rqeStartTime').value = '';
+            if (data.end_time) document.getElementById('rqeEndTime').value = data.end_time.substring(0, 5);
+            else document.getElementById('rqeEndTime').value = '';
+            if (data.description) document.getElementById('rqeDescription').value = data.description;
+            if (data.date) document.getElementById('rqeDateLabel').textContent = data.date;
+            updateRqeDurationPreview();
+        })
+        .catch(() => {
+            document.getElementById('rqeStartTime').value = '';
+            document.getElementById('rqeEndTime').value   = '';
+        });
+
+    // Cargar horas mensuales del cliente
+    const clientId = extProps.client_id;
+    if (clientId) {
+        fetch(`/api/client/${clientId}/monthly_remote_hours`)
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) return;
+                const pct = Math.min(100, (data.used_hours / data.limit_hours) * 100);
+                const bar = document.getElementById('rqeHoursBar');
+                bar.style.width      = pct + '%';
+                bar.style.background = pct >= 100 ? '#ef4444' : pct >= 80 ? '#f59e0b' : '#06b6d4';
+                document.getElementById('rqeHoursLabel').textContent = `${data.used_hours}h / ${data.limit_hours}h`;
+                document.getElementById('rqeHoursDetail').textContent =
+                    `${data.session_count} sesión(es) · Restantes: ${data.remaining_hours}h · Mes: ${data.month}`;
+            })
+            .catch(() => {});
+    }
+
+    const modal = new bootstrap.Modal(document.getElementById('modalRemoteTaskQuickEdit'));
+    modal.show();
+}
+
+// ── Preview de duración en tiempo real ───────────────────────
+function updateRqeDurationPreview() {
+    const t0 = document.getElementById('rqeStartTime').value;
+    const t1 = document.getElementById('rqeEndTime').value;
+    const el = document.getElementById('rqeDurationPreview');
+    if (!t0 || !t1) { el.textContent = '—'; return; }
+    const diff = (new Date('1970-01-01T' + t1) - new Date('1970-01-01T' + t0)) / 3600000;
+    if (diff <= 0) { el.textContent = '—'; return; }
+    const h = Math.floor(diff);
+    const m = Math.round((diff - h) * 60);
+    el.textContent = h ? `${h}h${m ? m + 'm' : ''}` : `${m}m`;
+}
+
+// ── Guardar asistencia remota ────────────────────────────────
+function saveRemoteTask(markComplete) {
+    const taskId      = document.getElementById('rqeTaskId').value;
+    const startTime   = document.getElementById('rqeStartTime').value;
+    const endTime     = document.getElementById('rqeEndTime').value;
+    const description = document.getElementById('rqeDescription').value.trim();
+
+    fetch(`/api/remote_task/${taskId}/update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ start_time: startTime, end_time: endTime, description, mark_complete: markComplete })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            if (data.warning) {
+                document.getElementById('rqeWarningText').textContent = data.warning;
+                document.getElementById('rqeWarningLimit').style.display = 'block';
+            }
+            _remoteToast(markComplete ? '✅ Asistencia completada' : '✅ Guardado', 'success');
+            if (markComplete) {
+                const modal = bootstrap.Modal.getInstance(document.getElementById('modalRemoteTaskQuickEdit'));
+                if (modal) modal.hide();
+            }
+            if (window.calendarGlobalInstance) window.calendarGlobalInstance.refetchEvents();
+            if (window.calendarInstance) window.calendarInstance.refetchEvents();
+            setTimeout(() => renderGlobalTaskList && renderGlobalTaskList(), 600);
+        } else {
+            _remoteToast('❌ ' + (data.msg || 'Error'), 'danger');
+        }
+    })
+    .catch(() => _remoteToast('❌ Error de conexión', 'danger'));
+}
+
+// ── Eliminar asistencia remota ───────────────────────────────
+function deleteRemoteTask() {
+    const taskId = document.getElementById('rqeTaskId').value;
+    if (!confirm('¿Eliminar esta asistencia remota?')) return;
+
+    fetch(`/api/task/${taskId}/delete`, { method: 'POST',
+        headers: { 'Content-Type': 'application/json' } })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                const modal = bootstrap.Modal.getInstance(document.getElementById('modalRemoteTaskQuickEdit'));
+                if (modal) modal.hide();
+                _remoteToast('🗑️ Asistencia eliminada', 'secondary');
+                if (window.calendarGlobalInstance) window.calendarGlobalInstance.refetchEvents();
+                if (window.calendarInstance) window.calendarInstance.refetchEvents();
+                setTimeout(() => renderGlobalTaskList && renderGlobalTaskList(), 600);
+            } else {
+                _remoteToast('❌ No se pudo eliminar', 'danger');
+            }
+        })
+        .catch(() => _remoteToast('❌ Error de conexión', 'danger'));
+}
+
+// ── Toast helper ─────────────────────────────────────────────
+function _remoteToast(msg, type) {
+    // Intentar reutilizar toast existente de la app, o crear uno propio
+    let container = document.getElementById('remoteToastContainer');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'remoteToastContainer';
+        container.style.cssText = 'position:fixed;bottom:1.5rem;right:1.5rem;z-index:9999;';
+        document.body.appendChild(container);
+    }
+    const id   = 'rt_' + Date.now();
+    const html = `<div id="${id}" class="toast align-items-center text-bg-${type} border-0 mb-1 show" role="alert">
+        <div class="d-flex">
+            <div class="toast-body small">${msg}</div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" onclick="document.getElementById('${id}').remove()"></button>
+        </div>
+    </div>`;
+    container.insertAdjacentHTML('beforeend', html);
+    setTimeout(() => { const el = document.getElementById(id); if (el) el.remove(); }, 4000);
 }
 </script>

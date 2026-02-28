@@ -1326,13 +1326,14 @@ def get_all_tasks():
                     all_tech_names += ', ' + ', '.join(extra_techs)
                 
                 # Construir evento
+                is_remote_at = bool(getattr(task, 'is_remote', False))
                 event = {
                     'id': task.id,
-                    'title': f"{task.client_name if task.client_name else 'Sin cliente'} - {service_type.name if service_type else 'Sin tipo'}",
+                    'title': ('📡 ' if is_remote_at else '') + f"{task.client_name if task.client_name else 'Sin cliente'} - {service_type.name if service_type else 'Sin tipo'}",
                     'start': f"{task.date}T{task.start_time}:00" if (task.date and task.start_time) else str(task.date) if task.date else '',
                     'end': f"{task.date}T{task.end_time}:00" if (task.date and task.end_time) else str(task.date) if task.date else '',
-                    'backgroundColor': color,
-                    'borderColor': color,
+                    'backgroundColor': '#06b6d4' if is_remote_at else color,
+                    'borderColor': '#0891b2' if is_remote_at else color,
                     'extendedProps': {
                         'client': task.client_name or 'Sin cliente',
                         'client_id': task.client_id,
@@ -1341,7 +1342,9 @@ def get_all_tasks():
                         'tech_id': task.tech_id,
                         'tech_name': all_tech_names,
                         'desc': task.description or '',
-                        'has_signature': bool(task.signature_data)
+                        'has_signature': bool(task.signature_data),
+                        'is_remote': is_remote_at,
+                        'remote_hours': getattr(task, 'remote_support_hours', 0) or 0,
                     }
                 }
                 events.append(event)
@@ -2336,23 +2339,27 @@ def admin_all_tasks():
                     event_start = f"{date.today().isoformat()}T00:00:00"
                 
                 # Construir evento
+                is_remote = bool(getattr(task, 'is_remote', False))
                 event = {
                     'id': str(task.id),
-                    'title': task.client_name if task.client_name else 'Sin cliente',
+                    'title': ('📡 ' if is_remote else '') + (task.client_name if task.client_name else 'Sin cliente'),
                     'start': event_start,
-                    'backgroundColor': tech_color,
-                    'borderColor': tech_color,
+                    'backgroundColor': '#06b6d4' if is_remote else tech_color,
+                    'borderColor': '#0891b2' if is_remote else tech_color,
                     'textColor': text_color,
                     'extendedProps': {
                         'status': task.status,
                         'client': task.client_name or 'Sin cliente',
+                        'client_id': task.client_id,
                         'tech_id': task.tech_id,
                         'tech_name': tech_name or 'Sin asignar',
                         'tech_color': tech_color,
                         'text_color': text_color,
                         'service_type': service_type.name if service_type else 'Sin tipo',
                         'desc': task.description or '',
-                        'has_attachments': bool(task.attachments)
+                        'has_attachments': bool(task.attachments),
+                        'is_remote': is_remote,
+                        'remote_hours': getattr(task, 'remote_support_hours', 0) or 0,
                     }
                 }
                 
@@ -2567,37 +2574,182 @@ def stop_timer(timer_id):
 @app.route('/api/remote_assistance', methods=['POST'])
 @login_required
 def create_remote_assistance():
-    """Crear asistencia remota"""
+    """Crear asistencia remota con soporte opcional de fecha/hora/técnico"""
     if current_user.role != 'admin':
         return jsonify({'success': False, 'msg': 'No autorizado'}), 403
     
     try:
         data = request.get_json()
         client_name = data.get('client_name')
-        client_id = data.get('client_id')
+        client_id   = data.get('client_id')
         description = data.get('description', '')
+        date_val    = data.get('date')        # YYYY-MM-DD  (opcional)
+        start_time  = data.get('start_time')  # HH:MM       (opcional)
+        end_time    = data.get('end_time')    # HH:MM       (opcional)
+        tech_id     = data.get('tech_id')     # int         (opcional)
         
         if not client_name:
             return jsonify({'success': False, 'msg': 'Cliente requerido'}), 400
-        
+
+        # Detectar tipo de servicio "Asistencia Remota" o crear como primer servicio disponible
+        remote_service = ServiceType.query.filter(
+            ServiceType.name.ilike('%remot%')
+        ).first() or ServiceType.query.first()
+
+        # Si hay técnico + fecha → Pendiente; si no → Sin asignar
+        status = 'Pendiente' if (tech_id and date_val) else 'Sin asignar'
+
         task = Task(
-            tech_id=None,
-            client_id=client_id,
+            tech_id=int(tech_id) if tech_id else None,
+            client_id=int(client_id) if client_id else None,
             client_name=client_name,
             description=description,
             is_remote=True,
-            status='Sin asignar',
-            created_by=current_user.id
+            status=status,
+            created_by=current_user.id,
+            service_type_id=remote_service.id if remote_service else None,
         )
-        
+
+        if date_val:
+            from datetime import date as _date
+            task.date = date_val
+        if start_time:
+            task.start_time = start_time
+        if end_time:
+            task.end_time = end_time
+
         db.session.add(task)
         db.session.commit()
         
-        return jsonify({'success': True, 'task_id': task.id})
+        return jsonify({'success': True, 'task_id': task.id, 'status': status})
     except Exception as e:
         db.session.rollback()
         print(f"Error creating remote assistance: {str(e)}")
         return jsonify({'success': False, 'msg': str(e)}), 500
+
+
+@app.route('/api/remote_task/<int:task_id>/update', methods=['POST'])
+@login_required
+def update_remote_task(task_id):
+    """Actualizar rápidamente una asistencia remota (hora inicio/fin, descripción, completar)"""
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'msg': 'No autorizado'}), 403
+    
+    try:
+        task = Task.query.get(task_id)
+        if not task:
+            return jsonify({'success': False, 'msg': 'Tarea no encontrada'}), 404
+        if not task.is_remote:
+            return jsonify({'success': False, 'msg': 'No es una asistencia remota'}), 400
+
+        data = request.get_json()
+        start_time   = data.get('start_time')
+        end_time     = data.get('end_time')
+        description  = data.get('description')
+        mark_complete = data.get('mark_complete', False)
+
+        # Guardar horas
+        if start_time:
+            task.start_time = start_time
+        if end_time:
+            task.end_time = end_time
+        if description is not None:
+            task.description = description
+
+        # Calcular duración si hay inicio y fin
+        duration_hours = 0.0
+        if task.start_time and task.end_time:
+            try:
+                from datetime import datetime as _dt
+                t0 = _dt.strptime(task.start_time, '%H:%M')
+                t1 = _dt.strptime(task.end_time, '%H:%M')
+                diff = (t1 - t0).total_seconds() / 3600.0
+                if diff > 0:
+                    duration_hours = round(diff, 2)
+                    task.remote_support_hours = duration_hours
+                    # Generar work_duration formateado
+                    h = int(diff)
+                    m = int(round((diff - h) * 60))
+                    task.work_duration = f"{h}h {m:02d}min" if h else f"{m}min"
+            except Exception as _e:
+                print(f"Error calculando duración: {_e}")
+
+        # Límite mensual de horas de soporte por cliente
+        MONTHLY_LIMIT = 5.0
+        warning_msg = None
+        if task.client_id and duration_hours > 0:
+            from datetime import date as _date
+            now = _date.today()
+            past_tasks = Task.query.filter(
+                Task.client_id == task.client_id,
+                Task.is_remote == True,
+                Task.status == 'Completado',
+                Task.id != task_id,
+                db.func.extract('year',  Task.date) == now.year,
+                db.func.extract('month', Task.date) == now.month,
+            ).all()
+            used_hours = sum(t.remote_support_hours or 0 for t in past_tasks)
+            new_total  = used_hours + duration_hours
+            if new_total > MONTHLY_LIMIT:
+                warning_msg = (
+                    f"⚠️ El cliente acumulará {new_total:.2f}h de soporte remoto este mes "
+                    f"(límite: {MONTHLY_LIMIT}h). Se ha guardado igualmente."
+                )
+
+        if mark_complete:
+            task.status = 'Completado'
+            task.work_end_time = datetime.now()
+
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'duration_hours': duration_hours,
+            'work_duration': task.work_duration,
+            'warning': warning_msg
+        })
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error updating remote task: {str(e)}")
+        return jsonify({'success': False, 'msg': str(e)}), 500
+
+
+@app.route('/api/client/<int:client_id>/monthly_remote_hours', methods=['GET'])
+@login_required
+def get_client_monthly_remote_hours(client_id):
+    """Horas de soporte remoto del cliente en el mes actual"""
+    try:
+        from datetime import date as _date
+        import calendar as _cal
+        client = Client.query.get(client_id)
+        if not client:
+            return jsonify({'success': False}), 404
+
+        now = _date.today()
+        tasks = Task.query.filter(
+            Task.client_id == client_id,
+            Task.is_remote == True,
+            Task.status == 'Completado',
+            db.func.extract('year',  Task.date) == now.year,
+            db.func.extract('month', Task.date) == now.month,
+        ).all()
+
+        MONTHLY_LIMIT = 5.0
+        used_hours  = sum(t.remote_support_hours or 0 for t in tasks)
+        remaining   = max(0.0, MONTHLY_LIMIT - used_hours)
+        month_name  = _cal.month_name[now.month]
+
+        return jsonify({
+            'success': True,
+            'used_hours':      round(used_hours, 2),
+            'remaining_hours': round(remaining, 2),
+            'limit_hours':     MONTHLY_LIMIT,
+            'month':           month_name,
+            'session_count':   len(tasks),
+            'over_limit':      used_hours >= MONTHLY_LIMIT,
+        })
+    except Exception as e:
+        print(f"Error monthly_remote_hours: {e}")
+        return jsonify({'success': False}), 500
 
 @app.route('/edit_stock_item/<int:item_id>', methods=['POST'])
 @login_required
@@ -2801,16 +2953,18 @@ def get_client_support_info(client_id):
                     print(f"Error cargando técnicos secundarios de tarea {task.id}: {e}")
                 
                 # Construir evento
+                is_remote = bool(getattr(task, 'is_remote', False))
                 event = {
                     'id': task.id,
-                    'title': f"{task.client_name}" if task.client_name else "Sin cliente",
+                    'title': ('📡 ' if is_remote else '') + (task.client_name if task.client_name else 'Sin cliente'),
                     'start': f"{task.date}T{task.start_time}:00" if (task.date and task.start_time) else str(task.date),
                     'end': f"{task.date}T{task.end_time}:00" if (task.date and task.end_time) else str(task.date),
-                    'backgroundColor': tech_color,
-                    'borderColor': tech_color,
+                    'backgroundColor': '#06b6d4' if is_remote else tech_color,
+                    'borderColor': '#0891b2' if is_remote else tech_color,
                     'textColor': text_color,
                     'extendedProps': {
                         'client': task.client_name or 'Sin cliente',
+                        'client_id': task.client_id,
                         'tech_id': task.tech_id,
                         'tech_name': ' + '.join(all_tech_names) if all_tech_names else 'Sin asignar',
                         'all_tech_names': all_tech_names,
@@ -2820,7 +2974,9 @@ def get_client_support_info(client_id):
                         'service_color': service_color,
                         'status': task.status or 'Pendiente',
                         'desc': task.description or '',
-                        'has_attachments': bool(task.attachments)
+                        'has_attachments': bool(task.attachments),
+                        'is_remote': is_remote,
+                        'remote_hours': getattr(task, 'remote_support_hours', 0) or 0,
                     }
                 }
                 events.append(event)
@@ -2851,18 +3007,22 @@ def admin_tech_tasks(tech_id):
         service_type = ServiceType.query.get(task.service_type_id) if task.service_type_id else None
         color = service_type.color if service_type else '#6c757d'
         
+        is_remote_tt = bool(getattr(task, 'is_remote', False))
         events.append({
             'id': task.id,
-            'title': f"{task.client_name}",
+            'title': ('📡 ' if is_remote_tt else '') + (task.client_name or 'Sin cliente'),
             'start': f"{task.date}T{task.start_time}:00" if task.start_time else str(task.date),
             'end': f"{task.date}T{task.end_time}:00" if task.end_time else str(task.date),
-            'backgroundColor': color,
-            'borderColor': color,
+            'backgroundColor': '#06b6d4' if is_remote_tt else color,
+            'borderColor': '#0891b2' if is_remote_tt else color,
             'extendedProps': {
-                'client': task.client_name,
+                'client': task.client_name or 'Sin cliente',
+                'client_id': task.client_id,
                 'service_type': service_type.name if service_type else 'Sin tipo',
                 'status': task.status,
-                'desc': task.description or ''
+                'desc': task.description or '',
+                'is_remote': is_remote_tt,
+                'remote_hours': getattr(task, 'remote_support_hours', 0) or 0,
             }
         })
     
@@ -2924,18 +3084,22 @@ def get_tech_tasks():
                 
                 color = service_type.color if service_type else '#6c757d'
                 
+                is_remote_gt = bool(getattr(task, 'is_remote', False))
                 event = {
                     'id': task.id,
-                    'title': f"{task.client_name if task.client_name else 'Sin cliente'}",
+                    'title': ('📡 ' if is_remote_gt else '') + (task.client_name if task.client_name else 'Sin cliente'),
                     'start': f"{task.date}T{task.start_time}:00" if (task.date and task.start_time) else str(task.date) if task.date else '',
                     'end': f"{task.date}T{task.end_time}:00" if (task.date and task.end_time) else str(task.date) if task.date else '',
-                    'backgroundColor': color,
-                    'borderColor': color,
+                    'backgroundColor': '#06b6d4' if is_remote_gt else color,
+                    'borderColor': '#0891b2' if is_remote_gt else color,
                     'extendedProps': {
                         'client': task.client_name or 'Sin cliente',
+                        'client_id': task.client_id,
                         'service_type': service_type.name if service_type else 'Sin tipo',
                         'status': task.status or 'Pendiente',
-                        'desc': task.description or ''
+                        'desc': task.description or '',
+                        'is_remote': is_remote_gt,
+                        'remote_hours': getattr(task, 'remote_support_hours', 0) or 0,
                     }
                 }
                 events.append(event)
