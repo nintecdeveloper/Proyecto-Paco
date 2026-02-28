@@ -2686,13 +2686,6 @@ def import_clients():
         db.session.rollback()
         return jsonify({'success': False, 'msg': str(e)}), 500
 
-@app.route('/uploads/<filename>')
-def uploaded_file(filename):
-    """Servir archivos subidos"""
-    try:
-        return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
-    except Exception as e:
-        return jsonify({'success': False, 'msg': 'Archivo no encontrado'}), 404
 
 @app.route('/api/client/<int:client_id>/support_info', methods=['GET'])
 @login_required
@@ -3224,48 +3217,6 @@ def schedule_appointment():
         db.session.rollback()
         return jsonify({'success': False, 'msg': f'Error al agendar la cita: {str(e)}'}), 500
 
-@app.route('/edit_stock_item/<int:item_id>', methods=['POST'])
-@login_required
-def edit_stock_item(item_id):
-    """Endpoint para editar un elemento de stock"""
-    try:
-        if current_user.role != 'admin':
-            return jsonify({'success': False, 'msg': 'No autorizado'}), 403
-        
-        item = Stock.query.get_or_404(item_id)
-        
-        name = request.form.get('name')
-        quantity = request.form.get('quantity')
-        min_stock = request.form.get('min_stock')
-        supplier = request.form.get('supplier', '')
-        description = request.form.get('description', '')
-        category_id = request.form.get('category_id')
-        
-        if name:
-            item.name = name
-        if quantity is not None:
-            item.quantity = int(quantity)
-        if min_stock is not None:
-            item.min_stock = int(min_stock)
-        if supplier is not None:
-            item.supplier = supplier
-        if description is not None:
-            item.description = description
-        if category_id:
-            item.category_id = int(category_id) if category_id != '' else None
-        
-        db.session.commit()
-        check_low_stock()
-        
-        flash('Elemento actualizado correctamente', 'success')
-        return redirect(url_for('dashboard'))
-        
-    except Exception as e:
-        print(f"Error editing stock item: {str(e)}")
-        db.session.rollback()
-        flash('Error al actualizar el elemento', 'danger')
-        return redirect(url_for('dashboard'))
-
 @app.route('/edit_stock_category/<int:category_id>', methods=['POST'])
 @login_required
 def edit_stock_category(category_id):
@@ -3316,27 +3267,6 @@ def edit_stock_category(category_id):
         db.session.rollback()
         flash('Error al actualizar la categoría', 'danger')
         return redirect(url_for('dashboard'))
-
-@app.route('/api/stock_item/<int:item_id>')
-@login_required
-def api_get_stock_item(item_id):
-    """API para obtener detalles de un elemento de stock"""
-    try:
-        item = Stock.query.get_or_404(item_id)
-        return jsonify({
-            'success': True,
-            'data': {
-                'id': item.id,
-                'name': item.name,
-                'quantity': item.quantity,
-                'min_stock': item.min_stock,
-                'supplier': item.supplier or '',
-                'description': item.description or '',
-                'category_id': item.category_id or ''
-            }
-        })
-    except Exception as e:
-        return jsonify({'success': False, 'msg': str(e)}), 500
 
 @app.route('/api/stock_category/<int:category_id>')
 @login_required
