@@ -3573,7 +3573,8 @@ def uploaded_file(filename):
         return jsonify({'error': f'Error al servir el archivo: {str(e)}'}), 500
 
 # --- ARRANQUE ---
-if __name__ == '__main__':
+def initialize_database():
+    """Inicializar BD y migraciones. Se ejecuta siempre (gunicorn + python directo)."""
     with app.app_context():
         db.create_all()
     
@@ -3942,5 +3943,10 @@ if __name__ == '__main__':
             ))
         
         db.session.commit()
-    
+
+
+# Ejecutar migraciones siempre, tanto con gunicorn como con python directo
+initialize_database()
+
+if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)
