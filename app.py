@@ -2599,6 +2599,101 @@ def create_remote_assistance():
         print(f"Error creating remote assistance: {str(e)}")
         return jsonify({'success': False, 'msg': str(e)}), 500
 
+@app.route('/edit_stock_item/<int:item_id>', methods=['POST'])
+@login_required
+def edit_stock_item(item_id):
+    """Editar un artículo de stock"""
+    if current_user.role != 'admin':
+        flash('No tienes permiso para realizar esta acción', 'error')
+        return redirect(url_for('dashboard'))
+    
+    try:
+        item = Stock.query.get(item_id)
+        if not item:
+            return jsonify({'success': False, 'msg': 'Artículo no encontrado'}), 404
+        
+        item.name = request.form.get('name', item.name)
+        item.quantity = int(request.form.get('quantity', item.quantity))
+        item.min_stock = int(request.form.get('min_stock', item.min_stock))
+        item.description = request.form.get('description', item.description)
+        item.supplier = request.form.get('supplier', item.supplier)
+        
+        db.session.commit()
+        return jsonify({'success': True, 'msg': 'Artículo actualizado correctamente'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'msg': str(e)}), 500
+
+@app.route('/import_clients', methods=['POST'])
+@login_required
+def import_clients():
+    """Importar clientes desde CSV"""
+    if current_user.role != 'admin':
+        flash('No tienes permiso para realizar esta acción', 'error')
+        return redirect(url_for('dashboard'))
+    
+    try:
+        if 'file' not in request.files:
+            return jsonify({'success': False, 'msg': 'No file provided'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'success': False, 'msg': 'No file selected'}), 400
+        
+        if not file.filename.endswith(('.csv', '.txt')):
+            return jsonify({'success': False, 'msg': 'Solo se aceptan archivos CSV'}), 400
+        
+        import csv
+        import io
+        
+        stream = io.StringIO(file.stream.read().decode('UTF-8'), newline=None)
+        csv_data = csv.DictReader(stream)
+        
+        count = 0
+        errors = []
+        
+        for row in csv_data:
+            try:
+                # Validar campos requeridos
+                if not row.get('name') or not row.get('phone') or not row.get('email') or not row.get('address'):
+                    errors.append(f"Fila {count+1}: Faltan campos requeridos")
+                    continue
+                
+                # Evitar duplicados
+                existing = Client.query.filter_by(name=row['name']).first()
+                if existing:
+                    errors.append(f"Fila {count+1}: Cliente '{row['name']}' ya existe")
+                    continue
+                
+                client = Client(
+                    name=row['name'],
+                    phone=row['phone'],
+                    email=row['email'],
+                    address=row['address'],
+                    link=row.get('link', ''),
+                    notes=row.get('notes', ''),
+                    has_support=row.get('has_support', 'False').lower() == 'true',
+                    support_schedule=row.get('support_schedule', None)
+                )
+                db.session.add(client)
+                count += 1
+            except Exception as e:
+                errors.append(f"Fila {count+1}: {str(e)}")
+        
+        db.session.commit()
+        return jsonify({'success': True, 'msg': f'{count} clientes importados', 'errors': errors})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'msg': str(e)}), 500
+
+@app.route('/uploads/<filename>')
+def uploaded_file(filename):
+    """Servir archivos subidos"""
+    try:
+        return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+    except Exception as e:
+        return jsonify({'success': False, 'msg': 'Archivo no encontrado'}), 404
+
 @app.route('/api/client/<int:client_id>/support_info', methods=['GET'])
 @login_required
 def get_client_support_info(client_id):
