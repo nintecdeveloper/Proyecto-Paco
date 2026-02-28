@@ -3573,288 +3573,79 @@ def uploaded_file(filename):
         return jsonify({'error': f'Error al servir el archivo: {str(e)}'}), 500
 
 # --- ARRANQUE ---
+def _run_migration(conn, sql, description=""):
+    """Ejecuta una sentencia DDL de forma segura, con su propia transacción."""
+    try:
+        conn.execute(db.text(sql))
+        conn.execute(db.text("COMMIT"))
+        if description:
+            print(f"✓ {description}")
+    except Exception as e:
+        try:
+            conn.execute(db.text("ROLLBACK"))
+        except Exception:
+            pass
+        err_str = str(e).lower()
+        # Errores esperados: columna/tabla ya existe
+        if any(x in err_str for x in ['already exists', 'duplicate column', 'ya existe']):
+            if description:
+                print(f"ℹ  Ya existe: {description} (ignorado)")
+        else:
+            print(f"⚠  Migración [{description}]: {e}")
+
+
 def initialize_database():
     """Inicializar BD y migraciones. Se ejecuta siempre (gunicorn + python directo)."""
     with app.app_context():
+        # 1. Crear todas las tablas definidas en los modelos (seguro, idempotente)
         db.create_all()
     
-        # ✅ MIGRACIÓN: Eliminar restricción unique de email en User (si existe)
-        try:
-            from sqlalchemy import inspect, text as sa_text
-            if db.engine.dialect.name == 'postgresql':
-                with db.engine.connect() as conn:
-                    # Intentar eliminar el índice único de email si existe
-                    conn.execute(sa_text('DROP INDEX IF EXISTS ix_user_email'))
-                    conn.execute(sa_text('ALTER TABLE "user" DROP CONSTRAINT IF EXISTS uq_user_email'))
-                    conn.execute(sa_text('ALTER TABLE "user" DROP CONSTRAINT IF EXISTS user_email_key'))
-                    conn.commit()
-                    print("✓ Restricción unique de email eliminada (si existía)")
-            elif db.engine.dialect.name == 'sqlite':
-                # SQLite no soporta DROP CONSTRAINT, se deja así (la columna ya no tiene unique en el modelo)
-                pass
-        except Exception as e:
-            print(f"Nota: Migración unique email: {e}")
+        # 2. Migraciones DDL — cada una en su propia transacción limpia
+        is_pg = db.engine.dialect.name == 'postgresql'
+        is_sqlite = db.engine.dialect.name == 'sqlite'
 
-        # ✅ MIGRACIÓN: Ampliar columna 'password_hash' a VARCHAR(512) si es PostgreSQL
-        try:
-            from sqlalchemy import inspect, text as sa_text
-            inspector = inspect(db.engine)
-            if db.engine.dialect.name == 'postgresql':
-                user_columns = {col['name']: col for col in inspector.get_columns('user')}
-                ph_col = user_columns.get('password_hash')
-                current_length = getattr(ph_col['type'], 'length', None) if ph_col else None
-                if current_length is not None and current_length < 512:
-                    with db.engine.connect() as conn:
-                        conn.execute(sa_text('ALTER TABLE "user" ALTER COLUMN password_hash TYPE VARCHAR(512)'))
-                        conn.commit()
-                        print("✓ Columna 'password_hash' ampliada a VARCHAR(512)")
-        except Exception as e:
-            print(f"Nota: Migración 'password_hash': {e}")
+        with db.engine.connect() as conn:
+            # Forzar autocommit desactivado y comenzar limpio
+            conn.execute(db.text("ROLLBACK")) if is_pg else None
 
-        # ✅ MIGRACIÓN: Añadir columna 'supplier' a Stock
-        try:
-            from sqlalchemy import inspect
-            inspector = inspect(db.engine)
-            stock_columns = [col['name'] for col in inspector.get_columns('stock')]
-        
-            if 'supplier' not in stock_columns:
-                with db.engine.connect() as conn:
-                    conn.execute(db.text('ALTER TABLE stock ADD COLUMN supplier VARCHAR(100)'))
-                    conn.commit()
-                    print("✓ Columna 'supplier' añadida a Stock")
-        except Exception as e:
-            print(f"Nota: Migración 'supplier': {e}")
-    
-        # Migración: columna 'link'
-        try:
-            from sqlalchemy import inspect
-            inspector = inspect(db.engine)
-            columns = [col['name'] for col in inspector.get_columns('client')]
-            if 'link' not in columns:
-                with db.engine.connect() as conn:
-                    conn.execute(db.text('ALTER TABLE client ADD COLUMN link VARCHAR(500)'))
-                    conn.commit()
-                    print("✓ Columna 'link' añadida")
-        except Exception as e:
-            print(f"Nota: Migración de 'link': {e}")
+            # --- USER ---
+            if is_pg:
+                _run_migration(conn, 'DROP INDEX IF EXISTS ix_user_email', "Drop ix_user_email")
+                _run_migration(conn, 'ALTER TABLE "user" DROP CONSTRAINT IF EXISTS uq_user_email', "Drop uq_user_email")
+                _run_migration(conn, 'ALTER TABLE "user" DROP CONSTRAINT IF EXISTS user_email_key', "Drop user_email_key")
+                _run_migration(conn, 'ALTER TABLE "user" ALTER COLUMN password_hash TYPE VARCHAR(512)', "Ampliar password_hash")
 
-        # ✅ MIGRACIÓN: Añadir columna 'work_duration' a Task
-        try:
-            from sqlalchemy import inspect
-            inspector = inspect(db.engine)
-            task_columns = [col['name'] for col in inspector.get_columns('task')]
-            if 'work_duration' not in task_columns:
-                with db.engine.connect() as conn:
-                    conn.execute(db.text('ALTER TABLE task ADD COLUMN work_duration VARCHAR(20)'))
-                    conn.commit()
-                    print("✓ Columna 'work_duration' añadida a Task")
-        except Exception as e:
-            print(f"Nota: Migración 'work_duration': {e}")
+            # --- CLIENT ---
+            _run_migration(conn, 'ALTER TABLE client ADD COLUMN link VARCHAR(500)', "client.link")
+            _run_migration(conn, 'ALTER TABLE client ADD COLUMN support_schedule VARCHAR(5)', "client.support_schedule")
 
-        # ✅ MIGRACIÓN: Añadir columna 'support_schedule' a Client
-        try:
-            inspector = inspect(db.engine)
-            client_cols = [col['name'] for col in inspector.get_columns('client')]
-            if 'support_schedule' not in client_cols:
-                with db.engine.connect() as conn:
-                    conn.execute(db.text('ALTER TABLE client ADD COLUMN support_schedule VARCHAR(5)'))
-                    conn.commit()
-                    print("✓ Columna 'support_schedule' añadida a Client")
-        except Exception as e:
-            print(f"Nota: Migración 'support_schedule': {e}")
-    
+            # --- STOCK ---
+            _run_migration(conn, 'ALTER TABLE stock ADD COLUMN supplier VARCHAR(100)', "stock.supplier")
 
-        # MIGRACION: Tablas de pagos (se crean si no existen)
-        try:
-            from sqlalchemy import inspect as sa_inspect
-            _inspector = sa_inspect(db.engine)
-            _existing = _inspector.get_table_names()
-            if 'client_payment' not in _existing:
-                ClientPayment.__table__.create(db.engine)
-                print("Tabla 'client_payment' creada")
-            if 'payment_record' not in _existing:
-                PaymentRecord.__table__.create(db.engine)
-                print("Tabla 'payment_record' creada")
-        except Exception as _e:
-            print(f"Nota: Migracion tablas pago: {_e}")
+            # --- TASK: nuevas columnas ---
+            _run_migration(conn, 'ALTER TABLE task ADD COLUMN work_duration VARCHAR(20)', "task.work_duration")
+            _run_migration(conn, 'ALTER TABLE task ADD COLUMN created_by INTEGER DEFAULT NULL', "task.created_by")
+            _run_migration(conn, 'ALTER TABLE task ADD COLUMN is_remote BOOLEAN DEFAULT FALSE', "task.is_remote")
+            _run_migration(conn, 'ALTER TABLE task ADD COLUMN remote_support_hours FLOAT DEFAULT 0', "task.remote_support_hours")
+            _run_migration(conn, 'ALTER TABLE task ADD COLUMN parte_transport_start VARCHAR(10)', "task.parte_transport_start")
+            _run_migration(conn, 'ALTER TABLE task ADD COLUMN parte_arrival VARCHAR(10)', "task.parte_arrival")
+            _run_migration(conn, 'ALTER TABLE task ADD COLUMN parte_work_start VARCHAR(10)', "task.parte_work_start")
+            _run_migration(conn, 'ALTER TABLE task ADD COLUMN parte_work_end VARCHAR(10)', "task.parte_work_end")
 
-        # ✅ MIGRACIÓN: Añadir columna 'is_paid' a PaymentRecord
-        # Compatible con SQLite y PostgreSQL (DEFAULT FALSE válido en ambos)
-        try:
-            from sqlalchemy import inspect as sa_inspect2
-            _inspector2 = sa_inspect2(db.engine)
-            # Verificar primero que la tabla existe
-            if 'payment_record' in _inspector2.get_table_names():
-                pr_cols = [col['name'] for col in _inspector2.get_columns('payment_record')]
-                if 'is_paid' not in pr_cols:
-                    with db.engine.connect() as conn:
-                        try:
-                            # PostgreSQL / SQLite 3.23+ aceptan FALSE
-                            conn.execute(db.text('ALTER TABLE payment_record ADD COLUMN is_paid BOOLEAN NOT NULL DEFAULT FALSE'))
-                            conn.commit()
-                            print("✓ Columna 'is_paid' añadida a PaymentRecord")
-                        except Exception:
-                            try:
-                                # Fallback para SQLite antiguo: usar 0
-                                conn.rollback()
-                                conn.execute(db.text('ALTER TABLE payment_record ADD COLUMN is_paid BOOLEAN DEFAULT 0'))
-                                conn.commit()
-                                print("✓ Columna 'is_paid' añadida a PaymentRecord (fallback)")
-                            except Exception as e2:
-                                print(f"Nota: Migración 'is_paid' fallback: {e2}")
-        except Exception as e:
-            print(f"Nota: Migración 'is_paid': {e}")
+            # --- TASK: hacer nullable tech_id y date en PostgreSQL ---
+            if is_pg:
+                _run_migration(conn, 'ALTER TABLE task ALTER COLUMN tech_id DROP NOT NULL', "task.tech_id nullable")
+                _run_migration(conn, 'ALTER TABLE task ALTER COLUMN date DROP NOT NULL', "task.date nullable")
+                # FK created_by (ignorar si ya existe)
+                _run_migration(conn,
+                    'ALTER TABLE task ADD CONSTRAINT fk_task_created_by '
+                    'FOREIGN KEY (created_by) REFERENCES "user"(id) ON DELETE SET NULL',
+                    "task.created_by FK")
 
-        # ✅ MIGRACIÓN: Hacer 'tech_id' nullable en Task
-        try:
-            from sqlalchemy import inspect
-            inspector = inspect(db.engine)
-            if 'task' in inspector.get_table_names():
-                task_cols = {col['name']: col for col in inspector.get_columns('task')}
-                if 'tech_id' in task_cols:
-                    tech_id_col = task_cols['tech_id']
-                    if not tech_id_col['nullable']:
-                        with db.engine.connect() as conn:
-                            if db.engine.dialect.name == 'postgresql':
-                                conn.execute(db.text('ALTER TABLE task ALTER COLUMN tech_id DROP NOT NULL'))
-                            elif db.engine.dialect.name == 'sqlite':
-                                # SQLite no soporta ALTER COLUMN, se ignora
-                                pass
-                            conn.commit()
-                            print("✓ Columna 'tech_id' en Task ahora es nullable")
-        except Exception as e:
-            print(f"Nota: Migración 'tech_id nullable': {e}")
+            # --- PAYMENT_RECORD: is_paid ---
+            _run_migration(conn, 'ALTER TABLE payment_record ADD COLUMN is_paid BOOLEAN NOT NULL DEFAULT FALSE', "payment_record.is_paid")
 
-        # ✅ MIGRACIÓN: Hacer 'date' nullable en Task
-        try:
-            from sqlalchemy import inspect
-            inspector = inspect(db.engine)
-            if 'task' in inspector.get_table_names():
-                task_cols = {col['name']: col for col in inspector.get_columns('task')}
-                if 'date' in task_cols:
-                    date_col = task_cols['date']
-                    if not date_col['nullable']:
-                        with db.engine.connect() as conn:
-                            if db.engine.dialect.name == 'postgresql':
-                                conn.execute(db.text('ALTER TABLE task ALTER COLUMN date DROP NOT NULL'))
-                            elif db.engine.dialect.name == 'sqlite':
-                                # SQLite no soporta ALTER COLUMN, se ignora
-                                pass
-                            conn.commit()
-                            print("✓ Columna 'date' en Task ahora es nullable")
-        except Exception as e:
-            print(f"Nota: Migración 'date nullable': {e}")
-
-
-        try:
-            from sqlalchemy import inspect as sa_inspect3
-            _inspector3 = sa_inspect3(db.engine)
-            if 'task_technician' not in _inspector3.get_table_names():
-                TaskTechnician.__table__.create(db.engine)
-                print("✓ Tabla 'task_technician' creada")
-        except Exception as e:
-            print(f"Nota: Migración 'task_technician': {e}")
-
-        # ✅ MIGRACIÓN: Añadir columna 'created_by' a Task (VERSIÓN MEJORADA)
-        try:
-            inspector = inspect(db.engine)
-            if 'task' in inspector.get_table_names():
-                task_cols = [col['name'] for col in inspector.get_columns('task')]
-                if 'created_by' not in task_cols:
-                    with db.engine.connect() as conn:
-                        try:
-                            # Intentar con DEFAULT NULL para PostgreSQL
-                            conn.execute(db.text('ALTER TABLE task ADD COLUMN created_by INTEGER DEFAULT NULL'))
-                            conn.commit()
-                            print("✓ Columna 'created_by' añadida a Task")
-                        except Exception as e1:
-                            print(f"⚠️  Nota: Intento 1 fallido - {e1}")
-                            try:
-                                conn.rollback()
-                            except:
-                                pass
-                        
-                            # Intento 2: Sin DEFAULT
-                            try:
-                                conn.execute(db.text('ALTER TABLE task ADD COLUMN created_by INTEGER'))
-                                conn.commit()
-                                print("✓ Columna 'created_by' añadida a Task (sin DEFAULT)")
-                            except Exception as e2:
-                                print(f"⚠️  Nota: Intento 2 fallido - {e2}")
-                                try:
-                                    conn.rollback()
-                                except:
-                                    pass
-                    
-                        # Intento de agregar FK
-                        try:
-                            conn.execute(db.text('ALTER TABLE task ADD CONSTRAINT fk_task_created_by FOREIGN KEY (created_by) REFERENCES "user"(id) ON DELETE SET NULL'))
-                            conn.commit()
-                            print("✓ FK 'created_by' añadida a Task")
-                        except Exception as e3:
-                            print(f"⚠️  Nota: FK no se pudo agregar - {e3}")
-                            try:
-                                conn.rollback()
-                            except:
-                                pass
-                else:
-                    print("ℹ️  Columna 'created_by' ya existe en Task")
-        except Exception as e:
-            print(f"⚠️  Nota: Error en migración de 'created_by': {e}")
-
-        # ✅ MIGRACIÓN: Tabla TimerSession para cronómetros persistentes
-        try:
-            from sqlalchemy import inspect as sa_inspect_timer
-            _inspector_timer = sa_inspect_timer(db.engine)
-            if 'timer_session' not in _inspector_timer.get_table_names():
-                TimerSession.__table__.create(db.engine)
-                print("✓ Tabla 'timer_session' creada")
-        except Exception as e:
-            print(f"Nota: Migración 'timer_session': {e}")
-
-        # ✅ MIGRACIÓN: Añadir columnas is_remote y remote_support_hours a Task
-        try:
-            inspector = inspect(db.engine)
-            if 'task' in inspector.get_table_names():
-                task_cols = [col['name'] for col in inspector.get_columns('task')]
-                if 'is_remote' not in task_cols:
-                    with db.engine.connect() as conn:
-                        try:
-                            conn.execute(db.text('ALTER TABLE task ADD COLUMN is_remote BOOLEAN DEFAULT 0'))
-                            conn.commit()
-                            print("✓ Columna 'is_remote' añadida a Task")
-                        except Exception as e:
-                            print(f"Nota: Migración 'is_remote': {e}")
-            
-                if 'remote_support_hours' not in task_cols:
-                    with db.engine.connect() as conn:
-                        try:
-                            conn.execute(db.text('ALTER TABLE task ADD COLUMN remote_support_hours FLOAT DEFAULT 0'))
-                            conn.commit()
-                            print("✓ Columna 'remote_support_hours' añadida a Task")
-                        except Exception as e:
-                            print(f"Nota: Migración 'remote_support_hours': {e}")
-        except Exception as e:
-            print(f"Nota: Migración de columnas remotas: {e}")
-
-        # ✅ MIGRACIÓN: Columnas de timestamps del parte v2
-        try:
-            from sqlalchemy import inspect as _ins_v2
-            _inspector_v2 = _ins_v2(db.engine)
-            if 'task' in _inspector_v2.get_table_names():
-                _existing_cols = [c['name'] for c in _inspector_v2.get_columns('task')]
-                _new_cols_v2 = ['parte_transport_start', 'parte_arrival', 'parte_work_start', 'parte_work_end']
-                for _col in _new_cols_v2:
-                    if _col not in _existing_cols:
-                        with db.engine.connect() as _conn:
-                            try:
-                                _conn.execute(db.text(f'ALTER TABLE task ADD COLUMN {_col} VARCHAR(10)'))
-                                _conn.commit()
-                                print(f"✓ Columna '{_col}' añadida a Task")
-                            except Exception as _e:
-                                print(f"Nota: Migración '{_col}': {_e}")
-        except Exception as e:
-            print(f"Nota: Migración timestamps parte v2: {e}")
+        print("✓ Migraciones completadas")
 
         # Usuarios de prueba
         if not User.query.filter_by(username='admin').first():
