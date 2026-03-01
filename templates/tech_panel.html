@@ -1288,7 +1288,18 @@
         });
 
         let calendar;
-        const modalAction = new bootstrap.Modal(document.getElementById('modalEventAction'));
+        let _modalActionInstance;
+        function getModalAction() {
+            if (!_modalActionInstance) {
+                _modalActionInstance = new bootstrap.Modal(document.getElementById('modalEventAction'));
+            }
+            return _modalActionInstance;
+        }
+        // Alias para compatibilidad con código que usa modalAction directamente
+        const modalAction = { 
+            show: function() { getModalAction().show(); }, 
+            hide: function() { getModalAction().hide(); } 
+        };
 
         // Almacén local de tareas para la lista
         let cachedTasks = [];       // Eventos del rango visible del calendario (para referencia)
