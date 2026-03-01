@@ -1980,13 +1980,16 @@
                                 <input type="time" id="remoteStartTime" class="form-control form-control-sm bg-dark text-white border-secondary">
                             </div>
                             <div class="col-sm-3">
-                                <label class="form-label small mb-1">Hora fin</label>
+                                <label class="form-label small mb-1">Hora fin <span class="text-muted" style="font-size:0.75rem;">(opcional)</span></label>
                                 <input type="time" id="remoteEndTime" class="form-control form-control-sm bg-dark text-white border-secondary">
                             </div>
                             <div class="col-sm-3">
                                 <label class="form-label small mb-1">Técnico (opcional)</label>
                                 <select id="remoteTechSelect" class="form-select form-select-sm bg-dark text-white border-secondary">
                                     <option value="">Sin asignar</option>
+                                    {% for emp in employees %}
+                                    <option value="{{ emp.id }}">{{ emp.username }}</option>
+                                    {% endfor %}
                                 </select>
                             </div>
                         </div>
@@ -2008,7 +2011,7 @@
         </div>
     </div>
 
-    <!-- Modal edición rápida asistencia remota -->
+    <!-- Modal edición rápida asistencia remota (Parte) -->
     <div class="modal fade" id="modalRemoteTaskQuickEdit" tabindex="-1">
         <div class="modal-dialog modal-md">
             <div class="modal-content bg-dark text-white border-info">
@@ -2024,10 +2027,28 @@
                     <input type="hidden" id="rqeTaskId">
                     <input type="hidden" id="rqeClientId">
 
-                    <!-- Estado -->
+                    <!-- Estado + Fecha -->
                     <div class="d-flex align-items-center justify-content-between mb-2">
                         <span id="rqeStatusBadge" class="badge bg-warning text-dark">Pendiente</span>
                         <small class="text-muted" id="rqeDateLabel"></small>
+                    </div>
+
+                    <!-- Ficha del cliente con soporte -->
+                    <div id="rqeClientCard" class="card bg-secondary bg-opacity-10 border-secondary mb-3 p-2" style="display:none;">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div>
+                                <span class="text-white small fw-bold" id="rqeClientCardName">—</span>
+                                <div class="text-muted" style="font-size:0.75rem;">
+                                    <i class="bi bi-telephone me-1"></i><span id="rqeClientCardPhone">—</span>
+                                    &nbsp;·&nbsp;
+                                    <i class="bi bi-envelope me-1"></i><span id="rqeClientCardEmail">—</span>
+                                </div>
+                            </div>
+                            <div>
+                                <span class="badge bg-success" id="rqeSupportBadge" style="display:none;"><i class="bi bi-shield-check me-1"></i>Con Soporte</span>
+                                <span class="badge bg-danger" id="rqeNoSupportBadge" style="display:none;"><i class="bi bi-shield-x me-1"></i>Sin Soporte</span>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Barra de horas mensuales -->
@@ -2057,9 +2078,9 @@
                         </div>
                     </div>
 
-                    <!-- Descripción -->
+                    <!-- Descripción / Notas -->
                     <div class="mb-2">
-                        <label class="form-label small mb-1">Descripción</label>
+                        <label class="form-label small mb-1">Notas del parte</label>
                         <textarea id="rqeDescription" class="form-control form-control-sm bg-dark text-white border-secondary" rows="2" placeholder="Notas sobre la asistencia..."></textarea>
                     </div>
 
@@ -2077,7 +2098,7 @@
                         <i class="bi bi-floppy me-1"></i>Guardar
                     </button>
                     <button type="button" class="btn btn-success btn-sm" onclick="saveRemoteTask(true)">
-                        <i class="bi bi-check-lg me-1"></i>Completar
+                        <i class="bi bi-check-lg me-1"></i>Registrar Parte
                     </button>
                 </div>
             </div>
@@ -6022,13 +6043,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// ── Cargar técnicos disponibles ──────────────────────────────
+// ── Cargar técnicos disponibles (fallback AJAX si el template no los incluyó) ─
 function _loadRemoteTechOptions() {
+    const sel = document.getElementById('remoteTechSelect');
+    // Si ya hay opciones cargadas por el template Jinja2, no es necesario hacer fetch
+    if (!sel || sel.options.length > 1) return;
     fetch('/api/admin/tech_colors')
         .then(r => r.json())
         .then(data => {
-            const sel = document.getElementById('remoteTechSelect');
-            if (!sel || !data.success) return;
+            if (!sel || !data.success || !data.data.length) return;
             sel.innerHTML = '<option value="">Sin asignar</option>';
             data.data.forEach(t => {
                 const opt = document.createElement('option');
@@ -6133,6 +6156,11 @@ function submitRemoteAssistance() {
             document.getElementById('remoteHoursSection').style.display = 'none';
             document.getElementById('remoteSelectedClientId').value = '';
             document.getElementById('remoteSelectedClientName').value = '';
+            document.getElementById('remoteTechSelect').value = '';
+            document.getElementById('remoteStartTime').value = '';
+            document.getElementById('remoteEndTime').value = '';
+            const rDate = document.getElementById('remoteDate');
+            if (rDate) rDate.value = new Date().toISOString().split('T')[0];
             // Refrescar calendarios y lista
             if (window.calendarGlobalInstance) window.calendarGlobalInstance.refetchEvents();
             if (window.calendarInstance) window.calendarInstance.refetchEvents();
@@ -6167,6 +6195,9 @@ function openRemoteTaskQuickEdit(taskId, clientName, extProps) {
     document.getElementById('rqeDescription').value = extProps.desc || '';
     document.getElementById('rqeWarningLimit').style.display = 'none';
 
+    // Ocultar ficha cliente mientras carga
+    document.getElementById('rqeClientCard').style.display = 'none';
+
     // Cargar datos actualizados de la tarea desde el servidor para rellenar horas
     fetch(`/api/task/${taskId}`)
         .then(r => r.json())
@@ -6179,6 +6210,24 @@ function openRemoteTaskQuickEdit(taskId, clientName, extProps) {
             if (data.description) document.getElementById('rqeDescription').value = data.description;
             if (data.date) document.getElementById('rqeDateLabel').textContent = data.date;
             updateRqeDurationPreview();
+
+            // Mostrar ficha del cliente si hay info
+            const ci = data.client_info;
+            if (ci) {
+                document.getElementById('rqeClientCardName').textContent  = ci.name || clientName || '—';
+                document.getElementById('rqeClientCardPhone').textContent = ci.phone || '—';
+                document.getElementById('rqeClientCardEmail').textContent = ci.email || '—';
+                const badgeOk = document.getElementById('rqeSupportBadge');
+                const badgeNo = document.getElementById('rqeNoSupportBadge');
+                if (ci.has_support) {
+                    badgeOk.style.display = 'inline-block';
+                    badgeNo.style.display = 'none';
+                } else {
+                    badgeOk.style.display = 'none';
+                    badgeNo.style.display = 'inline-block';
+                }
+                document.getElementById('rqeClientCard').style.display = 'block';
+            }
         })
         .catch(() => {
             document.getElementById('rqeStartTime').value = '';

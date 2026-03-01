@@ -1181,6 +1181,24 @@
                         <small class="text-info fw-bold" id="techRmtDateLabel"></small>
                     </div>
 
+                    <!-- Ficha cliente con badge de soporte -->
+                    <div id="techRmtClientCard" class="card bg-secondary bg-opacity-10 border-secondary mb-3 p-2" style="display:none;">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div>
+                                <span class="text-white small fw-bold" id="techRmtClientCardName">—</span>
+                                <div class="text-muted" style="font-size:0.75rem;">
+                                    <i class="bi bi-telephone me-1"></i><span id="techRmtClientCardPhone">—</span>
+                                    &nbsp;·&nbsp;
+                                    <i class="bi bi-envelope me-1"></i><span id="techRmtClientCardEmail">—</span>
+                                </div>
+                            </div>
+                            <div>
+                                <span class="badge bg-success" id="techRmtSupportBadge" style="display:none;"><i class="bi bi-shield-check me-1"></i>Con Soporte</span>
+                                <span class="badge bg-danger" id="techRmtNoSupportBadge" style="display:none;"><i class="bi bi-shield-x me-1"></i>Sin Soporte</span>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Horas de soporte mensual -->
                     <div id="techRmtHoursSection" class="card bg-secondary bg-opacity-10 border-secondary mb-3 p-2" style="display:none;">
                         <div class="d-flex justify-content-between align-items-center mb-1">
@@ -3272,6 +3290,7 @@
             document.getElementById('techRmtDateLabel').textContent = '';
             document.getElementById('techRmtWarning').style.display = 'none';
             document.getElementById('techRmtHoursSection').style.display = 'none';
+            document.getElementById('techRmtClientCard').style.display = 'none';
 
             // Cargar datos actuales de la tarea desde el servidor
             fetch(`/api/task/${taskId}`)
@@ -3283,6 +3302,24 @@
                     if (data.description) document.getElementById('techRmtDescription').value = data.description;
                     if (data.date) document.getElementById('techRmtDateLabel').textContent = data.date;
                     updateTechRmtDuration();
+
+                    // Mostrar ficha cliente con soporte
+                    const ci = data.client_info;
+                    if (ci) {
+                        document.getElementById('techRmtClientCardName').textContent  = ci.name || '—';
+                        document.getElementById('techRmtClientCardPhone').textContent = ci.phone || '—';
+                        document.getElementById('techRmtClientCardEmail').textContent = ci.email || '—';
+                        const badgeOk = document.getElementById('techRmtSupportBadge');
+                        const badgeNo = document.getElementById('techRmtNoSupportBadge');
+                        if (ci.has_support) {
+                            badgeOk.style.display = 'inline-block';
+                            badgeNo.style.display = 'none';
+                        } else {
+                            badgeOk.style.display = 'none';
+                            badgeNo.style.display = 'inline-block';
+                        }
+                        document.getElementById('techRmtClientCard').style.display = 'block';
+                    }
                 })
                 .catch(() => {});
 

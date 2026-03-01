@@ -1443,7 +1443,7 @@ def get_task_full(task_id):
             'id': task.id,
             'client_name': task.client_name,
             'client_info': client_info,  # ✅ AÑADIDO
-            'date': task.date.strftime('%Y-%m-%d'),
+            'date': task.date.strftime('%Y-%m-%d') if task.date else None,
             'start_time': task.start_time or '',
             'end_time': task.end_time or '',
             'service_type': service_type.name if service_type else '',
@@ -1487,7 +1487,7 @@ def get_task_details(task_id):
             'id': task.id,
             'client_name': task.client_name,
             'client_info': client_info,  # ✅ AÑADIDO
-            'date': task.date.strftime('%Y-%m-%d'),
+            'date': task.date.strftime('%Y-%m-%d') if task.date else None,
             'start_time': task.start_time,
             'end_time': task.end_time,
             'service_type': service_type.name if service_type else 'Sin tipo',
@@ -1613,7 +1613,7 @@ def get_tech_stats(tech_id):
         service_stats[service_name]['tasks'].append({
             'id': task.id,
             'client': task.client_name,
-            'date': task.date.strftime('%d/%m/%Y'),
+            'date': task.date.strftime('%d/%m/%Y') if task.date else None,
             'time': f"{task.start_time} - {task.end_time}" if task.start_time and task.end_time else 'No especificado',
             'description': task.description or 'Sin descripción',  # ✅ AÑADIDO
             'has_attachments': bool(task.attachments),
@@ -2173,7 +2173,7 @@ def get_task(task_id):
         'data': {
             'id': task.id,
             'client_name': task.client_name,
-            'date': task.date.strftime('%Y-%m-%d'),
+            'date': task.date.strftime('%Y-%m-%d') if task.date else None,
             'time': task.start_time or '',
             'service_type': service_type.name if service_type else '',
             'notes': task.description or '',
@@ -2206,7 +2206,7 @@ def api_task_details(task_id):
             'id': task.id,
             'client_name': task.client_name,
             'tech_name': task.tech.username if task.tech else 'Sin asignar',
-            'date': task.date.strftime('%Y-%m-%d'),
+            'date': task.date.strftime('%Y-%m-%d') if task.date else None,
             'start_time': task.start_time or '',
             'end_time': task.end_time or '',
             'service_type': service_type.name if service_type else 'Sin tipo',
@@ -2854,6 +2854,7 @@ def update_remote_task(task_id):
                 Task.is_remote == True,
                 Task.status == 'Completado',
                 Task.id != task_id,
+                Task.date != None,
                 db.func.extract('year',  Task.date) == now.year,
                 db.func.extract('month', Task.date) == now.month,
             ).all()
@@ -2868,6 +2869,9 @@ def update_remote_task(task_id):
         if mark_complete:
             task.status = 'Completado'
             task.work_end_time = datetime.now()
+            # Asignar fecha de hoy si la tarea no tiene fecha aún
+            if not task.date:
+                task.date = date.today()
 
         db.session.commit()
         return jsonify({
@@ -2899,6 +2903,7 @@ def get_client_monthly_remote_hours(client_id):
             Task.client_id == client_id,
             Task.is_remote == True,
             Task.status == 'Completado',
+            Task.date != None,
             db.func.extract('year',  Task.date) == now.year,
             db.func.extract('month', Task.date) == now.month,
         ).all()
@@ -3034,134 +3039,6 @@ def get_client_support_info(client_id):
         print(f"Error getting client support: {str(e)}")
         return jsonify({'success': False}), 500
 
-    """Endpoint para calendario global del admin - ROBUSTO CON MANEJO DE ERRORES"""
-    try:
-        if current_user.role != 'admin':
-            return jsonify([])
-        
-        try:
-            tasks = Task.query.all()
-        except Exception as e:
-            print(f"Error cargando tareas: {e}")
-            return jsonify({'error': 'Error cargando tareas'}), 500
-        
-        events = []
-        
-        # Paleta de colores para diferenciar técnicos
-        TECH_COLORS = [
-            '#3b82f6',  # azul
-            '#22c55e',  # verde
-            '#a855f7',  # morado
-            '#f59e0b',  # ámbar
-            '#ef4444',  # rojo
-            '#06b6d4',  # cian
-            '#ec4899',  # rosa
-            '#84cc16',  # lima
-            '#f97316',  # naranja
-            '#14b8a6',  # teal
-        ]
-
-        def get_contrast_color(hex_color):
-            """Devuelve #000 o #fff para máximo contraste sobre el color de fondo dado."""
-            try:
-                h = hex_color.lstrip('#')
-                if len(h) < 6:
-                    return '#ffffff'
-                r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
-                luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-                return '#000000' if luminance > 0.5 else '#ffffff'
-            except Exception:
-                return '#ffffff'
-        
-        # Obtener todos los técnicos y asignarles colores
-        try:
-            techs = User.query.filter_by(role='tech').order_by(User.id).all()
-            tech_color_map = {}
-            for i, tech in enumerate(techs):
-                tech_color_map[tech.id] = TECH_COLORS[i % len(TECH_COLORS)]
-        except Exception as e:
-            print(f"Error cargando técnicos: {e}")
-            tech_color_map = {}
-        
-        # Procesar cada tarea
-        for task in tasks:
-            try:
-                # Obtener tipo de servicio
-                service_type = None
-                try:
-                    if task.service_type_id:
-                        service_type = ServiceType.query.get(task.service_type_id)
-                except Exception as e:
-                    print(f"Error cargando servicio para tarea {task.id}: {e}")
-                
-                service_color = service_type.color if service_type else '#6c757d'
-                
-                # Color del técnico para el calendario global (del técnico principal)
-                tech_color = tech_color_map.get(task.tech_id, '#6c757d')
-                text_color = get_contrast_color(tech_color)
-                
-                # Obtener todos los técnicos (principal + secundarios)
-                all_tech_names = []
-                
-                # Técnico principal
-                try:
-                    if task.tech:
-                        all_tech_names.append(task.tech.username)
-                except Exception as e:
-                    print(f"Error cargando técnico principal de tarea {task.id}: {e}")
-                
-                # Técnicos secundarios
-                try:
-                    if hasattr(task, 'extra_technicians'):
-                        for task_tech in task.extra_technicians:
-                            try:
-                                if task_tech.user and task_tech.user.id != task.tech_id:
-                                    all_tech_names.append(task_tech.user.username)
-                            except Exception as e:
-                                print(f"Error procesando técnico secundario de tarea {task.id}: {e}")
-                except Exception as e:
-                    print(f"Error cargando técnicos secundarios de tarea {task.id}: {e}")
-                
-                # Construir evento
-                is_remote = bool(getattr(task, 'is_remote', False))
-                event = {
-                    'id': task.id,
-                    'title': ('📡 ' if is_remote else '') + (task.client_name if task.client_name else 'Sin cliente'),
-                    'start': f"{task.date}T{task.start_time}:00" if (task.date and task.start_time) else str(task.date),
-                    'end': f"{task.date}T{task.end_time}:00" if (task.date and task.end_time) else str(task.date),
-                    'backgroundColor': '#06b6d4' if is_remote else tech_color,
-                    'borderColor': '#0891b2' if is_remote else tech_color,
-                    'textColor': text_color,
-                    'extendedProps': {
-                        'client': task.client_name or 'Sin cliente',
-                        'client_id': task.client_id,
-                        'tech_id': task.tech_id,
-                        'tech_name': ' + '.join(all_tech_names) if all_tech_names else 'Sin asignar',
-                        'all_tech_names': all_tech_names,
-                        'tech_color': tech_color,
-                        'text_color': text_color,
-                        'service_type': service_type.name if service_type else 'Sin tipo',
-                        'service_color': service_color,
-                        'status': task.status or 'Pendiente',
-                        'desc': task.description or '',
-                        'has_attachments': bool(task.attachments),
-                        'is_remote': is_remote,
-                        'remote_hours': getattr(task, 'remote_support_hours', 0) or 0,
-                    }
-                }
-                events.append(event)
-                
-            except Exception as e:
-                print(f"Error procesando tarea {task.id}: {e}")
-                continue
-        
-        return jsonify(events)
-        
-    except Exception as e:
-        print(f"Error CRÍTICO en admin_all_tasks: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': f'Error en agenda: {str(e)}'}), 500
 
 @app.route('/api/admin/tasks/<int:tech_id>')
 @login_required
@@ -3745,7 +3622,7 @@ def api_client_monthly_hours(client_id):
                     mins = h * 60 + m + (1 if s >= 30 else 0)
                     total_minutes += mins
                     work_entries.append({
-                        'date': task.date.strftime('%d/%m/%Y'),
+                        'date': task.date.strftime('%d/%m/%Y') if task.date else None,
                         'tech': task.tech.username if task.tech else 'N/A',
                         'duration': task.work_duration,
                         'service': task.service_type.name if task.service_type else 'N/A',
@@ -3761,7 +3638,7 @@ def api_client_monthly_hours(client_id):
                     if mins > 0:
                         total_minutes += mins
                         work_entries.append({
-                            'date': task.date.strftime('%d/%m/%Y'),
+                            'date': task.date.strftime('%d/%m/%Y') if task.date else None,
                             'tech': task.tech.username if task.tech else 'N/A',
                             'duration': f"{mins//60:02d}:{mins%60:02d}:00",
                             'service': task.service_type.name if task.service_type else 'N/A',
@@ -3826,7 +3703,7 @@ def api_client_work_hours_alias(client_id):
             if mins > 0:
                 total_minutes += mins
             task_list.append({
-                'date': task.date.strftime('%d/%m/%Y'),
+                'date': task.date.strftime('%d/%m/%Y') if task.date else None,
                 'tech': task.tech.username if task.tech else 'N/A',
                 'service': task.service_type.name if task.service_type else 'N/A',
                 'duration': duration_str
