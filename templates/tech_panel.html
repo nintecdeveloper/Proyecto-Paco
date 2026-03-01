@@ -748,6 +748,27 @@
                     </div>
                 </div>
             </div>
+
+            <!-- TAREAS SIN ASIGNAR -->
+            <div class="card bg-dark border-danger border-2 mt-4">
+                <div class="card-header bg-danger bg-opacity-20 border-danger d-flex justify-content-between align-items-center">
+                    <h5 class="card-title text-danger mb-0">
+                        <i class="bi bi-exclamation-circle-fill me-2"></i>Tareas Pendientes por Asignar
+                    </h5>
+                    <span class="badge bg-danger rounded-pill" id="unassignedCountBadge" style="display:none; font-size:0.9rem;"></span>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Estas tareas no tienen técnico asignado. Puedes completarlas directamente desde aquí.
+                    </p>
+                    <div id="techUnassignedTasksList" style="max-height: 400px; overflow-y: auto;">
+                        <div class="text-muted text-center py-3">
+                            <i class="bi bi-inbox me-2"></i>Cargando...
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- SECCIÓN ANALÍTICAS -->
@@ -1349,6 +1370,7 @@
                         try { calendar.updateSize(); calendar.refetchEvents(); } catch(e) {}
                     }, 100);
                 }
+                setTimeout(() => loadTechUnassignedTasks(), 200);
             }
 
             // ✅ Inicializar firma + cargar draft cuando se muestra el parte
@@ -3422,6 +3444,62 @@
                 }
             })
             .catch(() => showToast('❌ Error de conexión', 'error'));
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // TAREAS SIN ASIGNAR — Visibles y completables por técnicos
+        // ═══════════════════════════════════════════════════════════════
+
+        function loadTechUnassignedTasks() {
+            fetch('/api/tech/unassigned_tasks')
+                .then(res => res.json())
+                .then(data => {
+                    const container = document.getElementById('techUnassignedTasksList');
+                    const badge     = document.getElementById('unassignedCountBadge');
+                    if (!container) return;
+
+                    if (!data.success || data.data.length === 0) {
+                        container.innerHTML = '<div class="text-muted text-center py-3"><i class="bi bi-check-circle me-2"></i>No hay tareas pendientes por asignar</div>';
+                        badge.style.display = 'none';
+                        return;
+                    }
+
+                    badge.textContent = data.data.length;
+                    badge.style.display = 'inline-block';
+
+                    let html = '';
+                    data.data.forEach(task => {
+                        const color = task.service_type_color || '#6c757d';
+                        html += `
+                            <div class="card bg-dark border-danger mb-2">
+                                <div class="card-body p-2">
+                                    <div class="d-flex justify-content-between align-items-start mb-1">
+                                        <strong class="text-danger">${task.client_name || '(sin cliente)'}</strong>
+                                        <div class="d-flex gap-1 align-items-center flex-wrap">
+                                            <small class="badge" style="background:${color};">${task.service_type_name}</small>
+                                            <small class="text-muted"><i class="bi bi-calendar-event me-1"></i>${task.date}</small>
+                                        </div>
+                                    </div>
+                                    <small class="text-muted d-block mb-2">${task.description || '(sin descripción)'}</small>
+                                    <button class="btn btn-sm btn-success fw-bold" onclick="techTakeUnassignedTask(${task.id})">
+                                        <i class="bi bi-clipboard-check me-1"></i> Completar
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    container.innerHTML = html;
+                })
+                .catch(err => {
+                    console.error('Error cargando tareas sin asignar:', err);
+                    const container = document.getElementById('techUnassignedTasksList');
+                    if (container) container.innerHTML = '<div class="text-danger text-center py-2"><i class="bi bi-exclamation-triangle me-1"></i>Error al cargar tareas</div>';
+                });
+        }
+
+        function techTakeUnassignedTask(taskId) {
+            // Abre la sección de parte pre-rellenada con los datos de la tarea
+            openParteFromTask(taskId);
         }
 
     </script>

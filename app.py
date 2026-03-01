@@ -2572,6 +2572,33 @@ def get_unassigned_tasks():
         print(f"Error getting unassigned tasks: {str(e)}")
         return jsonify({'success': False, 'msg': str(e)}), 500
 
+@app.route('/api/tech/unassigned_tasks')
+@login_required
+def get_tech_unassigned_tasks():
+    """Obtener tareas sin técnico asignado - accesible para técnicos"""
+    try:
+        tasks = Task.query.filter(
+            Task.tech_id == None,
+            Task.status == 'Sin asignar'
+        ).order_by(Task.date.asc()).all()
+
+        result = []
+        for task in tasks:
+            service_type = ServiceType.query.get(task.service_type_id) if task.service_type_id else None
+            result.append({
+                'id': task.id,
+                'client_name': task.client_name,
+                'description': task.description,
+                'date': task.date.strftime('%d/%m/%Y') if task.date else '—',
+                'service_type_name': service_type.name if service_type else '—',
+                'service_type_color': service_type.color if service_type else '#6c757d',
+            })
+
+        return jsonify({'success': True, 'data': result})
+    except Exception as e:
+        print(f"Error getting unassigned tasks for tech: {str(e)}")
+        return jsonify({'success': False, 'msg': str(e)}), 500
+
 @app.route('/api/task/<int:task_id>/assign_tech', methods=['POST'])
 @login_required
 def assign_tech_to_task(task_id):
