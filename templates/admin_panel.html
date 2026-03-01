@@ -509,19 +509,40 @@
                                 <th>Servicio</th>
                                 <th>Fecha</th>
                                 <th>Técnico</th>
-                                <th><i class="bi bi-stopwatch me-1"></i>Tiempo</th>
+                                <th><i class="bi bi-truck me-1"></i>Transporte</th>
+                                <th><i class="bi bi-stopwatch me-1"></i>Trabajo</th>
                                 <th>Archivos</th>
                                 <th>Acción</th>
                             </tr>
                         </thead>
                         <tbody id="reportsTbody">
                             {% for r in informes %}
-                            <tr data-report-id="{{ r.id }}" data-client="{{ r.client_name|lower }}" data-date="{{ r.date.strftime('%Y-%m-%d') }}">
+                            <tr data-report-id="{{ r.id }}" data-client="{{ r.client_name|lower }}" data-date="{{ r.date.strftime('%Y-%m-%d') }}"
+                                {% if r.is_remote %}style="border-left:3px solid #06b6d4;"{% endif %}>
                                 <td>{{ r.id }}</td>
                                 <td>{{ r.client_name }}</td>
-                                <td>{{ r.service_type.name if r.service_type is not string else r.service_type }}</td>
-                                <td>{{ r.date.strftime('%d/%m/%Y') }}</td>
+                                <td>
+                                    {% if r.is_remote %}
+                                        <span class="badge bg-info text-dark"><i class="bi bi-telephone-fill me-1"></i>{{ r.service_type.name if r.service_type else 'Asistencia Remota' }}</span>
+                                    {% else %}
+                                        {{ r.service_type.name if r.service_type is not string else r.service_type }}
+                                    {% endif %}
+                                </td>
+                                <td>{{ r.date.strftime('%d/%m/%Y') if r.date else '—' }}</td>
                                 <td>{{ r.tech.username if r.tech else 'Sin técnico' }}</td>
+                                <td>
+                                    {% if r.is_remote %}
+                                        <span class="text-muted small">—</span>
+                                    {% elif r.parte_transport_start and r.parte_arrival %}
+                                        {% set t0 = r.parte_transport_start %}
+                                        {% set t1 = r.parte_arrival %}
+                                        <span style="font-family:'Courier New',monospace;font-size:0.82rem;font-weight:600;color:#20c997;background:#001a0f;border:1px solid #20c997;border-radius:6px;padding:2px 7px;white-space:nowrap;">
+                                            {{ t0 }} → {{ t1 }}
+                                        </span>
+                                    {% else %}
+                                        <span class="text-muted small">—</span>
+                                    {% endif %}
+                                </td>
                                 <td>
                                     {% if r.work_duration %}
                                         <span style="font-family:'Courier New',monospace;font-size:0.85rem;font-weight:700;color:#f37021;background:#1a0d00;border:1px solid #f37021;border-radius:6px;padding:3px 8px;letter-spacing:1px;white-space:nowrap;">{{ r.work_duration }}</span>
@@ -537,15 +558,18 @@
                                         <i class="bi bi-paperclip"></i> {{ att_list|length }}
                                     </button>
                                     {% else %}
-                                    <span class="text-muted small">Sin archivos</span>
+                                    <span class="text-muted small">—</span>
                                     {% endif %}
                                     {% else %}
-                                    <span class="text-muted small">Sin archivos</span>
+                                    <span class="text-muted small">—</span>
                                     {% endif %}
                                 </td>
-                                <td>
+                                <td class="d-flex gap-1 flex-wrap">
+                                    <button class="btn btn-sm btn-outline-info" onclick="openReportDetailModal({{ r.id }})">
+                                        <i class="bi bi-eye-fill"></i>
+                                    </button>
                                     <a href="/print_report/{{ r.id }}" target="_blank" class="btn btn-sm btn-outline-warning">
-                                        <i class="bi bi-printer-fill"></i> Imprimir
+                                        <i class="bi bi-printer-fill"></i>
                                     </a>
                                 </td>
                             </tr>
@@ -1777,6 +1801,33 @@
     </div>
 
     <!-- ✅ NUEVO: Modal para Asistencia Remota -->
+
+    <!-- ── Modal: Detalle de Informe/Parte ──────────────────────────────── -->
+    <div class="modal fade" id="modalReportDetail" tabindex="-1" aria-labelledby="modalReportDetailLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content bg-dark text-white border-secondary">
+                <div class="modal-header border-secondary" id="reportDetailHeader">
+                    <h5 class="modal-title" id="modalReportDetailLabel">
+                        <i class="bi bi-file-earmark-text me-2"></i>Detalle del Informe
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="reportDetailBody">
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-warning"></div>
+                        <p class="mt-2 text-muted">Cargando...</p>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <a id="reportDetailPrintBtn" href="#" target="_blank" class="btn btn-outline-warning btn-sm">
+                        <i class="bi bi-printer-fill me-1"></i>Imprimir parte
+                    </a>
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="modal fade" id="modalRemoteAssistance" tabindex="-1">
         <div class="modal-dialog modal-lg">
             <div class="modal-content bg-dark text-white">
@@ -5135,13 +5186,20 @@
                             : '<span class="text-muted small">—</span>';
                         var attachHtml = r.has_attachments
                             ? '<button class="btn btn-sm btn-outline-info" onclick="showAttachmentsModal(' + r.id + ', \'' + r.client_name.replace(/'/g,"\'") + '\')"><i class="bi bi-paperclip"></i> ' + r.attachments_count + '</button>'
-                            : '<span class="text-muted small">Sin archivos</span>';
-                        var tr = document.createElement('tr');
+                            : '<span class="text-muted small">—</span>';
                         var svcHtml = r.is_remote
                             ? '<span class="badge bg-info text-dark"><i class="bi bi-telephone-fill me-1"></i>' + r.service_type + '</span>'
                             : r.service_type;
+                        var transportHtml = (!r.is_remote && r.parte_transport_start && r.parte_arrival)
+                            ? '<span style="font-family:\'Courier New\',monospace;font-size:0.82rem;font-weight:600;color:#20c997;background:#001a0f;border:1px solid #20c997;border-radius:6px;padding:2px 7px;white-space:nowrap;">' + r.parte_transport_start + ' → ' + r.parte_arrival + '</span>'
+                            : '<span class="text-muted small">—</span>';
+                        var actionHtml = '<div class="d-flex gap-1">'
+                            + '<button class="btn btn-sm btn-outline-info" onclick="openReportDetailModal(' + r.id + ')"><i class="bi bi-eye-fill"></i></button>'
+                            + '<a href="/print_report/' + r.id + '" target="_blank" class="btn btn-sm btn-outline-warning"><i class="bi bi-printer-fill"></i></a>'
+                            + '</div>';
+                        var tr = document.createElement('tr');
                         if (r.is_remote) tr.style.borderLeft = '3px solid #06b6d4';
-                        tr.innerHTML = '<td>' + r.id + '</td><td>' + r.client_name + '</td><td>' + svcHtml + '</td><td>' + r.date + '</td><td>' + r.tech + '</td><td>' + durationHtml + '</td><td>' + attachHtml + '</td><td><a href="/print_report/' + r.id + '" target="_blank" class="btn btn-sm btn-outline-warning"><i class="bi bi-printer-fill"></i> Imprimir</a></td>';
+                        tr.innerHTML = '<td>' + r.id + '</td><td>' + r.client_name + '</td><td>' + svcHtml + '</td><td>' + r.date + '</td><td>' + r.tech + '</td><td>' + transportHtml + '</td><td>' + durationHtml + '</td><td>' + attachHtml + '</td><td>' + actionHtml + '</td>';
                         tbody.appendChild(tr);
                     });
                 })
@@ -5922,4 +5980,154 @@ function _remoteToast(msg, type) {
     container.insertAdjacentHTML('beforeend', html);
     setTimeout(() => { const el = document.getElementById(id); if (el) el.remove(); }, 4000);
 }
+
+        // ══════════════════════════════════════════════════════════════════
+        // MODAL DETALLE DE INFORME
+        // ══════════════════════════════════════════════════════════════════
+        function openReportDetailModal(taskId) {
+            document.getElementById('reportDetailPrintBtn').href = '/print_report/' + taskId;
+            const header = document.getElementById('reportDetailHeader');
+            const body   = document.getElementById('reportDetailBody');
+            body.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-warning"></div><p class="mt-2 text-muted">Cargando...</p></div>';
+            new bootstrap.Modal(document.getElementById('modalReportDetail')).show();
+
+            fetch('/api/report_detail/' + taskId)
+                .then(r => r.json())
+                .then(d => {
+                    if (!d.success) {
+                        body.innerHTML = '<div class="alert alert-danger">Error al cargar el detalle</div>';
+                        return;
+                    }
+                    renderReportDetail(d, header, body);
+                })
+                .catch(() => {
+                    body.innerHTML = '<div class="alert alert-danger">Error de conexión</div>';
+                });
+        }
+
+        function renderReportDetail(d, header, body) {
+            // Actualizar cabecera según tipo
+            if (d.is_remote) {
+                header.querySelector('.modal-title').innerHTML =
+                    '<i class="bi bi-telephone-fill me-2 text-info"></i>Asistencia Remota — ' + d.client_name;
+            } else {
+                header.querySelector('.modal-title').innerHTML =
+                    '<i class="bi bi-file-earmark-text me-2 text-warning"></i>Parte de Trabajo — ' + d.client_name;
+            }
+
+            // ── Fila de metadatos ──────────────────────────────────────────
+            var metaHtml = '<div class="row g-2 mb-3">'
+                + _rdCell('Cliente',   d.client_name, 'bi-building', 'col-md-4')
+                + _rdCell('Técnico',   d.tech,         'bi-person-fill', 'col-md-4')
+                + _rdCell('Fecha',     d.date,         'bi-calendar-fill', 'col-md-4')
+                + _rdCell('Servicio',  d.service_type, 'bi-tools', 'col-md-6')
+                + _rdCell('ID Parte',  '#' + d.id,     'bi-hash', 'col-md-3')
+                + '</div>';
+
+            var timingHtml = '';
+            if (d.is_remote) {
+                // ── Tiempos asistencia remota ──────────────────────────────
+                timingHtml = '<div class="card border-info bg-dark mb-3"><div class="card-header border-info py-2">'
+                    + '<small class="fw-bold text-info"><i class="bi bi-clock me-1"></i>TIEMPOS DE SESIÓN REMOTA</small></div>'
+                    + '<div class="card-body py-2"><div class="row g-2">'
+                    + _rdCell('Hora inicio', d.start_time || '—', 'bi-play-circle', 'col-4')
+                    + _rdCell('Hora fin',    d.end_time   || '—', 'bi-stop-circle', 'col-4')
+                    + _rdCell('Duración',    d.work_duration || '—', 'bi-stopwatch', 'col-4')
+                    + '</div></div></div>';
+            } else {
+                // ── Tiempos parte presencial ───────────────────────────────
+                var hasTransport = d.parte_transport_start || d.parte_arrival;
+                var hasWork      = d.parte_work_start || d.parte_work_end;
+
+                if (hasTransport || hasWork || d.work_duration) {
+                    timingHtml = '<div class="card border-secondary bg-dark mb-3"><div class="card-header border-secondary py-2">'
+                        + '<small class="fw-bold text-light"><i class="bi bi-clock-history me-1"></i>TIEMPOS DEL PARTE</small></div>'
+                        + '<div class="card-body py-2">';
+
+                    // Barra de progreso visual de la jornada
+                    if (hasTransport || hasWork) {
+                        timingHtml += '<div class="row g-2 mb-2">';
+                        if (d.parte_transport_start)
+                            timingHtml += _rdCell('Salida (transporte)', d.parte_transport_start, 'bi-truck', 'col-6 col-md-3');
+                        if (d.parte_arrival)
+                            timingHtml += _rdCell('Llegada al cliente', d.parte_arrival, 'bi-geo-alt-fill', 'col-6 col-md-3');
+                        if (d.parte_work_start)
+                            timingHtml += _rdCell('Inicio trabajo', d.parte_work_start, 'bi-play-circle-fill', 'col-6 col-md-3');
+                        if (d.parte_work_end)
+                            timingHtml += _rdCell('Fin trabajo', d.parte_work_end, 'bi-stop-circle-fill', 'col-6 col-md-3');
+                        timingHtml += '</div>';
+
+                        // Resumen de duraciones
+                        timingHtml += '<div class="row g-2">';
+                        if (d.transport_duration)
+                            timingHtml += '<div class="col-md-6"><div class="p-2 rounded" style="background:#001a0f;border:1px solid #20c997;">'
+                                + '<small class="text-muted d-block"><i class="bi bi-truck me-1"></i>Tiempo de transporte</small>'
+                                + '<span style="font-family:'Courier New',monospace;font-size:1rem;font-weight:700;color:#20c997;">' + d.transport_duration + '</span>'
+                                + '</div></div>';
+                        if (d.work_duration)
+                            timingHtml += '<div class="col-md-6"><div class="p-2 rounded" style="background:#1a0d00;border:1px solid #f37021;">'
+                                + '<small class="text-muted d-block"><i class="bi bi-stopwatch me-1"></i>Tiempo de trabajo</small>'
+                                + '<span style="font-family:'Courier New',monospace;font-size:1rem;font-weight:700;color:#f37021;">' + d.work_duration + '</span>'
+                                + '</div></div>';
+                        timingHtml += '</div>';
+                    } else if (d.work_duration) {
+                        timingHtml += '<div class="p-2 rounded" style="background:#1a0d00;border:1px solid #f37021;">'
+                            + '<small class="text-muted d-block"><i class="bi bi-stopwatch me-1"></i>Duración total</small>'
+                            + '<span style="font-family:'Courier New',monospace;font-size:1rem;font-weight:700;color:#f37021;">' + d.work_duration + '</span>'
+                            + '</div>';
+                    }
+                    timingHtml += '</div></div>';
+                }
+            }
+
+            // ── Descripción / observaciones ────────────────────────────────
+            var descHtml = '';
+            if (d.description) {
+                descHtml = '<div class="mb-3"><label class="form-label text-muted small fw-bold"><i class="bi bi-chat-text me-1"></i>DESCRIPCIÓN / OBSERVACIONES</label>'
+                    + '<div class="p-2 rounded border border-secondary" style="background:#111;white-space:pre-wrap;font-size:0.88rem;">' + _esc(d.description) + '</div></div>';
+            }
+
+            // ── Piezas / materiales ───────────────────────────────────────
+            var partsHtml = '';
+            if (d.parts_text && !d.is_remote) {
+                partsHtml = '<div class="mb-3"><label class="form-label text-muted small fw-bold"><i class="bi bi-box-seam me-1"></i>PIEZAS / MATERIALES</label>'
+                    + '<div class="p-2 rounded border border-secondary" style="background:#111;white-space:pre-wrap;font-size:0.88rem;">' + _esc(d.parts_text) + '</div></div>';
+            }
+
+            // ── Firma ─────────────────────────────────────────────────────
+            var firmaHtml = '';
+            if (!d.is_remote && d.has_signature) {
+                firmaHtml = '<div class="mb-2"><div class="d-flex align-items-center gap-2 p-2 rounded border border-success" style="background:#001a00;">'
+                    + '<i class="bi bi-pen-fill text-success fs-5"></i>'
+                    + '<div><small class="text-muted d-block">Firmado por</small>'
+                    + '<span class="text-success fw-bold">' + _esc(d.signature_client_name || 'Cliente') + '</span>'
+                    + (d.signature_timestamp ? '<small class="text-muted ms-2">· ' + d.signature_timestamp + '</small>' : '')
+                    + '</div></div></div>';
+            }
+
+            // ── Adjuntos ──────────────────────────────────────────────────
+            var attHtml = '';
+            if (d.attachments && d.attachments.length > 0) {
+                attHtml = '<div class="mb-2"><label class="form-label text-muted small fw-bold"><i class="bi bi-paperclip me-1"></i>ARCHIVOS ADJUNTOS (' + d.attachments.length + ')</label><div class="d-flex flex-wrap gap-1">';
+                d.attachments.forEach(function(a) {
+                    attHtml += '<span class="badge bg-secondary">' + _esc(a.name) + '</span>';
+                });
+                attHtml += '</div></div>';
+            }
+
+            body.innerHTML = metaHtml + timingHtml + descHtml + partsHtml + firmaHtml + attHtml;
+        }
+
+        function _rdCell(label, value, icon, colClass) {
+            return '<div class="' + (colClass || 'col-md-4') + '">'
+                + '<div class="p-2 rounded" style="background:#1a1a1a;border:1px solid #333;">'
+                + '<small class="text-muted d-block"><i class="bi ' + icon + ' me-1"></i>' + label + '</small>'
+                + '<span class="fw-bold text-white small">' + (value || '—') + '</span>'
+                + '</div></div>';
+        }
+
+        function _esc(s) {
+            return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        }
+
 </script>

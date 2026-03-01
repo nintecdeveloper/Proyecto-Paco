@@ -1886,6 +1886,80 @@ def create_alarm():
     flash('Alarma creada correctamente.', 'success')
     return redirect(url_for('dashboard'))
 
+@app.route('/api/report_detail/<int:task_id>')
+@login_required
+def api_report_detail(task_id):
+    """Detalle completo de un informe/parte para el modal de admin"""
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'msg': 'No autorizado'}), 403
+    try:
+        t = Task.query.get_or_404(task_id)
+        svc_name = t.service_type.name if t.service_type else ('Asistencia Remota' if t.is_remote else '—')
+        tech_name = t.tech.username if t.tech else 'Sin técnico'
+        date_str = t.date.strftime('%d/%m/%Y') if t.date else '—'
+
+        # Calcular tiempo de transporte
+        transport_duration = ''
+        if t.parte_transport_start and t.parte_arrival:
+            try:
+                from datetime import datetime as _dt2
+                t0 = _dt2.strptime(t.parte_transport_start, '%H:%M')
+                t1 = _dt2.strptime(t.parte_arrival, '%H:%M')
+                diff_min = int((t1 - t0).total_seconds() / 60)
+                if diff_min > 0:
+                    h, m = divmod(diff_min, 60)
+                    transport_duration = f'{h}h {m:02d}min' if h else f'{m}min'
+            except Exception:
+                pass
+
+        # Adjuntos
+        attachments = []
+        if t.attachments:
+            try:
+                atts = json.loads(t.attachments)
+                if isinstance(atts, list):
+                    for a in atts:
+                        if isinstance(a, dict):
+                            attachments.append({'name': a.get('original_name', a.get('filename', '')), 'filename': a.get('filename', '')})
+                        else:
+                            attachments.append({'name': str(a), 'filename': str(a)})
+            except Exception:
+                pass
+
+        return jsonify({
+            'success':               True,
+            'id':                    t.id,
+            'is_remote':             bool(t.is_remote),
+            'client_name':           t.client_name or '—',
+            'service_type':          svc_name,
+            'date':                  date_str,
+            'tech':                  tech_name,
+            # Tiempos del parte presencial
+            'parte_transport_start': t.parte_transport_start or '',
+            'parte_arrival':         t.parte_arrival or '',
+            'parte_work_start':      t.parte_work_start or '',
+            'parte_work_end':        t.parte_work_end or '',
+            'transport_duration':    transport_duration,
+            'work_duration':         t.work_duration or '',
+            # Tiempos asistencia remota
+            'start_time':            t.start_time or '',
+            'end_time':              t.end_time or '',
+            'remote_support_hours':  t.remote_support_hours or 0,
+            # Contenido
+            'description':           t.description or '',
+            'parts_text':            t.parts_text or '',
+            # Firma
+            'has_signature':         bool(t.signature_data),
+            'signature_client_name': t.signature_client_name or '',
+            'signature_timestamp':   t.signature_timestamp.strftime('%d/%m/%Y %H:%M') if t.signature_timestamp else '',
+            # Adjuntos
+            'attachments':           attachments,
+        })
+    except Exception as e:
+        print(f"Error en api_report_detail: {e}")
+        return jsonify({'success': False, 'msg': str(e)}), 500
+
+
 @app.route('/api/reports')
 @login_required
 def api_reports():
@@ -1935,16 +2009,42 @@ def api_reports():
                 except Exception:
                     pass
 
+            # Calcular tiempo de transporte si hay datos
+            transport_duration = ''
+            if t.parte_transport_start and t.parte_arrival:
+                try:
+                    from datetime import datetime as _dt2
+                    t0 = _dt2.strptime(t.parte_transport_start, '%H:%M')
+                    t1 = _dt2.strptime(t.parte_arrival, '%H:%M')
+                    diff_min = int((t1 - t0).total_seconds() / 60)
+                    if diff_min > 0:
+                        h, m = divmod(diff_min, 60)
+                        transport_duration = f'{h}h {m:02d}min' if h else f'{m}min'
+                except Exception:
+                    pass
+
             results.append({
-                'id':               t.id,
-                'client_name':      t.client_name or '—',
-                'service_type':     svc_name,
-                'date':             date_str,
-                'tech':             tech_name,
-                'work_duration':    t.work_duration or '',
-                'has_attachments':  has_attachments,
-                'attachments_count': att_count,
-                'is_remote':        bool(t.is_remote),
+                'id':                    t.id,
+                'client_name':           t.client_name or '—',
+                'service_type':          svc_name,
+                'date':                  date_str,
+                'tech':                  tech_name,
+                'work_duration':         t.work_duration or '',
+                'has_attachments':       has_attachments,
+                'attachments_count':     att_count,
+                'is_remote':             bool(t.is_remote),
+                # Timestamps del parte
+                'parte_transport_start': t.parte_transport_start or '',
+                'parte_arrival':         t.parte_arrival or '',
+                'parte_work_start':      t.parte_work_start or '',
+                'parte_work_end':        t.parte_work_end or '',
+                'transport_duration':    transport_duration,
+                # Datos adicionales para el detalle
+                'start_time':            t.start_time or '',
+                'end_time':              t.end_time or '',
+                'description':           t.description or '',
+                'parts_text':            t.parts_text or '',
+                'remote_support_hours':  t.remote_support_hours or 0,
             })
 
         return jsonify({'success': True, 'data': results, 'total': len(results)})
