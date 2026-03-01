@@ -1886,6 +1886,73 @@ def create_alarm():
     flash('Alarma creada correctamente.', 'success')
     return redirect(url_for('dashboard'))
 
+@app.route('/api/reports')
+@login_required
+def api_reports():
+    """API endpoint para obtener informes completados con filtros, incluyendo asistencias remotas"""
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'msg': 'No autorizado'}), 403
+    
+    try:
+        client_filter  = request.args.get('client', '').strip().lower()
+        date_from_str  = request.args.get('date_from', '')
+        date_to_str    = request.args.get('date_to', '')
+
+        query = Task.query.filter_by(status='Completado')
+
+        if client_filter:
+            query = query.filter(Task.client_name.ilike(f'%{client_filter}%'))
+        if date_from_str:
+            try:
+                df = datetime.strptime(date_from_str, '%Y-%m-%d').date()
+                query = query.filter(Task.date >= df)
+            except Exception:
+                pass
+        if date_to_str:
+            try:
+                dt = datetime.strptime(date_to_str, '%Y-%m-%d').date()
+                query = query.filter(Task.date <= dt)
+            except Exception:
+                pass
+
+        tasks = query.order_by(Task.date.desc()).limit(200).all()
+
+        results = []
+        for t in tasks:
+            svc_name = t.service_type.name if t.service_type else ('Asistencia Remota' if t.is_remote else '—')
+            tech_name = t.tech.username if t.tech else 'Sin técnico'
+            date_str = t.date.strftime('%d/%m/%Y') if t.date else '—'
+
+            # Adjuntos
+            has_attachments = False
+            att_count = 0
+            if t.attachments:
+                try:
+                    atts = json.loads(t.attachments)
+                    if isinstance(atts, list) and len(atts) > 0:
+                        has_attachments = True
+                        att_count = len(atts)
+                except Exception:
+                    pass
+
+            results.append({
+                'id':               t.id,
+                'client_name':      t.client_name or '—',
+                'service_type':     svc_name,
+                'date':             date_str,
+                'tech':             tech_name,
+                'work_duration':    t.work_duration or '',
+                'has_attachments':  has_attachments,
+                'attachments_count': att_count,
+                'is_remote':        bool(t.is_remote),
+            })
+
+        return jsonify({'success': True, 'data': results, 'total': len(results)})
+    except Exception as e:
+        print(f"Error en api_reports: {e}")
+        return jsonify({'success': False, 'msg': str(e)}), 500
+
+
 @app.route('/print_report/<int:report_id>')
 @login_required
 def print_report(report_id):

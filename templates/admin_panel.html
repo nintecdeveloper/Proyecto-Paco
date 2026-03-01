@@ -410,23 +410,31 @@
                     </div>
                 </div>
 
-                <div class="row">
-                    <div class="col-lg-9">
+                <!-- Botón para mostrar/ocultar lista de tareas -->
+                <div class="d-flex justify-content-end mb-2">
+                    <button class="btn btn-sm btn-outline-light" id="toggleTaskListBtn" onclick="toggleGlobalTaskList()" title="Mostrar/ocultar lista de tareas">
+                        <i class="bi bi-layout-sidebar-reverse me-1"></i> Mostrar lista de tareas
+                    </button>
+                </div>
+
+                <div class="row" id="globalCalendarRow">
+                    <div class="col-12" id="calendarGlobalColFull">
                         <div id="calendarGlobal"></div>
                     </div>
-                    <div class="col-lg-3">
+                    <div class="col-lg-3 d-none" id="taskListSidebarCol">
                         <div class="card bg-dark border-secondary mt-3 mt-lg-0">
-                            <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
-                                <h6 class="mb-0 small"><i class="bi bi-list-task me-2"></i>Tareas</h6>
-                                <div class="form-check form-switch mb-0">
-                                    <div class="btn-group btn-group-sm" role="group" aria-label="Filtro de estado">
-                                        <input type="radio" class="btn-check" name="taskStatusFilter" id="filterTodas" value="todas" checked onchange="renderGlobalTaskList()">
-                                        <label class="btn btn-outline-secondary" for="filterTodas" style="font-size:0.72rem;padding:3px 8px;">Todas</label>
-                                        <input type="radio" class="btn-check" name="taskStatusFilter" id="filterPendientes" value="pendientes" onchange="renderGlobalTaskList()">
-                                        <label class="btn btn-outline-warning" for="filterPendientes" style="font-size:0.72rem;padding:3px 8px;">Pendientes</label>
-                                        <input type="radio" class="btn-check" name="taskStatusFilter" id="filterCompletadas" value="completadas" onchange="renderGlobalTaskList()">
-                                        <label class="btn btn-outline-success" for="filterCompletadas" style="font-size:0.72rem;padding:3px 8px;">Completadas</label>
-                                    </div>
+                            <div class="card-header bg-secondary text-white">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <h6 class="mb-0 small"><i class="bi bi-list-task me-2"></i>Tareas</h6>
+                                    <button class="btn btn-sm btn-close btn-close-white" onclick="toggleGlobalTaskList()" title="Ocultar lista"></button>
+                                </div>
+                                <div class="btn-group btn-group-sm w-100" role="group" aria-label="Filtro de estado">
+                                    <input type="radio" class="btn-check" name="taskStatusFilter" id="filterTodas" value="todas" checked onchange="renderGlobalTaskList()">
+                                    <label class="btn btn-outline-secondary" for="filterTodas" style="font-size:0.72rem;padding:3px 8px;">Todas</label>
+                                    <input type="radio" class="btn-check" name="taskStatusFilter" id="filterPendientes" value="pendientes" onchange="renderGlobalTaskList()">
+                                    <label class="btn btn-outline-warning" for="filterPendientes" style="font-size:0.72rem;padding:3px 8px;">Pendientes</label>
+                                    <input type="radio" class="btn-check" name="taskStatusFilter" id="filterCompletadas" value="completadas" onchange="renderGlobalTaskList()">
+                                    <label class="btn btn-outline-success" for="filterCompletadas" style="font-size:0.72rem;padding:3px 8px;">Completadas</label>
                                 </div>
                             </div>
                             <div class="card-body p-1">
@@ -2541,6 +2549,29 @@
             // refetchEvents() llama a la función events() que aplica getActiveFilters()
             // eventsSet se dispara automáticamente y actualiza la lista lateral
             calendarGlobalInstance.refetchEvents();
+        }
+
+
+        // ── Toggle lista de tareas lateral ───────────────────────
+        let _taskListVisible = false;
+        function toggleGlobalTaskList() {
+            _taskListVisible = !_taskListVisible;
+            const sidebarCol   = document.getElementById('taskListSidebarCol');
+            const calendarCol  = document.getElementById('calendarGlobalColFull');
+            const btn          = document.getElementById('toggleTaskListBtn');
+
+            if (_taskListVisible) {
+                sidebarCol.classList.remove('d-none');
+                calendarCol.className = 'col-lg-9';
+                btn.innerHTML = '<i class="bi bi-layout-sidebar-reverse me-1"></i> Ocultar lista de tareas';
+                renderGlobalTaskList && renderGlobalTaskList();
+            } else {
+                sidebarCol.classList.add('d-none');
+                calendarCol.className = 'col-12';
+                btn.innerHTML = '<i class="bi bi-layout-sidebar-reverse me-1"></i> Mostrar lista de tareas';
+            }
+            // Re-renderizar el calendario para que ocupe el espacio correcto
+            setTimeout(() => { if (calendarGlobalInstance) calendarGlobalInstance.updateSize(); }, 50);
         }
 
         function refreshGlobalCalendar() {
@@ -5106,7 +5137,11 @@
                             ? '<button class="btn btn-sm btn-outline-info" onclick="showAttachmentsModal(' + r.id + ', \'' + r.client_name.replace(/'/g,"\'") + '\')"><i class="bi bi-paperclip"></i> ' + r.attachments_count + '</button>'
                             : '<span class="text-muted small">Sin archivos</span>';
                         var tr = document.createElement('tr');
-                        tr.innerHTML = '<td>' + r.id + '</td><td>' + r.client_name + '</td><td>' + r.service_type + '</td><td>' + r.date + '</td><td>' + r.tech + '</td><td>' + durationHtml + '</td><td>' + attachHtml + '</td><td><a href="/print_report/' + r.id + '" target="_blank" class="btn btn-sm btn-outline-warning"><i class="bi bi-printer-fill"></i> Imprimir</a></td>';
+                        var svcHtml = r.is_remote
+                            ? '<span class="badge bg-info text-dark"><i class="bi bi-telephone-fill me-1"></i>' + r.service_type + '</span>'
+                            : r.service_type;
+                        if (r.is_remote) tr.style.borderLeft = '3px solid #06b6d4';
+                        tr.innerHTML = '<td>' + r.id + '</td><td>' + r.client_name + '</td><td>' + svcHtml + '</td><td>' + r.date + '</td><td>' + r.tech + '</td><td>' + durationHtml + '</td><td>' + attachHtml + '</td><td><a href="/print_report/' + r.id + '" target="_blank" class="btn btn-sm btn-outline-warning"><i class="bi bi-printer-fill"></i> Imprimir</a></td>';
                         tbody.appendChild(tr);
                     });
                 })
