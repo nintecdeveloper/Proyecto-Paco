@@ -564,12 +564,9 @@
                                     <span class="text-muted small">—</span>
                                     {% endif %}
                                 </td>
-                                <td class="d-flex gap-1 flex-wrap">
-                                    <button class="btn btn-sm btn-outline-info" onclick="openReportDetailModal({{ r.id }})">
+                                <td>
+                                    <a href="/print_report/{{ r.id }}" target="_blank" class="btn btn-sm btn-outline-info">
                                         <i class="bi bi-eye-fill"></i>
-                                    </button>
-                                    <a href="/print_report/{{ r.id }}" target="_blank" class="btn btn-sm btn-outline-warning">
-                                        <i class="bi bi-printer-fill"></i>
                                     </a>
                                 </td>
                             </tr>
@@ -1819,9 +1816,6 @@
                     </div>
                 </div>
                 <div class="modal-footer border-secondary">
-                    <a id="reportDetailPrintBtn" href="#" target="_blank" class="btn btn-outline-warning btn-sm">
-                        <i class="bi bi-printer-fill me-1"></i>Ver parte
-                    </a>
                     <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
                 </div>
             </div>
@@ -2163,7 +2157,7 @@
                 <div class="modal-footer border-secondary">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
                     <a id="printReportLink" href="#" target="_blank" class="btn btn-warning">
-                        <i class="bi bi-printer-fill me-1"></i> Ver Parte
+                        <i class="bi bi-printer-fill me-1"></i> Imprimir Parte
                     </a>
                 </div>
             </div>
@@ -5193,10 +5187,7 @@
                         var transportHtml = (!r.is_remote && r.parte_transport_start && r.parte_arrival)
                             ? '<span style="font-family:\'Courier New\',monospace;font-size:0.82rem;font-weight:600;color:#20c997;background:#001a0f;border:1px solid #20c997;border-radius:6px;padding:2px 7px;white-space:nowrap;">' + r.parte_transport_start + ' → ' + r.parte_arrival + '</span>'
                             : '<span class="text-muted small">—</span>';
-                        var actionHtml = '<div class="d-flex gap-1">'
-                            + '<button class="btn btn-sm btn-outline-info" onclick="openReportDetailModal(' + r.id + ')"><i class="bi bi-eye-fill"></i></button>'
-                            + '<a href="/print_report/' + r.id + '" target="_blank" class="btn btn-sm btn-outline-warning"><i class="bi bi-printer-fill"></i></a>'
-                            + '</div>';
+                        var actionHtml = '<a href="/print_report/' + r.id + '" target="_blank" class="btn btn-sm btn-outline-info"><i class="bi bi-eye-fill"></i></a>';
                         var tr = document.createElement('tr');
                         if (r.is_remote) tr.style.borderLeft = '3px solid #06b6d4';
                         tr.innerHTML = '<td>' + r.id + '</td><td>' + r.client_name + '</td><td>' + svcHtml + '</td><td>' + r.date + '</td><td>' + r.tech + '</td><td>' + transportHtml + '</td><td>' + durationHtml + '</td><td>' + attachHtml + '</td><td>' + actionHtml + '</td>';
