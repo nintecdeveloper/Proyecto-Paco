@@ -392,13 +392,7 @@
                     <p class="text-muted small">Estadísticas y rendimiento</p>
                 </div>
             </div>
-            <div class="col-12 col-md-6" onclick="showSection('section-incidencias')">
-                <div class="menu-card">
-                    <i class="bi bi-exclamation-triangle fs-1 text-danger mb-2 d-block"></i>
-                    <h4 class="text-white">INCIDENCIAS</h4>
-                    <p class="text-muted small">Reportar problemas</p>
-                </div>
-            </div>
+
         </div>
 
         <div id="section-parte" class="d-none" style="max-width: 900px; margin: auto;">
@@ -413,7 +407,7 @@
                     <label class="form-label text-warning fw-bold mb-2 small">VINCULAR CITA (OPCIONAL)</label>
                     <select name="linked_task_id" id="linkedTaskSelect" class="form-select form-select-lg"
                         onchange="fillFromTask(this)">
-                        <option value="none" selected>Nueva incidencia (Sin cita)</option>
+                        <option value="none" selected>Nuevo parte (Sin cita)</option>
                         {% for task in pending_tasks %}
                         <option value="{{ task.id }}" data-client="{{ task.client_name }}"
                             data-date="{{ task.date.strftime('%Y-%m-%d') }}" data-time="{{ task.start_time }}"
@@ -820,50 +814,7 @@
 
 
         <!-- SECCIÓN INCIDENCIAS -->
-        <div id="section-incidencias" class="d-none" style="max-width: 700px; margin: auto;">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h3 class="text-danger fw-bold m-0 fs-4"><i class="bi bi-exclamation-triangle me-2"></i>Reportar Incidencia</h3>
-                <button class="btn btn-outline-secondary btn-sm px-3" onclick="showSection('home-menu')">Atrás</button>
-            </div>
 
-            <div class="card bg-dark border-danger p-4">
-                <form id="formIncidencias" method="POST">
-                    <div class="mb-3">
-                        <label class="form-label fw-bold text-white">Tipo de Incidencia *</label>
-                        <select id="incidencia_tipo" name="tipo" class="form-select" required onchange="updateIncidenciaEmail()">
-                            <option value="">-- Seleccionar --</option>
-                            <option value="operativa">Incidencia Operativa (Cliente, Servicio, etc.)</option>
-                            <option value="tecnica">Error Técnico de la Web</option>
-                        </select>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-bold text-white">Asunto *</label>
-                        <input type="text" id="incidencia_asunto" name="asunto" class="form-control" placeholder="Resumen breve del problema" required>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-bold text-white">Descripción Detallada *</label>
-                        <textarea id="incidencia_descripcion" name="descripcion" class="form-control" rows="5" 
-                                  placeholder="Describe el problema con el mayor detalle posible..." required></textarea>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-bold text-white">Cliente Relacionado (opcional)</label>
-                        <input type="text" id="incidencia_cliente" name="cliente" class="form-control" placeholder="Nombre del cliente si aplica">
-                    </div>
-
-                    <div class="alert alert-info border-info">
-                        <i class="bi bi-info-circle me-2"></i>
-                        <strong>Destinatario:</strong> <span id="emailDestinatario" class="text-warning">Selecciona un tipo de incidencia</span>
-                    </div>
-
-                    <button type="submit" class="btn btn-danger w-100 btn-lg fw-bold">
-                        <i class="bi bi-send-fill me-2"></i>Enviar Incidencia
-                    </button>
-                </form>
-            </div>
-        </div>
 
     </div><!-- /container-fluid -->
 
@@ -3193,66 +3144,7 @@
             if (snEl) snEl.addEventListener('input', () => saveDraft(false));
         });
 
-                // ==================== INCIDENCIAS ====================
-        function updateIncidenciaEmail() {
-            const tipo = document.getElementById('incidencia_tipo').value;
-            const emailSpan = document.getElementById('emailDestinatario');
-            
-            if (tipo === 'operativa') {
-                emailSpan.textContent = 'paco@oslaprint.com';
-            } else if (tipo === 'tecnica') {
-                emailSpan.textContent = 'nintecdeveloper@gmail.com';
-            } else {
-                emailSpan.textContent = 'Selecciona un tipo de incidencia';
-            }
-        }
 
-        // Manejar envío de formulario de incidencias
-        document.getElementById('formIncidencias')?.addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const tipo = document.getElementById('incidencia_tipo').value;
-            const asunto = document.getElementById('incidencia_asunto').value;
-            const descripcion = document.getElementById('incidencia_descripcion').value;
-            const cliente = document.getElementById('incidencia_cliente').value;
-            
-            // Validar campos
-            if (!tipo || !asunto || !descripcion) {
-                alert('Por favor, complete todos los campos obligatorios');
-                return;
-            }
-            
-            // Enviar al servidor
-            fetch('/report_incidencia', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    tipo: tipo,
-                    asunto: asunto,
-                    descripcion: descripcion,
-                    cliente: cliente,
-                    usuario: '{{ current_user.username }}',
-                    email_usuario: '{{ current_user.email }}'
-                })
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    alert('✓ Incidencia reportada correctamente. Recibirás una respuesta pronto.');
-                    this.reset();
-                    updateIncidenciaEmail();
-                    showSection('home-menu');
-                } else {
-                    alert('❌ Error al enviar incidencia: ' + (data.msg || 'Error desconocido'));
-                }
-            })
-            .catch(err => {
-                console.error('Error:', err);
-                alert('❌ Error de conexión al enviar la incidencia');
-            });
-        });
 
     </script>
 </body>

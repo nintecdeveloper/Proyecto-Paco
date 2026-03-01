@@ -365,9 +365,14 @@
                             title="Actualizar calendario">
                             <i class="bi bi-arrow-clockwise me-1"></i> Actualizar
                         </button>
-                        <button class="btn btn-warning btn-sm fw-bold" onclick="openNuevaTareaModal('cita')"
-                            title="Crear nueva cita o tarea">
-                            <i class="bi bi-calendar-plus-fill me-1"></i> Nueva Cita / Tarea
+                        <button class="btn btn-warning btn-sm fw-bold" data-bs-toggle="modal"
+                            data-bs-target="#modalScheduleAppointment">
+                            <i class="bi bi-calendar-plus-fill me-1"></i> Nueva Cita
+                        </button>
+                        <button class="btn btn-danger btn-sm fw-bold" data-bs-toggle="modal"
+                            data-bs-target="#modalCreateUnassignedTask"
+                            title="Crear tarea sin técnico asignado">
+                            <i class="bi bi-exclamation-circle-fill me-1"></i> Tarea Pendiente
                         </button>
                         <button class="btn btn-info btn-sm fw-bold" data-bs-toggle="modal"
                             data-bs-target="#modalRemoteAssistance"
@@ -1698,114 +1703,98 @@
     </div>
 
     <!-- Modal: Agendar Cita -->
-    <!-- Modal unificado: Nueva Cita / Tarea Sin Asignar -->
-    <div class="modal fade" id="modalNuevaTarea" tabindex="-1">
+    <div class="modal fade" id="modalScheduleAppointment" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content bg-dark text-white">
-                <div class="modal-header border-secondary" id="nuevaTareaHeader">
-                    <h5 class="modal-title" id="nuevaTareaTitle">
-                        <i class="bi bi-calendar-plus-fill me-2 text-warning"></i>Nueva Cita
-                    </h5>
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">Agendar Nueva Cita</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body pb-1">
-                    <!-- Toggle tipo de tarea -->
-                    <div class="d-flex gap-2 mb-3">
-                        <button type="button" id="btnModoCita" class="btn btn-warning btn-sm flex-fill fw-bold active"
-                            onclick="setModoNuevaTarea('cita')">
-                            <i class="bi bi-calendar-check me-1"></i>Cita con fecha
-                        </button>
-                        <button type="button" id="btnModoSinAsignar" class="btn btn-outline-danger btn-sm flex-fill fw-bold"
-                            onclick="setModoNuevaTarea('sin_asignar')">
-                            <i class="bi bi-clock-history me-1"></i>Sin fecha / Sin asignar
-                        </button>
-                    </div>
-
-                    <!-- Info contextual -->
-                    <div id="infoCita" class="alert alert-secondary py-2 small mb-3">
-                        <i class="bi bi-info-circle me-1"></i>
-                        Cita con fecha y hora. Si no asignas técnico quedará como <strong>Sin asignar</strong>.
-                    </div>
-                    <div id="infoSinAsignar" class="alert alert-warning py-2 small mb-3 d-none">
-                        <i class="bi bi-exclamation-triangle me-1"></i>
-                        Sin fecha ni técnico. No aparecerá en el calendario. Visible en la lista de tareas pendientes.
-                    </div>
-
-                    <!-- CAMPO COMÚN: Técnicos (solo modo cita) -->
-                    <div id="seccionTecnicos">
+                <form id="formScheduleAppointment">
+                    <div class="modal-body">
                         <label class="form-label">Técnicos <span class="text-muted small">(opcional)</span></label>
-                        <div class="border border-secondary rounded p-2 mb-2" style="max-height:120px;overflow-y:auto;background:#111;">
+                        <div class="border border-secondary rounded p-2 mb-2" style="max-height:130px;overflow-y:auto;background:#111;">
                             {% for u in empleados %}
                             <div class="form-check">
                                 <input class="form-check-input tech-checkbox" type="checkbox"
-                                    name="tech_ids[]" value="{{ u.id }}" id="schedTech{{ u.id }}">
-                                <label class="form-check-label text-white" for="schedTech{{ u.id }}">{{ u.username }}</label>
+                                    name="tech_ids[]" value="{{ u.id }}"
+                                    id="schedTech{{ u.id }}">
+                                <label class="form-check-label text-white" for="schedTech{{ u.id }}">
+                                    {{ u.username }}
+                                </label>
                             </div>
                             {% endfor %}
                         </div>
-                    </div>
-
-                    <!-- CAMPO COMÚN: Cliente -->
-                    <label class="form-label">Cliente</label>
-                    <div class="position-relative mb-2">
-                        <input type="text" id="unifiedClientInput" class="form-control" required autocomplete="off"
-                            placeholder="Nombre del cliente...">
-                        <div id="unifiedClientList" class="suggestions-list"></div>
-                    </div>
-
-                    <!-- CAMPOS SOLO MODO CITA -->
-                    <div id="seccionFechaHora">
-                        <div class="row g-2 mb-2">
-                            <div class="col-6">
-                                <label class="form-label">Fecha</label>
-                                <input type="date" id="unifiedDate" class="form-control">
-                            </div>
-                            <div class="col-3">
-                                <label class="form-label">Hora inicio</label>
-                                <input type="time" id="unifiedTime" class="form-control">
-                            </div>
-                            <div class="col-3">
-                                <label class="form-label">Hora fin</label>
-                                <input type="time" id="unifiedEndTime" class="form-control">
-                            </div>
+                        <small class="text-info d-block mb-1">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Sin técnico: la cita queda como <strong>Sin asignar</strong> y cualquier técnico puede completarla.
+                        </small>
+                        <label class="form-label mt-1">Cliente</label>
+                        <div class="position-relative mb-2">
+                            <input type="text" name="client_name" id="scheduleClientInput" class="form-control" required
+                                autocomplete="off">
+                            <div id="scheduleClientList" class="suggestions-list"></div>
                         </div>
+                        <label class="form-label">Fecha</label>
+                        <input type="date" name="date" class="form-control mb-2" required>
+                        <label class="form-label">Hora</label>
+                        <input type="time" name="time" class="form-control mb-2" required>
+                        <label class="form-label">Hora Fin (opcional)</label>
+                        <input type="time" name="end_time" class="form-control mb-2">
+                        <label class="form-label">Tipo de Servicio</label>
+                        <select name="service_type" class="form-select mb-2" required>
+                            {% for svc in all_service_types %}
+                            <option value="{{ svc.name }}">{{ svc.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <label class="form-label">Notas</label>
+                        <textarea name="notes" class="form-control" rows="3"></textarea>
                     </div>
-
-                    <!-- CAMPO COMÚN: Tipo de servicio -->
-                    <label class="form-label">Tipo de Servicio</label>
-                    <select id="unifiedServiceType" class="form-select mb-2" required>
-                        <option value="">-- Seleccionar --</option>
-                        {% for svc in all_service_types %}
-                        <option value="{{ svc.id }}" data-name="{{ svc.name }}">{{ svc.name }}</option>
-                        {% endfor %}
-                    </select>
-
-                    <!-- CAMPO COMÚN: Notas -->
-                    <label class="form-label">Notas / Descripción</label>
-                    <textarea id="unifiedNotes" class="form-control" rows="3"
-                        placeholder="Describe el trabajo a realizar..."></textarea>
-                </div>
-                <div class="modal-footer border-secondary">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="button" class="btn btn-warning fw-bold" id="unifiedSubmitBtn" onclick="submitUnifiedForm()">
-                        <i class="bi bi-calendar-plus-fill me-1"></i>Agendar Cita
-                    </button>
-                </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn btn-warning" onclick="submitScheduleForm()" id="scheduleSubmitBtn">Agendar</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
 
-    <!-- Mantener IDs legacy para compatibilidad con JS existente -->
-    <div id="modalScheduleAppointment" style="display:none;" data-compat="true">
-        <input type="hidden" id="scheduleClientInput">
-        <div id="scheduleClientList"></div>
-        <input type="hidden" id="formScheduleAppointment">
-    </div>
-    <div id="modalCreateUnassignedTask" style="display:none;" data-compat="true">
-        <input type="hidden" id="unassignedClientInput">
-        <div id="unassignedClientList"></div>
-        <select id="unassignedServiceType" style="display:none;">{% for svc in all_service_types %}<option value="{{ svc.id }}">{{ svc.name }}</option>{% endfor %}</select>
-        <textarea id="unassignedDescription" style="display:none;"></textarea>
+    <!-- Modal: Crear Tarea Sin Técnico -->
+    <div class="modal fade" id="modalCreateUnassignedTask" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary bg-danger bg-opacity-10">
+                    <h5 class="modal-title"><i class="bi bi-exclamation-circle me-2"></i>Crear Tarea Pendiente por Asignar</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="formCreateUnassignedTask">
+                    <div class="modal-body">
+                        <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Esta tarea <strong>no tendrá fecha ni técnico asignado</strong>. Deberá ser asignada desde el apartado de tareas pendientes.
+                        </div>
+                        <label class="form-label">Cliente</label>
+                        <div class="position-relative mb-2">
+                            <input type="text" name="client_name" id="unassignedClientInput" class="form-control" required autocomplete="off">
+                            <div id="unassignedClientList" class="suggestions-list"></div>
+                        </div>
+                        <label class="form-label">Tipo de Servicio</label>
+                        <select name="service_type_id" id="unassignedServiceType" class="form-select mb-2" required>
+                            <option value="">-- Seleccionar --</option>
+                            {% for svc in all_service_types %}
+                            <option value="{{ svc.id }}">{{ svc.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <label class="form-label">Descripción/Notas</label>
+                        <textarea name="description" id="unassignedDescription" class="form-control" rows="3" placeholder="Describa el trabajo a realizar..."></textarea>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn btn-danger" onclick="submitUnassignedTaskForm()" id="unassignedSubmitBtn">Crear Tarea</button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 
     <!-- ✅ NUEVO: Modal para Asistencia Remota -->
@@ -2338,7 +2327,8 @@
             });
         });
 
-        // Autocomplete for unified modal is set up dynamically in openNuevaTareaModal()
+        setupAutocomplete('scheduleClientInput', 'scheduleClientList');
+        setupAutocomplete('unassignedClientInput', 'unassignedClientList');
 
         function loadEmployeeCalendar(userId) {
             currentEmployeeId = userId;
@@ -3120,23 +3110,28 @@
         // Función para manejar clic en día del calendario individual del empleado
         function handleAdminDateClick(info) {
             if (!currentEmployeeId) return;
-            openNuevaTareaModal('cita');
-            // Prellenar fecha y marcar técnico correspondiente
-            setTimeout(() => {
-                document.getElementById('unifiedDate').value = info.dateStr;
-                document.querySelectorAll('#modalNuevaTarea .tech-checkbox').forEach(function(cb) {
-                    cb.checked = (cb.value == currentEmployeeId);
-                });
-            }, 50);
+
+            // Prellenar el modal con la fecha seleccionada y el empleado actual
+            document.getElementById('scheduleClientInput').value = '';
+            // Desmarcar todos los checkboxes y marcar el del empleado actual
+            document.querySelectorAll('#modalScheduleAppointment .tech-checkbox').forEach(function(cb) {
+                cb.checked = (cb.value == currentEmployeeId);
+            });
+            document.querySelector('#modalScheduleAppointment input[name="date"]').value = info.dateStr;
+
+            // Abrir el modal de nueva cita
+            new bootstrap.Modal(document.getElementById('modalScheduleAppointment')).show();
         }
 
         // Función para manejar clic en día del calendario global
         function handleAdminDateClickGlobal(info) {
-            openNuevaTareaModal('cita');
-            setTimeout(() => {
-                document.getElementById('unifiedDate').value = info.dateStr;
-                document.querySelectorAll('#modalNuevaTarea .tech-checkbox').forEach(cb => cb.checked = false);
-            }, 50);
+            // Prellenar el modal con la fecha seleccionada
+            document.getElementById('scheduleClientInput').value = '';
+            document.querySelectorAll('#modalScheduleAppointment .tech-checkbox').forEach(function(cb) { cb.checked = false; });
+            document.querySelector('#modalScheduleAppointment input[name="date"]').value = info.dateStr;
+
+            // Abrir el modal de nueva cita
+            new bootstrap.Modal(document.getElementById('modalScheduleAppointment')).show();
         }
 
         // Función para ver los detalles completos de una tarea
@@ -4436,7 +4431,28 @@
         }
 
         // Actualizar calendario después de agendar
-        // Legacy form listener no longer needed — unified modal handles submit
+        const formSchedule = document.querySelector('#modalScheduleAppointment form');
+        if (formSchedule && !formSchedule.hasAttribute('data-enhanced')) {
+            formSchedule.setAttribute('data-enhanced', 'true');
+            formSchedule.addEventListener('submit', function (e) {
+                e.preventDefault();
+                const formData = new FormData(this);
+                fetch('/schedule_appointment', {
+                    method: 'POST',
+                    body: formData
+                })
+                    .then(response => {
+                        if (response.ok) {
+                            bootstrap.Modal.getInstance(document.getElementById('modalScheduleAppointment')).hide();
+                            if (window.calendarGlobalInstance) window.calendarGlobalInstance.refetchEvents();
+                            if (window.calendar) window.calendar.refetchEvents();
+                            alert('✓ Cita agendada');
+                            this.reset();
+                            location.reload();
+                        }
+                    });
+            });
+        }
 
         // FUNCIÓN PARA MOSTRAR ARCHIVOS ADJUNTOS EN INFORMES
         function showAttachmentsModal(taskId, clientName) {
@@ -5031,8 +5047,54 @@
         // TÉCNICOS — Validar al menos uno seleccionado en modal de cita
         // =====================================================================
         // ✅ NUEVA: Enviar formulario de cita por AJAX
-        // Legacy — now handled by submitUnifiedForm()
-        function submitScheduleForm() { submitUnifiedForm(); }
+        function submitScheduleForm() {
+            // Técnico opcional — sin selección la tarea quedará "Sin asignar"
+            const submitBtn = document.getElementById('scheduleSubmitBtn');
+            const originalText = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i> Agendando...';
+            
+            const formData = new FormData(document.getElementById('formScheduleAppointment'));
+            
+            fetch('/schedule_appointment', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+                
+                if (data.success) {
+                    // Cerrar modal
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('modalScheduleAppointment'));
+                    if (modal) modal.hide();
+                    
+                    // Mostrar mensaje de éxito
+                    alert('✅ ' + data.msg);
+                    
+                    // ✅ SINCRONIZACIÓN: Refrescar calendarios automáticamente
+                    setTimeout(() => {
+                        if (calendar) calendar.refetchEvents();
+                        if (calendarGlobalInstance) calendarGlobalInstance.refetchEvents();
+                    }, 300);
+                    
+                    // Limpiar formulario
+                    document.getElementById('formScheduleAppointment').reset();
+                    document.querySelectorAll('#formScheduleAppointment .tech-checkbox').forEach(cb => cb.checked = false);
+                } else {
+                    alert('❌ Error: ' + (data.msg || 'No se pudo agendar la cita'));
+                }
+            })
+            .catch(err => {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+                console.error('Error:', err);
+                alert('❌ Error de conexión. Por favor, intenta de nuevo.');
+            });
+            
+            return false;
+        }
 
         function validateTechSelection() {
             // Técnico opcional — siempre válido
@@ -5189,9 +5251,59 @@
         }
 
         // ==================== TAREAS SIN TÉCNICO ====================
-        // Legacy — now handled by submitUnifiedForm() in sin_asignar mode
         function submitUnassignedTaskForm() {
-            openNuevaTareaModal('sin_asignar');
+            const submitBtn = document.getElementById('unassignedSubmitBtn');
+            const originalText = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i> Creando...';
+            
+            const clientName = document.getElementById('unassignedClientInput').value.trim();
+            const serviceTypeId = document.getElementById('unassignedServiceType').value;
+            const description = document.getElementById('unassignedDescription').value.trim();
+            
+            if (!clientName || !serviceTypeId) {
+                alert('⚠️ Por favor completa los campos requeridos');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+                return false;
+            }
+            
+            fetch('/create_task_unassigned', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    client_name: clientName,
+                    service_type_id: parseInt(serviceTypeId),
+                    description: description
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+                
+                if (data.success) {
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('modalCreateUnassignedTask'));
+                    if (modal) modal.hide();
+                    alert('✅ Tarea creada correctamente');
+                    
+                    // Cargar tareas sin técnico
+                    loadUnassignedTasks();
+                    
+                    // Limpiar formulario
+                    document.getElementById('formCreateUnassignedTask').reset();
+                } else {
+                    alert('❌ Error: ' + (data.msg || 'No se pudo crear la tarea'));
+                }
+            })
+            .catch(err => {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+                console.error('Error:', err);
+                alert('❌ Error de conexión');
+            });
+            
+            return false;
         }
 
         function loadUnassignedTasks() {
@@ -5339,7 +5451,55 @@
         // ==================== VALIDAR TÉCNICOS EN MODAL CITA ====================
 
         // ✅ NUEVA: Enviar formulario de cita por AJAX
-        // Legacy submitScheduleForm (duplicate removed)
+        function submitScheduleForm() {
+            // Técnico opcional — sin selección la tarea quedará "Sin asignar"
+            const submitBtn = document.getElementById('scheduleSubmitBtn');
+            const originalText = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i> Agendando...';
+            
+            const formData = new FormData(document.getElementById('formScheduleAppointment'));
+            
+            fetch('/schedule_appointment', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+                
+                if (data.success) {
+                    // Cerrar modal
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('modalScheduleAppointment'));
+                    if (modal) modal.hide();
+                    
+                    // Mostrar mensaje de éxito
+                    alert('✅ ' + data.msg);
+                    
+                    // ✅ SINCRONIZACIÓN: Refrescar calendarios automáticamente
+                    setTimeout(() => {
+                        if (calendar) calendar.refetchEvents();
+                        if (calendarGlobalInstance) calendarGlobalInstance.refetchEvents();
+                    }, 300);
+                    
+                    // Limpiar formulario
+                    document.getElementById('formScheduleAppointment').reset();
+                    document.querySelectorAll('#formScheduleAppointment .tech-checkbox').forEach(cb => cb.checked = false);
+                } else {
+                    alert('❌ Error: ' + (data.msg || 'No se pudo agendar la cita'));
+                }
+            })
+            .catch(err => {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+                console.error('Error:', err);
+                alert('❌ Error de conexión. Por favor, intenta de nuevo.');
+            });
+            
+            return false;
+        }
+
         function validateTechSelection() {
             // Técnico opcional — siempre válido
             return true;
@@ -5959,180 +6119,6 @@ function _remoteToast(msg, type) {
 
         function _esc(s) {
             return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-        }
-
-
-        // ══════════════════════════════════════════════════════════
-        // MODAL UNIFICADO: Nueva Cita / Tarea Sin Asignar
-        // ══════════════════════════════════════════════════════════
-        let _modoNuevaTarea = 'cita'; // 'cita' | 'sin_asignar'
-
-        function openNuevaTareaModal(modo) {
-            _modoNuevaTarea = modo || 'cita';
-            // Limpiar formulario
-            document.getElementById('unifiedClientInput').value = '';
-            document.getElementById('unifiedDate').value = '';
-            document.getElementById('unifiedTime').value = '';
-            document.getElementById('unifiedEndTime').value = '';
-            document.getElementById('unifiedServiceType').value = '';
-            document.getElementById('unifiedNotes').value = '';
-            document.querySelectorAll('#modalNuevaTarea .tech-checkbox').forEach(cb => cb.checked = false);
-            setModoNuevaTarea(_modoNuevaTarea);
-            new bootstrap.Modal(document.getElementById('modalNuevaTarea')).show();
-            // Activar autocompletado en el input unificado
-            setupAutocomplete('unifiedClientInput', 'unifiedClientList');
-        }
-
-        function setModoNuevaTarea(modo) {
-            _modoNuevaTarea = modo;
-            const esCita = modo === 'cita';
-
-            // Botones toggle
-            document.getElementById('btnModoCita').className =
-                'btn btn-sm flex-fill fw-bold ' + (esCita ? 'btn-warning' : 'btn-outline-warning');
-            document.getElementById('btnModoSinAsignar').className =
-                'btn btn-sm flex-fill fw-bold ' + (!esCita ? 'btn-danger' : 'btn-outline-danger');
-
-            // Secciones visibles
-            document.getElementById('seccionTecnicos').style.display = esCita ? '' : 'none';
-            document.getElementById('seccionFechaHora').style.display = esCita ? '' : 'none';
-            document.getElementById('infoCita').classList.toggle('d-none', !esCita);
-            document.getElementById('infoSinAsignar').classList.toggle('d-none', esCita);
-
-            // Header y botón submit
-            const title = document.getElementById('nuevaTareaTitle');
-            const btn   = document.getElementById('unifiedSubmitBtn');
-            if (esCita) {
-                title.innerHTML = '<i class="bi bi-calendar-plus-fill me-2 text-warning"></i>Nueva Cita';
-                btn.className   = 'btn btn-warning fw-bold';
-                btn.innerHTML   = '<i class="bi bi-calendar-plus-fill me-1"></i>Agendar Cita';
-            } else {
-                title.innerHTML = '<i class="bi bi-clock-history me-2 text-danger"></i>Tarea Sin Asignar';
-                btn.className   = 'btn btn-danger fw-bold';
-                btn.innerHTML   = '<i class="bi bi-exclamation-circle-fill me-1"></i>Crear Tarea';
-            }
-        }
-
-        function submitUnifiedForm() {
-            const clientName = document.getElementById('unifiedClientInput').value.trim();
-            const svcSelect  = document.getElementById('unifiedServiceType');
-            const svcId      = svcSelect.value;
-            const svcName    = svcSelect.options[svcSelect.selectedIndex]?.dataset?.name || '';
-            const notes      = document.getElementById('unifiedNotes').value.trim();
-            const btn        = document.getElementById('unifiedSubmitBtn');
-
-            if (!clientName) {
-                alert('⚠️ El cliente es obligatorio');
-                return;
-            }
-            if (!svcId) {
-                alert('⚠️ El tipo de servicio es obligatorio');
-                return;
-            }
-
-            if (_modoNuevaTarea === 'sin_asignar') {
-                // ── Ruta: Tarea sin fecha ni técnico ──────────────────
-                btn.disabled = true;
-                btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i> Creando...';
-
-                fetch('/create_task_unassigned', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        client_name:     clientName,
-                        service_type_id: parseInt(svcId),
-                        description:     notes
-                    })
-                })
-                .then(r => r.json())
-                .then(data => {
-                    btn.disabled = false;
-                    setModoNuevaTarea('sin_asignar'); // restaurar texto botón
-                    if (data.success) {
-                        bootstrap.Modal.getInstance(document.getElementById('modalNuevaTarea')).hide();
-                        // Refrescar lista de sin asignar
-                        loadUnassignedTasks && loadUnassignedTasks();
-                        showToastOsla('✅ Tarea sin asignar creada correctamente', 'success');
-                    } else {
-                        alert('❌ ' + (data.msg || 'Error al crear la tarea'));
-                    }
-                })
-                .catch(() => {
-                    btn.disabled = false;
-                    setModoNuevaTarea('sin_asignar');
-                    alert('❌ Error de conexión');
-                });
-
-            } else {
-                // ── Ruta: Cita con fecha ───────────────────────────────
-                const dateVal    = document.getElementById('unifiedDate').value;
-                const timeVal    = document.getElementById('unifiedTime').value;
-                const endTimeVal = document.getElementById('unifiedEndTime').value;
-
-                if (!dateVal || !timeVal) {
-                    alert('⚠️ La fecha y la hora de inicio son obligatorias para una cita');
-                    return;
-                }
-
-                btn.disabled = true;
-                btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i> Agendando...';
-
-                const formData = new FormData();
-                formData.append('client_name',   clientName);
-                formData.append('date',          dateVal);
-                formData.append('time',          timeVal);
-                formData.append('end_time',      endTimeVal);
-                formData.append('service_type',  svcName);
-                formData.append('notes',         notes);
-                document.querySelectorAll('#modalNuevaTarea .tech-checkbox:checked').forEach(cb => {
-                    formData.append('tech_ids[]', cb.value);
-                });
-
-                fetch('/schedule_appointment', {
-                    method: 'POST',
-                    body: formData
-                })
-                .then(r => r.json())
-                .then(data => {
-                    btn.disabled = false;
-                    setModoNuevaTarea('cita');
-                    if (data.success) {
-                        bootstrap.Modal.getInstance(document.getElementById('modalNuevaTarea')).hide();
-                        if (calendarGlobalInstance) calendarGlobalInstance.refetchEvents();
-                        if (typeof calendar !== 'undefined' && calendar) calendar.refetchEvents();
-                        loadUnassignedTasks && loadUnassignedTasks();
-                        showToastOsla('✅ ' + data.msg, 'success');
-                    } else {
-                        alert('❌ ' + (data.msg || 'No se pudo agendar la cita'));
-                    }
-                })
-                .catch(() => {
-                    btn.disabled = false;
-                    setModoNuevaTarea('cita');
-                    alert('❌ Error de conexión');
-                });
-            }
-        }
-
-        // Toast helper ligero para el modal unificado
-        function showToastOsla(msg, type) {
-            let container = document.getElementById('remoteToastContainer');
-            if (!container) {
-                container = document.createElement('div');
-                container.id = 'remoteToastContainer';
-                container.style.cssText = 'position:fixed;bottom:1.5rem;right:1.5rem;z-index:9999;';
-                document.body.appendChild(container);
-            }
-            const id = 'ot_' + Date.now();
-            const bgClass = type === 'success' ? 'text-bg-success' : 'text-bg-danger';
-            container.insertAdjacentHTML('beforeend',
-                `<div id="${id}" class="toast align-items-center ${bgClass} border-0 mb-1 show" role="alert">
-                    <div class="d-flex">
-                        <div class="toast-body small">${msg}</div>
-                        <button class="btn-close btn-close-white me-2 m-auto" onclick="document.getElementById('${id}').remove()"></button>
-                    </div>
-                </div>`);
-            setTimeout(() => { const el = document.getElementById(id); if (el) el.remove(); }, 4000);
         }
 
 </script>

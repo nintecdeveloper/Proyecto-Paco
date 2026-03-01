@@ -3826,51 +3826,7 @@ def api_client_work_hours_alias(client_id):
         })
     except Exception as e:
         return jsonify({'success': False, 'msg': str(e)}), 500
-@login_required
-def report_incidencia():
-    """Endpoint para reportar incidencias desde el panel técnico"""
-    try:
-        data = request.get_json()
-        if not data:
-            return jsonify({'success': False, 'msg': 'No se recibieron datos'}), 400
-        
-        tipo = data.get('tipo', '')
-        asunto = data.get('asunto', '')
-        descripcion = data.get('descripcion', '')
-        cliente = data.get('cliente', '')
-        usuario = data.get('usuario', current_user.username)
-        
-        if not tipo or not asunto or not descripcion:
-            return jsonify({'success': False, 'msg': 'Faltan campos obligatorios'}), 400
-        
-        # Determinar destinatario
-        email_dest = 'paco@oslaprint.com' if tipo == 'operativa' else 'nintecdeveloper@gmail.com'
-        
-        # Crear alarma en el sistema para que el admin la vea
-        alarm = Alarm(
-            alarm_type='incidencia_' + tipo,
-            title=f'Incidencia {tipo.title()}: {asunto}',
-            description=f'Técnico: {usuario}\nCliente: {cliente or "N/A"}\n\n{descripcion}',
-            client_name=cliente if cliente else None,
-            priority='high' if tipo == 'tecnica' else 'normal'
-        )
-        db.session.add(alarm)
-        db.session.commit()
-        
-        # En producción se enviaría email a email_dest
-        print(f"\n{'='*60}")
-        print(f"📧 INCIDENCIA REPORTADA → {email_dest}")
-        print(f"Tipo: {tipo} | Asunto: {asunto}")
-        print(f"Técnico: {usuario} | Cliente: {cliente or 'N/A'}")
-        print(f"Descripción: {descripcion}")
-        print('='*60 + '\n')
-        
-        return jsonify({'success': True, 'msg': 'Incidencia reportada correctamente'})
-        
-    except Exception as e:
-        db.session.rollback()
-        print(f"Error en report_incidencia: {e}")
-        return jsonify({'success': False, 'msg': 'Error al procesar la incidencia'}), 500
+
 
 @app.route('/logout')
 def logout():
