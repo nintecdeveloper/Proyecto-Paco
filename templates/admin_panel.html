@@ -2540,14 +2540,17 @@
                         return {
                             id: e.id,
                             title: e.title,
-                            start: e.start ? e.start.toISOString().split("T")[0] + "T" + (e.extendedProps.start_time || "00:00") : "",  // ✅ FIX: Hora sin conversión timezone
+                            start: e.start ? e.start.toISOString().split("T")[0] + "T" + (e.extendedProps.start_time || "00:00") : "",
                             color: e.backgroundColor || '#6c757d',
                             extendedProps: {
                                 status: e.extendedProps.status,
                                 client: e.extendedProps.client,
+                                client_id: e.extendedProps.client_id,
+                                tech_id: e.extendedProps.tech_id,
                                 tech_name: e.extendedProps.tech_name,
                                 service_type: e.extendedProps.service_type,
-                                desc: e.extendedProps.desc
+                                desc: e.extendedProps.desc,
+                                is_remote: e.extendedProps.is_remote || false
                             }
                         };
                     });
@@ -2691,12 +2694,14 @@
                             extendedProps: {
                                 status: e.extendedProps.status,
                                 client: e.extendedProps.client,
+                                client_id: e.extendedProps.client_id,
                                 tech_id: e.extendedProps.tech_id,
                                 tech_name: e.extendedProps.tech_name,
                                 tech_color: e.extendedProps.tech_color,
                                 service_type: e.extendedProps.service_type,
                                 desc: e.extendedProps.desc,
-                                has_attachments: e.extendedProps.has_attachments
+                                has_attachments: e.extendedProps.has_attachments,
+                                is_remote: e.extendedProps.is_remote || false
                             }
                         };
                     });

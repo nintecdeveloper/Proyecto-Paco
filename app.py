@@ -2799,16 +2799,17 @@ def create_remote_assistance():
 @app.route('/api/remote_task/<int:task_id>/update', methods=['POST'])
 @login_required
 def update_remote_task(task_id):
-    """Actualizar rápidamente una asistencia remota (hora inicio/fin, descripción, completar)"""
-    if current_user.role != 'admin':
-        return jsonify({'success': False, 'msg': 'No autorizado'}), 403
-    
+    """Actualizar una asistencia remota (hora inicio/fin, descripción, completar)"""
     try:
         task = Task.query.get(task_id)
         if not task:
             return jsonify({'success': False, 'msg': 'Tarea no encontrada'}), 404
         if not task.is_remote:
             return jsonify({'success': False, 'msg': 'No es una asistencia remota'}), 400
+
+        # Permitir al admin O al técnico asignado
+        if current_user.role != 'admin' and current_user.id != task.tech_id:
+            return jsonify({'success': False, 'msg': 'No autorizado'}), 403
 
         data = request.get_json()
         start_time   = data.get('start_time')
@@ -2873,7 +2874,8 @@ def update_remote_task(task_id):
             'success': True,
             'duration_hours': duration_hours,
             'work_duration': task.work_duration,
-            'warning': warning_msg
+            'warning': warning_msg,
+            'status': task.status
         })
     except Exception as e:
         db.session.rollback()
