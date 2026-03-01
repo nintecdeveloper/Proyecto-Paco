@@ -3828,6 +3828,82 @@ def api_client_work_hours_alias(client_id):
         return jsonify({'success': False, 'msg': str(e)}), 500
 
 
+@app.route('/api/client/<int:client_id>/service_history')
+@login_required
+def api_client_service_history(client_id):
+    """Devuelve el historial completo de servicios (partes) realizados para un cliente"""
+    try:
+        client = Client.query.get_or_404(client_id)
+
+        # Filtros opcionales por año/mes desde query params
+        year  = request.args.get('year',  type=int)
+        month = request.args.get('month', type=int)
+        status_filter = request.args.get('status', 'all')  # 'all', 'Completado', 'Pendiente'
+
+        query = Task.query.filter(Task.client_id == client_id)
+
+        if status_filter != 'all':
+            query = query.filter(Task.status == status_filter)
+
+        if year:
+            query = query.filter(db.extract('year', Task.date) == year)
+        if month:
+            query = query.filter(db.extract('month', Task.date) == month)
+
+        tasks = query.order_by(Task.date.desc()).all()
+
+        task_list = []
+        for task in tasks:
+            # Calcular duración
+            duration_str = '—'
+            if task.work_duration:
+                duration_str = task.work_duration
+            elif task.start_time and task.end_time:
+                try:
+                    sh, sm = map(int, task.start_time.split(':'))
+                    eh, em = map(int, task.end_time.split(':'))
+                    mins = (eh * 60 + em) - (sh * 60 + sm)
+                    if mins > 0:
+                        duration_str = f"{mins//60:02d}:{mins%60:02d}:00"
+                except:
+                    pass
+
+            # Técnicos adicionales
+            extra_techs = [tt.user.username for tt in task.extra_technicians if tt.user]
+
+            task_list.append({
+                'id':           task.id,
+                'date':         task.date.strftime('%d/%m/%Y') if task.date else '—',
+                'date_iso':     task.date.isoformat() if task.date else '',
+                'tech':         task.tech.username if task.tech else 'Sin asignar',
+                'extra_techs':  extra_techs,
+                'service':      task.service_type.name if task.service_type else '—',
+                'service_color': task.service_type.color if task.service_type else '#6c757d',
+                'description':  task.description or '',
+                'status':       task.status,
+                'duration':     duration_str,
+                'is_remote':    task.is_remote,
+                'has_signature': bool(task.signature_data),
+                'parts_text':   task.parts_text or '',
+            })
+
+        # Años disponibles para el filtro
+        available_years = db.session.query(
+            db.extract('year', Task.date).label('yr')
+        ).filter(Task.client_id == client_id, Task.date != None).distinct().order_by(db.text('yr desc')).all()
+        available_years = [int(r.yr) for r in available_years]
+
+        return jsonify({
+            'success': True,
+            'client_name': client.name,
+            'total': len(task_list),
+            'tasks': task_list,
+            'available_years': available_years,
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'msg': str(e)}), 500
+
+
 @app.route('/logout')
 def logout():
     logout_user()

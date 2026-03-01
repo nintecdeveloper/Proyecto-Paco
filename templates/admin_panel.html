@@ -810,6 +810,12 @@
                             </div>
 
                             <div class="card-footer bg-black border-secondary">
+                                <div class="d-flex gap-2 mb-2">
+                                    <button class="btn btn-sm btn-outline-info flex-fill"
+                                        onclick="showClientServiceHistory({{ c.id }}, '{{ c.name }}')">
+                                        <i class="bi bi-clock-history"></i> Historial
+                                    </button>
+                                </div>
                                 <div class="d-flex gap-2">
                                     <button class="btn btn-sm btn-outline-warning flex-fill edit-client-btn"
                                         data-client-id="{{ c.id }}">
@@ -2251,6 +2257,76 @@
                     <div id="workHoursContent">
                         <div class="text-center text-muted py-3">
                             <i class="bi bi-hourglass-split"></i> Cargando...
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== MODAL: Historial de Servicios del Cliente ====== -->
+    <div class="modal fade" id="modalClientServiceHistory" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title">
+                        <i class="bi bi-clock-history me-2 text-info"></i>
+                        Historial de servicios — <span id="historyClientName"></span>
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Filtros -->
+                    <div class="row g-2 mb-3 align-items-end">
+                        <div class="col-auto">
+                            <label class="form-label small text-muted mb-1">Año</label>
+                            <select id="historyFilterYear" class="form-select form-select-sm bg-black text-white border-secondary" onchange="applyHistoryFilters()">
+                                <option value="">Todos</option>
+                            </select>
+                        </div>
+                        <div class="col-auto">
+                            <label class="form-label small text-muted mb-1">Mes</label>
+                            <select id="historyFilterMonth" class="form-select form-select-sm bg-black text-white border-secondary" onchange="applyHistoryFilters()">
+                                <option value="">Todos</option>
+                                <option value="1">Enero</option>
+                                <option value="2">Febrero</option>
+                                <option value="3">Marzo</option>
+                                <option value="4">Abril</option>
+                                <option value="5">Mayo</option>
+                                <option value="6">Junio</option>
+                                <option value="7">Julio</option>
+                                <option value="8">Agosto</option>
+                                <option value="9">Septiembre</option>
+                                <option value="10">Octubre</option>
+                                <option value="11">Noviembre</option>
+                                <option value="12">Diciembre</option>
+                            </select>
+                        </div>
+                        <div class="col-auto">
+                            <label class="form-label small text-muted mb-1">Estado</label>
+                            <select id="historyFilterStatus" class="form-select form-select-sm bg-black text-white border-secondary" onchange="applyHistoryFilters()">
+                                <option value="all">Todos</option>
+                                <option value="Completado">Completados</option>
+                                <option value="Pendiente">Pendientes</option>
+                            </select>
+                        </div>
+                        <div class="col-auto">
+                            <button class="btn btn-sm btn-outline-secondary" onclick="resetHistoryFilters()">
+                                <i class="bi bi-x-circle me-1"></i>Limpiar
+                            </button>
+                        </div>
+                        <div class="col text-end">
+                            <span id="historyCount" class="badge bg-secondary"></span>
+                        </div>
+                    </div>
+
+                    <!-- Contenido -->
+                    <div id="historyContent">
+                        <div class="text-center text-muted py-4">
+                            <div class="spinner-border spinner-border-sm me-2"></div>Cargando historial...
                         </div>
                     </div>
                 </div>
@@ -5243,6 +5319,122 @@
                 })
                 .catch(function(e) {
                     document.getElementById('workHoursContent').innerHTML = '<div class="text-danger">Error de conexión</div>';
+                });
+        }
+
+        // ==================== HISTORIAL DE SERVICIOS DEL CLIENTE ====================
+        var _historyClientId = null;
+
+        function showClientServiceHistory(clientId, clientName) {
+            _historyClientId = clientId;
+            document.getElementById('historyClientName').textContent = clientName;
+            document.getElementById('historyFilterYear').value = '';
+            document.getElementById('historyFilterMonth').value = '';
+            document.getElementById('historyFilterStatus').value = 'all';
+            new bootstrap.Modal(document.getElementById('modalClientServiceHistory')).show();
+            loadClientHistory(clientId, '', '', 'all');
+        }
+
+        function applyHistoryFilters() {
+            if (!_historyClientId) return;
+            var year   = document.getElementById('historyFilterYear').value;
+            var month  = document.getElementById('historyFilterMonth').value;
+            var status = document.getElementById('historyFilterStatus').value;
+            loadClientHistory(_historyClientId, year, month, status);
+        }
+
+        function resetHistoryFilters() {
+            document.getElementById('historyFilterYear').value = '';
+            document.getElementById('historyFilterMonth').value = '';
+            document.getElementById('historyFilterStatus').value = 'all';
+            applyHistoryFilters();
+        }
+
+        function loadClientHistory(clientId, year, month, status) {
+            document.getElementById('historyContent').innerHTML = '<div class="text-center text-muted py-4"><div class="spinner-border spinner-border-sm me-2"></div>Cargando...</div>';
+            var url = '/api/client/' + clientId + '/service_history?status=' + encodeURIComponent(status);
+            if (year)  url += '&year='  + year;
+            if (month) url += '&month=' + month;
+
+            fetch(url)
+                .then(r => r.json())
+                .then(function(data) {
+                    if (!data.success) {
+                        document.getElementById('historyContent').innerHTML = '<div class="alert alert-danger">Error al cargar el historial</div>';
+                        return;
+                    }
+
+                    // Rellenar selector de años (solo primera vez o si cambia)
+                    var yearSel = document.getElementById('historyFilterYear');
+                    var currentYear = yearSel.value;
+                    // Reconstruir opciones de año
+                    yearSel.innerHTML = '<option value="">Todos</option>';
+                    (data.available_years || []).forEach(function(y) {
+                        var opt = document.createElement('option');
+                        opt.value = y;
+                        opt.textContent = y;
+                        if (String(y) === String(currentYear)) opt.selected = true;
+                        yearSel.appendChild(opt);
+                    });
+
+                    // Contador
+                    document.getElementById('historyCount').textContent = data.total + ' parte' + (data.total !== 1 ? 's' : '');
+
+                    if (data.tasks.length === 0) {
+                        document.getElementById('historyContent').innerHTML =
+                            '<div class="text-center text-muted py-5"><i class="bi bi-calendar-x fs-1 d-block mb-2"></i>No hay servicios registrados con los filtros seleccionados</div>';
+                        return;
+                    }
+
+                    var html = '<div class="table-responsive">';
+                    html += '<table class="table table-dark table-hover table-sm align-middle">';
+                    html += '<thead class="table-secondary"><tr>';
+                    html += '<th style="width:100px">Fecha</th>';
+                    html += '<th>Tipo</th>';
+                    html += '<th>Técnico</th>';
+                    html += '<th>Descripción</th>';
+                    html += '<th style="width:90px">Duración</th>';
+                    html += '<th style="width:90px">Estado</th>';
+                    html += '<th style="width:60px" class="text-center">Parte</th>';
+                    html += '</tr></thead><tbody>';
+
+                    data.tasks.forEach(function(t) {
+                        var statusBadge = '';
+                        if (t.status === 'Completado') {
+                            statusBadge = '<span class="badge bg-success">Completado</span>';
+                        } else if (t.status === 'Pendiente') {
+                            statusBadge = '<span class="badge bg-warning text-dark">Pendiente</span>';
+                        } else {
+                            statusBadge = '<span class="badge bg-secondary">' + t.status + '</span>';
+                        }
+
+                        var remoteIcon = t.is_remote ? '<i class="bi bi-wifi text-info ms-1" title="Remoto"></i>' : '';
+                        var sigIcon    = t.has_signature ? '<i class="bi bi-pen-fill text-success ms-1" title="Firmado"></i>' : '';
+
+                        var techStr = t.tech;
+                        if (t.extra_techs && t.extra_techs.length > 0) {
+                            techStr += '<br><small class="text-muted">+' + t.extra_techs.join(', ') + '</small>';
+                        }
+
+                        var desc = t.description ? (t.description.length > 60 ? t.description.substring(0, 60) + '…' : t.description) : '<span class="text-muted fst-italic">—</span>';
+
+                        html += '<tr>';
+                        html += '<td><small>' + t.date + '</small></td>';
+                        html += '<td><span class="badge" style="background:' + t.service_color + ';color:#fff;">' + t.service + '</span>' + remoteIcon + '</td>';
+                        html += '<td><small>' + techStr + '</small></td>';
+                        html += '<td><small>' + desc + '</small>' + sigIcon + '</td>';
+                        html += '<td><small style="font-family:\'Courier New\',monospace;color:#f37021;">' + t.duration + '</small></td>';
+                        html += '<td>' + statusBadge + '</td>';
+                        html += '<td class="text-center"><a href="/print_report/' + t.id + '" target="_blank" class="btn btn-xs btn-outline-info py-0 px-1" title="Ver parte" style="font-size:0.75rem;"><i class="bi bi-eye-fill"></i></a></td>';
+                        html += '</tr>';
+                    });
+
+                    html += '</tbody></table></div>';
+                    document.getElementById('historyContent').innerHTML = html;
+                })
+                .catch(function(e) {
+                    document.getElementById('historyContent').innerHTML = '<div class="alert alert-danger">Error de conexión al cargar el historial</div>';
+                    console.error('Error cargando historial:', e);
                 });
         }
 
