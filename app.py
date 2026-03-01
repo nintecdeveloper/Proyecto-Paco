@@ -2176,7 +2176,8 @@ def get_task(task_id):
             'date': task.date.strftime('%Y-%m-%d'),
             'time': task.start_time or '',
             'service_type': service_type.name if service_type else '',
-            'notes': task.description or ''
+            'notes': task.description or '',
+            'tech_id': task.tech_id
         }
     })
 
@@ -3434,6 +3435,21 @@ def edit_appointment(task_id):
         task.date = datetime.strptime(request.form.get('date'), '%Y-%m-%d').date()
         task.start_time = request.form.get('time')
         task.description = request.form.get('notes', '')
+        
+        # Actualizar técnico si se recibe
+        tech_id_str = request.form.get('tech_id', '').strip()
+        if tech_id_str:
+            tech_id_val = int(tech_id_str)
+            tech = User.query.get(tech_id_val)
+            if tech and tech.role == 'tech':
+                task.tech_id = tech_id_val
+                if task.status == 'Sin asignar':
+                    task.status = 'Pendiente'
+        elif tech_id_str == '':
+            # Dejado en blanco => sin asignar (solo si admin)
+            if current_user.role == 'admin':
+                task.tech_id = None
+                task.status = 'Sin asignar'
         
         # Actualizar tipo de servicio
         service_type_name = request.form.get('service_type')

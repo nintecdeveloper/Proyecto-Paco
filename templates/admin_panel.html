@@ -217,6 +217,23 @@
         .task-item.status-Pendiente {
             border-left-color: var(--osla-orange);
         }
+
+        /* Eventos del calendario más legibles */
+        .fc-daygrid-event {
+            min-height: 22px !important;
+            padding: 1px 2px !important;
+        }
+        .fc-daygrid-event .fc-event-title {
+            font-size: 0.82rem !important;
+            white-space: normal !important;
+            overflow: visible !important;
+        }
+        .fc-daygrid-event-dot {
+            display: none !important;
+        }
+        .fc-event-time {
+            font-size: 0.78rem !important;
+        }
     </style>
 </head>
 
@@ -714,6 +731,15 @@
                 <div class="d-flex justify-content-between mb-3 align-items-center flex-wrap gap-2">
                     <h4 class="fw-bold text-white fs-5 m-0">Gestión de Clientes</h4>
                     <div class="d-flex gap-2">
+                        <!-- Toggle vista -->
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button type="button" id="btnViewCards" class="btn btn-warning active" onclick="setClientsView('cards')" title="Vista fichas">
+                                <i class="bi bi-grid-3x3-gap-fill"></i>
+                            </button>
+                            <button type="button" id="btnViewList" class="btn btn-outline-warning" onclick="setClientsView('list')" title="Vista lista">
+                                <i class="bi bi-list-ul"></i>
+                            </button>
+                        </div>
                         <button class="btn btn-warning btn-sm fw-bold" data-bs-toggle="modal"
                             data-bs-target="#modalAddClient">
                             <i class="bi bi-person-plus-fill me-1"></i> Nuevo Cliente
@@ -724,6 +750,7 @@
                 <input type="text" id="clientSearchInput" class="form-control mb-3" placeholder="🔍 Buscar cliente..."
                     onkeyup="filterClientsView()">
 
+                <!-- Vista fichas (existente) -->
                 <div class="row g-3" id="clientsCardContainer">
                     {% for c in clients %}
                     <div class="col-12 col-md-6 col-lg-4 client-card-wrapper" data-client-name="{{ c.name|lower }}"
@@ -841,6 +868,65 @@
                             <i class="bi bi-info-circle me-2"></i>No hay clientes registrados aún.
                             Haz clic en "Nuevo Cliente" para añadir uno.
                         </div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Vista lista (nueva) -->
+                <div id="clientsListContainer" style="display:none;">
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover table-sm align-middle">
+                            <thead class="table-secondary">
+                                <tr>
+                                    <th>Cliente</th>
+                                    <th>Teléfono</th>
+                                    <th>Email</th>
+                                    <th>Dirección</th>
+                                    <th>Soporte</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="clientsListBody">
+                                {% for c in clients %}
+                                <tr class="client-list-row" data-client-name="{{ c.name|lower }}" data-client-phone="{{ c.phone }}" data-client-email="{{ c.email }}">
+                                    <td>
+                                        <span class="fw-bold text-warning">{{ c.name }}</span>
+                                        {% if c.link %}<a href="{{ c.link }}" target="_blank" class="ms-1 text-info" title="Sitio web"><i class="bi bi-globe" style="font-size:0.75rem;"></i></a>{% endif %}
+                                    </td>
+                                    <td><a href="tel:{{ c.phone }}" class="text-decoration-none text-white small">{{ c.phone }}</a></td>
+                                    <td><span class="text-muted small">{{ c.email }}</span></td>
+                                    <td>
+                                        <span class="text-muted small">{{ c.address|truncate(35) }}</span>
+                                        <a href="https://www.google.com/maps/search/?api=1&query={{ c.address | urlencode }}" target="_blank" class="ms-1 text-warning" title="Google Maps"><i class="bi bi-geo-alt-fill" style="font-size:0.7rem;"></i></a>
+                                    </td>
+                                    <td>
+                                        {% if c.has_support %}
+                                        <span class="badge support-badge"><i class="bi bi-shield-check"></i>
+                                            {% if c.support_schedule == 'lv' %}L-V{% elif c.support_schedule == 'ls' %}L-S{% elif c.support_schedule == 'ld' %}L-D{% endif %}
+                                        </span>
+                                        {% else %}
+                                        <span class="badge no-support-badge"><i class="bi bi-shield-x"></i></span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="d-flex gap-1">
+                                            <button class="btn btn-xs btn-outline-info py-0 px-1" onclick="showClientServiceHistory({{ c.id }}, '{{ c.name }}')" title="Historial"><i class="bi bi-clock-history"></i></button>
+                                            <button class="btn btn-xs btn-outline-warning py-0 px-1 edit-client-btn" data-client-id="{{ c.id }}" title="Editar"><i class="bi bi-pencil-fill"></i></button>
+                                            <form method="POST" action="/manage_clients" class="d-inline">
+                                                <input type="hidden" name="action" value="delete">
+                                                <input type="hidden" name="client_id" value="{{ c.id }}">
+                                                <button class="btn btn-xs btn-outline-danger py-0 px-1" onclick="return confirm('¿Eliminar cliente {{ c.name }}?')" title="Eliminar"><i class="bi bi-trash-fill"></i></button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% if clients|length == 0 %}
+                    <div class="alert alert-info text-center">
+                        <i class="bi bi-info-circle me-2"></i>No hay clientes registrados aún.
                     </div>
                     {% endif %}
                 </div>
@@ -2013,6 +2099,13 @@
                                 required autocomplete="off">
                             <div id="editAdminClientList" class="suggestions-list"></div>
                         </div>
+                        <label class="form-label">Técnico Asignado</label>
+                        <select name="tech_id" id="editAdminTechId" class="form-select mb-2">
+                            <option value="">— Sin asignar —</option>
+                            {% for emp in employees %}
+                            <option value="{{ emp.id }}">{{ emp.username }}</option>
+                            {% endfor %}
+                        </select>
                         <label class="form-label">Fecha</label>
                         <input type="date" name="date" id="editAdminDate" class="form-control mb-2" required>
                         <label class="form-label">Hora</label>
@@ -2439,7 +2532,7 @@
                 selectable: true,
                 eventContent: function (arg) {
                     let statusIcon = arg.event.extendedProps.status === 'Completado' ? '✅' : '⏳';
-                    return { html: `<div class="fc-content overflow-hidden text-truncate">${statusIcon} ${arg.event.title}</div>` };
+                    return { html: `<div class="fc-content overflow-hidden text-truncate" style="font-size:0.82rem;padding:2px 4px;line-height:1.3;white-space:normal;">${statusIcon} ${arg.event.title}</div>` };
                 },
                 eventsSet: function (events) {
                     // Serializar EventApi a objetos planos (.start es Date en FullCalendar, necesitamos string)
@@ -2569,10 +2662,10 @@
                     var txtColor = arg.event.textColor         || arg.event.extendedProps.text_color || getContrastColor(bgColor);
                     var techName   = arg.event.extendedProps.tech_name || '';
                     var title      = arg.event.title;
-                    var paperclip  = arg.event.extendedProps.has_attachments ? '<i class="bi bi-paperclip ms-1" style="font-size:0.7rem;"></i>' : '';
+                    var paperclip  = arg.event.extendedProps.has_attachments ? '<i class="bi bi-paperclip ms-1" style="font-size:0.75rem;"></i>' : '';
                     var statusIcon = arg.event.extendedProps.status === 'Completado' ? '✓ ' : '';
                     return {
-                        html: '<div class="fc-content overflow-hidden text-truncate" style="font-size:0.8rem;color:' + txtColor + ';padding:1px 3px;">'
+                        html: '<div class="fc-content overflow-hidden" style="font-size:0.82rem;color:' + txtColor + ';padding:2px 4px;line-height:1.35;white-space:normal;">'
                             + '<strong>' + techName + ':</strong> ' + statusIcon + title + paperclip
                             + '</div>'
                     };
@@ -3140,23 +3233,54 @@
             });
         }
 
+        var _clientsView = 'cards'; // 'cards' or 'list'
+
+        function setClientsView(view) {
+            _clientsView = view;
+            var cardContainer = document.getElementById('clientsCardContainer');
+            var listContainer = document.getElementById('clientsListContainer');
+            var btnCards = document.getElementById('btnViewCards');
+            var btnList = document.getElementById('btnViewList');
+            if (view === 'list') {
+                cardContainer.style.display = 'none';
+                listContainer.style.display = '';
+                btnList.classList.add('active');
+                btnList.classList.remove('btn-outline-warning');
+                btnList.classList.add('btn-warning');
+                btnCards.classList.remove('active', 'btn-warning');
+                btnCards.classList.add('btn-outline-warning');
+            } else {
+                cardContainer.style.display = '';
+                listContainer.style.display = 'none';
+                btnCards.classList.add('active');
+                btnCards.classList.remove('btn-outline-warning');
+                btnCards.classList.add('btn-warning');
+                btnList.classList.remove('active', 'btn-warning');
+                btnList.classList.add('btn-outline-warning');
+            }
+            filterClientsView(); // re-apply search filter
+        }
+
         function filterClientsView() {
             const input = document.getElementById("clientSearchInput");
             const filter = input.value.toLowerCase();
+            // Filter card wrappers
             const cards = document.querySelectorAll('.client-card-wrapper');
-
             cards.forEach(card => {
                 const name = card.dataset.clientName || '';
                 const phone = card.dataset.clientPhone || '';
                 const email = card.dataset.clientEmail || '';
-
                 const textContent = (name + ' ' + phone + ' ' + email).toLowerCase();
-
-                if (textContent.indexOf(filter) > -1) {
-                    card.style.display = '';
-                } else {
-                    card.style.display = 'none';
-                }
+                card.style.display = textContent.indexOf(filter) > -1 ? '' : 'none';
+            });
+            // Filter list rows
+            const rows = document.querySelectorAll('.client-list-row');
+            rows.forEach(row => {
+                const name = row.dataset.clientName || '';
+                const phone = row.dataset.clientPhone || '';
+                const email = row.dataset.clientEmail || '';
+                const textContent = (name + ' ' + phone + ' ' + email).toLowerCase();
+                row.style.display = textContent.indexOf(filter) > -1 ? '' : 'none';
             });
         }
 
@@ -3171,6 +3295,13 @@
                         document.getElementById('editAdminTime').value = data.data.time;
                         document.getElementById('editAdminService').value = data.data.service_type;
                         document.getElementById('editAdminNotes').value = data.data.notes;
+                        // Seleccionar técnico actual
+                        var techSel = document.getElementById('editAdminTechId');
+                        if (techSel && data.data.tech_id != null) {
+                            techSel.value = data.data.tech_id;
+                        } else if (techSel) {
+                            techSel.value = '';
+                        }
                         document.getElementById('formEditApptAdmin').action = `/edit_appointment/${taskId}`;
                         modalActionAdmin.hide();
                         new bootstrap.Modal(document.getElementById('modalEditAppointmentAdmin')).show();
@@ -4898,7 +5029,7 @@
         function renderRecordsList(records) {
             var container = document.getElementById('paymentRecordsList');
             if (!records || records.length === 0) {
-                container.innerHTML = '<div class="text-muted text-center py-2 small"><i class="bi bi-inbox me-1"></i>Sin cobros parciales registrados</div>';
+                container.innerHTML = '<div class="text-muted text-center py-2 small"><i class="bi bi-inbox me-1"></i>Sin cobros adicionales registrados. El pago principal (presupuesto/señal) se gestiona arriba.</div>';
                 return;
             }
             container.innerHTML = '';
@@ -5741,9 +5872,10 @@
                     </div>
 
                     <!-- Datos del presupuesto -->
-                    <div class="p-3 mb-3 rounded" style="background:#111;border:1px solid #333;">
+                    <div class="p-3 mb-3 rounded" style="background:#111;border:2px solid #c9a227;">
                         <h6 class="text-warning fw-bold mb-3">
-                            <i class="bi bi-file-earmark-text me-2"></i>Datos del Presupuesto
+                            <i class="bi bi-file-earmark-text me-2"></i>Pago Principal — Presupuesto
+                            <span class="badge bg-warning text-dark ms-2" style="font-size:0.65rem;">PRESUPUESTO</span>
                         </h6>
                         <div class="row g-2">
                             <div class="col-md-4">
@@ -5770,10 +5902,11 @@
                     </div>
 
                     <!-- Historial de cobros -->
-                    <div class="p-3 rounded" style="background:#111;border:1px solid #333;">
+                    <div class="p-3 rounded" style="background:#111;border:2px solid #444;">
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h6 class="text-warning fw-bold mb-0">
-                                <i class="bi bi-list-check me-2"></i>Historial de Cobros Parciales
+                            <h6 class="text-info fw-bold mb-0">
+                                <i class="bi bi-list-check me-2"></i>Otros Pagos / Cobros Parciales
+                                <span class="badge bg-info text-dark ms-2" style="font-size:0.65rem;">COBROS</span>
                             </h6>
                             <button class="btn btn-sm btn-outline-success fw-bold" onclick="showAddRecordForm()">
                                 <i class="bi bi-plus-circle-fill me-1"></i>A&ntilde;adir Cobro
