@@ -681,7 +681,7 @@
         </div>
 
         <div id="section-agenda" class="d-none" style="max-width: 1400px; margin: auto;">
-            <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="d-flex justify-content-between mb-3 align-items-center flex-wrap gap-2">
                 <h3 class="text-white fw-bold m-0 fs-4">Mi Calendario</h3>
                 <div class="d-flex gap-2">
                     <button class="btn btn-warning btn-sm fw-bold" data-bs-toggle="modal"
@@ -696,7 +696,7 @@
             <!-- FILTROS POR TIPO DE SERVICIO -->
             <div class="filter-group mb-3">
                 <div class="d-flex justify-content-between align-items-center mb-2">
-                    <small class="text-muted fw-bold">FILTRAR POR TIPO</small>
+                    <small class="text-muted fw-bold">FILTRAR POR TIPO DE SERVICIO</small>
                     <button class="btn btn-outline-light btn-sm" onclick="checkAllTechFilters()">
                         <i class="bi bi-check-all me-1"></i> Todos
                     </button>
@@ -706,49 +706,47 @@
                     <input type="checkbox" class="btn-check tech-filter-cb" id="tech-filter-{{ svc.id }}"
                         value="{{ svc.name }}" checked onchange="updateTechFilters()">
                     <label class="btn btn-outline-custom flex-grow-1" for="tech-filter-{{ svc.id }}"
-                        style="border-color: {{ svc.color }}; color: {{ svc.color }};">
+                        data-color="{{ svc.color }}">
                         {{ svc.name }}
                     </label>
                     {% endfor %}
                 </div>
             </div>
 
-            <div class="row g-3">
-                <div class="col-12 col-lg-9" id="calendarCol">
-                    <div id="calendarSection">
-                        <div id="calendar"></div>
-                    </div>
+            <!-- Botón para mostrar/ocultar lista de tareas -->
+            <div class="d-flex justify-content-end mb-2">
+                <button class="btn btn-sm btn-outline-light" id="toggleTaskListBtn" onclick="toggleTaskList()" title="Mostrar/ocultar lista de tareas">
+                    <i class="bi bi-layout-sidebar-reverse me-1"></i> Mostrar lista de tareas
+                </button>
+            </div>
+
+            <div class="row" id="techCalendarRow">
+                <div class="col-12" id="calendarCol">
+                    <div id="calendar"></div>
                 </div>
-                <div class="col-12 col-lg-3" id="taskListCol" style="display:none;">
-                    <div class="card bg-dark border-secondary p-2">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <h6 class="text-white fw-bold m-0 small">Mis Tareas</h6>
-                            <div class="btn-group btn-group-sm" role="group">
-                                <button type="button" class="btn btn-outline-light btn-sm" onclick="sortTasks('date')"
-                                    title="Ordenar por fecha">
-                                    <i class="bi bi-calendar3"></i>
-                                </button>
-                                <button type="button" class="btn btn-outline-light btn-sm" onclick="sortTasks('alpha')"
-                                    title="Ordenar alfabético">
-                                    <i class="bi bi-sort-alpha-down"></i>
-                                </button>
+                <div class="col-lg-3 d-none" id="taskListCol">
+                    <div class="card bg-dark border-secondary mt-3 mt-lg-0">
+                        <div class="card-header bg-secondary text-white">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <h6 class="mb-0 small"><i class="bi bi-list-task me-2"></i>Mis Tareas</h6>
+                                <button class="btn btn-sm btn-close btn-close-white" onclick="toggleTaskList()" title="Ocultar lista"></button>
+                            </div>
+                            <div class="btn-group btn-group-sm w-100" role="group">
+                                <input type="radio" class="btn-check" name="techTaskStatusFilter" id="techFilterTodas" value="todas" checked onchange="renderTaskList()">
+                                <label class="btn btn-outline-secondary" for="techFilterTodas" style="font-size:0.72rem;padding:3px 8px;">Todas</label>
+                                <input type="radio" class="btn-check" name="techTaskStatusFilter" id="techFilterPendientes" value="pendientes" onchange="renderTaskList()">
+                                <label class="btn btn-outline-warning" for="techFilterPendientes" style="font-size:0.72rem;padding:3px 8px;">Pendientes</label>
+                                <input type="radio" class="btn-check" name="techTaskStatusFilter" id="techFilterCompletadas" value="completadas" onchange="renderTaskList()">
+                                <label class="btn btn-outline-success" for="techFilterCompletadas" style="font-size:0.72rem;padding:3px 8px;">Completadas</label>
                             </div>
                         </div>
-                        <div class="form-check form-switch mb-2">
-                            <input class="form-check-input" type="checkbox" id="toggleCompleted"
-                                onchange="renderTaskList()">
-                            <label class="form-check-label" style="font-size:0.75rem;" for="toggleCompleted">Mostrar completadas</label>
+                        <div class="card-body p-1">
+                            <div id="taskListContainer" class="task-list-container" style="max-height: 580px; overflow-y: auto;">
+                                <div class="text-center text-muted py-3">Cargando...</div>
+                            </div>
                         </div>
-                        <div id="taskListContainer" class="task-list-container"></div>
                     </div>
                 </div>
-            </div>
-            
-            <!-- Toggle Button para Mostrar/Ocultar Lista -->
-            <div class="mt-2 text-center">
-                <button class="btn btn-sm btn-outline-info" onclick="toggleTaskList()" id="toggleTaskListBtn">
-                    <i class="bi bi-list me-1"></i>Mostrar Lista de Tareas
-                </button>
             </div>
         </div>
 
@@ -1295,10 +1293,9 @@
             }
             return _modalActionInstance;
         }
-        // Alias para compatibilidad con código que usa modalAction directamente
-        const modalAction = { 
-            show: function() { getModalAction().show(); }, 
-            hide: function() { getModalAction().hide(); } 
+        const modalAction = {
+            show: function() { getModalAction().show(); },
+            hide: function() { getModalAction().hide(); }
         };
 
         // Almacén local de tareas para la lista
@@ -1307,6 +1304,7 @@
         let currentSort = 'date';   // 'date' | 'alpha'
         let selectedFiles = [];     // Array para almacenar archivos seleccionados
         let _partePreloaded = false; // Flag: true cuando el parte se pre-rellena desde una cita del calendario
+        let _taskListVisible = false; // Flag: estado del panel lateral de tareas
 
         // Carga TODOS los eventos (no solo el rango visible) para la lista lateral
         function loadAllTasksForList() {
@@ -1444,13 +1442,6 @@
                 }
             });
             calendar.render();
-
-            // Agregar listener al checkbox de completadas
-            const toggleCheckbox = document.getElementById('toggleCompleted');
-            if (toggleCheckbox && !toggleCheckbox.hasAttribute('data-listener-added')) {
-                toggleCheckbox.addEventListener('change', renderTaskList);
-                toggleCheckbox.setAttribute('data-listener-added', 'true');
-            }
         }
 
         // --- FILTROS POR TIPO DE SERVICIO ---
@@ -1708,98 +1699,93 @@
         function renderTaskList() {
             const container = document.getElementById('taskListContainer');
             if (!container) return;
-            const showCompleted = document.getElementById('toggleCompleted')?.checked || false;
+
+            // Leer radio de 3 estados (todas / pendientes / completadas)
+            const selectedFilter = (document.querySelector('input[name="techTaskStatusFilter"]:checked') || {}).value || 'todas';
             const activeTypes = getTechActiveFilters();
 
             // Usar allTasksCache (todos los eventos) en lugar de cachedTasks (solo rango visible)
             const source = allTasksCache.length > 0 ? allTasksCache : cachedTasks;
 
-            // ✅ CAMBIO: Si showCompleted está ACTIVADO, mostrar SOLO completadas
-            // Si está desactivado, mostrar SOLO pendientes
             let filtered = source.filter(t => {
-                const statusOk = showCompleted 
-                    ? t.extendedProps.status === 'Completado'  // SOLO completadas
-                    : t.extendedProps.status !== 'Completado';  // SOLO pendientes
+                const status = (t.extendedProps.status || '').toLowerCase();
+                let statusOk;
+                if      (selectedFilter === 'completadas') statusOk = status === 'completado';
+                else if (selectedFilter === 'pendientes')  statusOk = status !== 'completado';
+                else                                       statusOk = true; // 'todas'
                 const typeOk = activeTypes.length === 0 || activeTypes.includes(t.extendedProps.service_type);
                 return statusOk && typeOk;
             });
 
-            // 2. Ordenar
+            // Ordenar por fecha
             filtered.sort((a, b) => {
-                if (currentSort === 'alpha') {
-                    return a.title.localeCompare(b.title);
-                } else {
-                    return new Date(a.start) - new Date(b.start);
-                }
+                if (currentSort === 'alpha') return a.title.localeCompare(b.title);
+                return new Date(a.start) - new Date(b.start);
             });
 
-            // 3. Renderizar HTML
-            container.innerHTML = '';
-            const statusLabel = showCompleted ? 'completadas' : 'pendientes';
             if (filtered.length === 0) {
-                container.innerHTML = `<div class="text-muted text-center py-3">No hay tareas ${statusLabel}.</div>`;
+                container.innerHTML = '<div class="text-center text-muted py-3">No hay tareas</div>';
                 return;
             }
 
+            container.innerHTML = '';
             filtered.forEach(t => {
-                const isDone = t.extendedProps.status === 'Completado';
-                const dateStr = t.start.split('T')[0];
-                const timeStr = t.start.includes('T') ? t.start.split('T')[1].substring(0, 5) : '';
-
-                // Usar el color del tipo también aquí
-                const typeColor = t.color;
+                const isDone   = (t.extendedProps.status || '').toLowerCase() === 'completado';
+                const isRemote = t.extendedProps.is_remote || false;
+                const dateStr  = t.start ? t.start.split('T')[0] : '—';
+                const timeStr  = t.start && t.start.includes('T') ? t.start.split('T')[1].substring(0, 5) : '';
+                const typeColor = t.color || '#6c757d';
+                const itemColor = isRemote ? '#06b6d4' : typeColor;
 
                 const div = document.createElement('div');
-                div.className = `task-item d-flex justify-content-between align-items-center`;
-                div.style.borderLeftColor = typeColor;
-                if (isDone) {
-                    div.style.opacity = '0.6';
-                    div.style.textDecoration = 'line-through';
-                }
+                div.className = `task-item status-${t.extendedProps.status}`;
+                div.style.borderLeftColor = itemColor;
+                div.style.borderLeftWidth = '4px';
+                if (isDone) div.style.opacity = '0.65';
+                if (isRemote) div.style.background = 'rgba(6,182,212,0.08)';
+
+                const remoteBadge = isRemote
+                    ? `<span class="badge bg-info text-dark ms-1" style="font-size:0.6rem;">📡 REMOTO</span>`
+                    : '';
 
                 div.innerHTML = `
-                <div class="d-flex align-items-center gap-2" style="flex-grow: 1;">
-                    <input type="checkbox" class="form-check-input" style="width: 24px; height: 24px; cursor: pointer;" 
-                        ${isDone ? 'checked' : ''} 
-                        onclick="toggleTaskComplete('${t.id}')" 
-                        title="${isDone ? 'Marcar como pendiente' : 'Marcar como completada'}">
-                    <div style="cursor:pointer; flex-grow: 1;" onclick="focusCalendarEvent('${t.id}')">
-                        <div class="fw-bold text-white">${t.extendedProps.client || 'Sin cliente'}</div>
-                        <div class="small text-secondary">
-                            <i class="bi bi-calendar-event me-1"></i>${dateStr} ${timeStr ? '| ' + timeStr : ''}
-                            <br>
-                            <span class="badge ${isDone ? 'bg-success' : 'bg-secondary'}">${t.extendedProps.status}</span>
-                            <span class="badge" style="background:${typeColor}">${t.extendedProps.service_type || 'Sin tipo'}</span>
-                        </div>
+                    <div class="fw-bold text-white" style="cursor:pointer;" onclick="focusCalendarEvent('${t.id}')">${t.extendedProps.client || 'Sin cliente'}${remoteBadge}</div>
+                    <div class="small text-secondary">
+                        <i class="bi bi-calendar-event me-1"></i>${dateStr}${timeStr ? ' | ' + timeStr : ''}
+                        <br>
+                        <span class="badge ${isDone ? 'bg-success' : 'bg-warning text-dark'}">${t.extendedProps.status}</span>
+                        <span class="badge" style="background:${itemColor}; color:#fff; font-size:0.65rem;">${t.extendedProps.service_type || 'Sin tipo'}</span>
                     </div>
-                </div>
-                <div class="d-flex gap-1 flex-shrink-0">
-                    <button class="btn btn-sm btn-outline-secondary" onclick="event.stopPropagation(); openEditFromList('${t.id}')" title="Editar"><i class="bi bi-pencil"></i></button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="event.stopPropagation(); deleteFromList('${t.id}')" title="Eliminar"><i class="bi bi-trash"></i></button>
-                </div>
-            `;
+                    <div class="d-flex gap-1 mt-1">
+                        <button class="btn btn-sm btn-outline-secondary" onclick="event.stopPropagation(); openEditFromList('${t.id}')" title="Editar"><i class="bi bi-pencil"></i></button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="event.stopPropagation(); deleteFromList('${t.id}')" title="Eliminar"><i class="bi bi-trash"></i></button>
+                    </div>
+                `;
+
+                div.onclick = () => focusCalendarEvent(t.id);
                 container.appendChild(div);
             });
         }
 
         // ✅ FUNCIÓN: Toggle mostrar/ocultar lista de tareas
         function toggleTaskList() {
+            _taskListVisible = !_taskListVisible;
             const taskListCol = document.getElementById('taskListCol');
             const calendarCol = document.getElementById('calendarCol');
-            const toggleBtn = document.getElementById('toggleTaskListBtn');
-            
-            if (taskListCol.style.display === 'none') {
-                // Mostrar lista
-                taskListCol.style.display = 'block';
-                calendarCol.className = 'col-12 col-lg-9';
-                toggleBtn.innerHTML = '<i class="bi bi-list me-1"></i>Ocultar Lista de Tareas';
-                renderTaskList();
+            const btn         = document.getElementById('toggleTaskListBtn');
+
+            if (_taskListVisible) {
+                taskListCol.classList.remove('d-none');
+                calendarCol.className = 'col-lg-9';
+                btn.innerHTML = '<i class="bi bi-layout-sidebar-reverse me-1"></i> Ocultar lista de tareas';
+                loadAllTasksForList();
             } else {
-                // Ocultar lista
-                taskListCol.style.display = 'none';
+                taskListCol.classList.add('d-none');
                 calendarCol.className = 'col-12';
-                toggleBtn.innerHTML = '<i class="bi bi-list me-1"></i>Mostrar Lista de Tareas';
+                btn.innerHTML = '<i class="bi bi-layout-sidebar-reverse me-1"></i> Mostrar lista de tareas';
             }
+            // Re-renderizar el calendario para que ocupe el espacio correcto
+            setTimeout(() => { if (calendar) calendar.updateSize(); }, 50);
         }
         
         // ✅ FUNCIÓN: Toggle estado de tarea completada/pendiente
@@ -3439,6 +3425,7 @@
         }
 
     </script>
+
 </body>
 
 </html>
