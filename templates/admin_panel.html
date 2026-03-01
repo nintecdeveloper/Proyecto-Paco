@@ -5989,511 +5989,581 @@
     </div>
 
 
-</body>
 
-</html>
+
 <script>
 // ============================================================
 // ASISTENCIA REMOTA — Funciones completas
 // ============================================================
 
-// ── Inicialización del buscador de clientes ──────────────────
-document.addEventListener('DOMContentLoaded', () => {
-    // Rellenar selector de técnicos en el modal de creación
-    _loadRemoteTechOptions();
+// ─────────────────────────────────────────────────────────────
+// INICIALIZACIÓN
+// El script está al final del <body>: el DOM ya existe.
+// Los listeners se registran aquí directamente, sin DOMContentLoaded.
+// Además se re-inicializan en shown.bs.modal para máxima fiabilidad.
+// ─────────────────────────────────────────────────────────────
 
-    // Fecha por defecto = hoy
-    const rDate = document.getElementById('remoteDate');
-    if (rDate) rDate.value = new Date().toISOString().split('T')[0];
+(function () {
+    'use strict';
 
-    const searchInput = document.getElementById('remoteClientSearch');
-    const clientsList = document.getElementById('remoteClientsList');
-
-    if (searchInput) {
-        searchInput.addEventListener('input', function() {
-            const val = this.value;
-            if (!val || val.length < 2) {
-                clientsList.innerHTML = '';
-                clientsList.style.display = 'none';
-                return;
-            }
-            fetch(`/api/clients_search?q=${encodeURIComponent(val)}`)
-                .then(res => res.json())
-                .then(data => {
-                    clientsList.innerHTML = '';
-                    if (data.length > 0) {
-                        clientsList.style.display = 'block';
-                        data.forEach(item => {
-                            const div = document.createElement('div');
-                            div.className = 'suggestion-item';
-                            div.innerText = item.name;
-                            div.onclick = () => selectRemoteClient(item.id, item.name);
-                            clientsList.appendChild(div);
-                        });
-                    } else {
-                        clientsList.style.display = 'none';
-                    }
-                })
-                .catch(() => { clientsList.style.display = 'none'; });
-        });
-
-        document.addEventListener('click', (e) => {
-            if (e.target !== searchInput) clientsList.style.display = 'none';
-        });
+    // ── 1. Cargar técnicos en el selector (Jinja ya los inyecta;
+    //        este fetch es sólo fallback si el template falla) ──
+    var sel = document.getElementById('remoteTechSelect');
+    if (sel && sel.options.length <= 1) {
+        fetch('/api/admin/tech_colors')
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (!data.success || !data.data || !data.data.length) return;
+                sel.innerHTML = '<option value="">Sin asignar</option>';
+                data.data.forEach(function (t) {
+                    var opt = document.createElement('option');
+                    opt.value = t.id;
+                    opt.textContent = t.username;
+                    sel.appendChild(opt);
+                });
+            })
+            .catch(function () {});
     }
-});
 
-// ── Cargar técnicos disponibles (fallback AJAX si el template no los incluyó) ─
-function _loadRemoteTechOptions() {
-    const sel = document.getElementById('remoteTechSelect');
-    // Si ya hay opciones cargadas por el template Jinja2, no es necesario hacer fetch
-    if (!sel || sel.options.length > 1) return;
-    fetch('/api/admin/tech_colors')
-        .then(r => r.json())
-        .then(data => {
-            if (!sel || !data.success || !data.data.length) return;
-            sel.innerHTML = '<option value="">Sin asignar</option>';
-            data.data.forEach(t => {
-                const opt = document.createElement('option');
-                opt.value = t.id;
-                opt.textContent = t.username;
-                sel.appendChild(opt);
+    // ── 2. Configurar el modal de creación ────────────────────
+    var createModal = document.getElementById('modalRemoteAssistance');
+    if (!createModal) return;
+
+    // Al abrirse: poner fecha de hoy y arrancar el buscador
+    createModal.addEventListener('shown.bs.modal', function () {
+        var rDate = document.getElementById('remoteDate');
+        if (rDate && !rDate.value) {
+            rDate.value = new Date().toISOString().split('T')[0];
+        }
+        _initClientSearch();
+        var si = document.getElementById('remoteClientSearch');
+        if (si) si.focus();
+    });
+
+    // Al cerrarse: limpiar todo el formulario
+    createModal.addEventListener('hidden.bs.modal', function () {
+        ['remoteClientSearch','remoteDescription','remoteStartTime',
+         'remoteEndTime','remoteSelectedClientId','remoteSelectedClientName']
+            .forEach(function (id) {
+                var el = document.getElementById(id);
+                if (el) el.value = '';
             });
-        })
-        .catch(() => {});
+        var s = document.getElementById('remoteTechSelect');
+        if (s) s.value = '';
+        var d = document.getElementById('remoteDate');
+        if (d) d.value = new Date().toISOString().split('T')[0];
+        var card = document.getElementById('remoteClientCard');
+        if (card) card.style.display = 'none';
+        var hours = document.getElementById('remoteHoursSection');
+        if (hours) hours.style.display = 'none';
+        _closeClientList();
+    });
+
+    // Inicializar ya ahora (por si se abriera antes del primer shown)
+    _initClientSearch();
+
+}());
+
+// ─────────────────────────────────────────────────────────────
+// BUSCADOR DE CLIENTES (autocomplete)
+// ─────────────────────────────────────────────────────────────
+var _clientSearchReady = false;
+
+function _initClientSearch() {
+    var input = document.getElementById('remoteClientSearch');
+    var list  = document.getElementById('remoteClientsList');
+    if (!input || !list) return;
+    if (_clientSearchReady) return;   // ya registrado, no duplicar
+    _clientSearchReady = true;
+
+    // z-index alto para que flote sobre el modal
+    list.style.zIndex = '9999';
+
+    // Escribir → buscar
+    input.addEventListener('input', function () {
+        var q = this.value.trim();
+        if (q.length < 2) { _closeClientList(); return; }
+
+        fetch('/api/clients_search?q=' + encodeURIComponent(q))
+            .then(function (res) {
+                if (!res.ok) throw new Error(res.status);
+                return res.json();
+            })
+            .then(function (items) {
+                list.innerHTML = '';
+                if (!Array.isArray(items) || items.length === 0) {
+                    _closeClientList(); return;
+                }
+                items.forEach(function (item) {
+                    var div = document.createElement('div');
+                    div.className = 'suggestion-item';
+                    div.textContent = item.name + (item.has_support ? ' ✓' : '');
+                    // mousedown ANTES de blur, evita que la lista desaparezca
+                    div.addEventListener('mousedown', function (e) {
+                        e.preventDefault();
+                        _selectClient(item);
+                    });
+                    list.appendChild(div);
+                });
+                list.style.display = 'block';
+            })
+            .catch(function () { _closeClientList(); });
+    });
+
+    // Perder foco → cerrar (con retardo para que mousedown funcione primero)
+    input.addEventListener('blur', function () {
+        setTimeout(_closeClientList, 150);
+    });
+
+    // Escape → cerrar
+    input.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') _closeClientList();
+    });
+
+    // Clic fuera → cerrar
+    document.addEventListener('mousedown', function (e) {
+        if (!input.contains(e.target) && !list.contains(e.target)) {
+            _closeClientList();
+        }
+    });
 }
 
-// ── Seleccionar cliente y cargar su info + horas mensuales ───
-function selectRemoteClient(clientId, clientName) {
-    document.getElementById('remoteSelectedClientId').value = clientId;
-    document.getElementById('remoteSelectedClientName').value = clientName;
-    document.getElementById('remoteClientSearch').value = clientName;
-    document.getElementById('remoteClientsList').style.display = 'none';
+function _closeClientList() {
+    var list = document.getElementById('remoteClientsList');
+    if (list) { list.innerHTML = ''; list.style.display = 'none'; }
+}
 
-    // Info básica del cliente
-    fetch(`/api/client/${clientId}/support_info`)
-        .then(res => res.json())
-        .then(data => {
+// ─────────────────────────────────────────────────────────────
+// SELECCIONAR CLIENTE
+// ─────────────────────────────────────────────────────────────
+function _selectClient(item) {
+    document.getElementById('remoteSelectedClientId').value   = item.id;
+    document.getElementById('remoteSelectedClientName').value = item.name;
+    document.getElementById('remoteClientSearch').value       = item.name;
+    _closeClientList();
+
+    // Mostrar ficha inmediatamente con los datos del buscador
+    document.getElementById('remoteClientName').textContent  = item.name;
+    document.getElementById('remoteClientPhone').textContent = item.phone  || '—';
+    document.getElementById('remoteClientEmail').textContent = item.email  || '—';
+
+    var badgeOk = document.getElementById('remoteSupportBadge');
+    var badgeNo = document.getElementById('remoteSupportBadgeNo');
+    if (item.has_support) {
+        badgeOk.style.display = 'inline-block';
+        badgeNo.style.display = 'none';
+    } else {
+        badgeOk.style.display = 'none';
+        badgeNo.style.display = 'inline-block';
+    }
+    document.getElementById('remoteClientCard').style.display = 'block';
+
+    // Cargar horas mensuales
+    fetch('/api/client/' + item.id + '/monthly_remote_hours')
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
             if (!data.success) return;
-            const c = data.data;
-            document.getElementById('remoteClientName').textContent = c.name;
-            document.getElementById('remoteClientPhone').textContent = c.phone || '-';
-            document.getElementById('remoteClientEmail').textContent = c.email || '-';
-
-            const badge    = document.getElementById('remoteSupportBadge');
-            const badgeNo  = document.getElementById('remoteSupportBadgeNo');
-            if (c.has_support) {
-                badge.style.display   = 'inline-block';
-                badgeNo.style.display = 'none';
-            } else {
-                badge.style.display   = 'none';
-                badgeNo.style.display = 'inline-block';
-            }
-            document.getElementById('remoteClientCard').style.display = 'block';
-        })
-        .catch(() => {});
-
-    // Horas mensuales
-    fetch(`/api/client/${clientId}/monthly_remote_hours`)
-        .then(res => res.json())
-        .then(data => {
-            if (!data.success) return;
-            const section = document.getElementById('remoteHoursSection');
+            var section = document.getElementById('remoteHoursSection');
             section.style.display = 'block';
-
-            const pct  = Math.min(100, (data.used_hours / data.limit_hours) * 100);
-            const bar  = document.getElementById('remoteHoursBar');
-            bar.style.width = pct + '%';
+            var pct = Math.min(100, (data.used_hours / data.limit_hours) * 100);
+            var bar = document.getElementById('remoteHoursBar');
+            bar.style.width      = pct + '%';
             bar.style.background = pct >= 100 ? '#ef4444' : pct >= 80 ? '#f59e0b' : '#06b6d4';
-
             document.getElementById('remoteHoursLabel').textContent =
-                `${data.used_hours}h / ${data.limit_hours}h`;
-
-            const warn = document.getElementById('remoteHoursWarning');
+                data.used_hours + 'h / ' + data.limit_hours + 'h';
+            var warn = document.getElementById('remoteHoursWarning');
             warn.style.display = data.over_limit ? 'block' : 'none';
         })
-        .catch(() => {});
+        .catch(function () {});
 }
 
-// ── Enviar creación de asistencia remota ──────────────────────
-function submitRemoteAssistance() {
-    const clientId   = document.getElementById('remoteSelectedClientId').value;
-    const clientName = document.getElementById('remoteSelectedClientName').value;
-    const description = document.getElementById('remoteDescription').value.trim();
-    const dateVal    = document.getElementById('remoteDate')?.value || null;
-    const startTime  = document.getElementById('remoteStartTime')?.value || null;
-    const endTime    = document.getElementById('remoteEndTime')?.value || null;
-    const techId     = document.getElementById('remoteTechSelect')?.value || null;
+// Compatibilidad: se llama desde onclick legacy
+function selectRemoteClient(clientId, clientName) {
+    _selectClient({ id: clientId, name: clientName });
+}
 
+// ─────────────────────────────────────────────────────────────
+// CREAR ASISTENCIA REMOTA
+// ─────────────────────────────────────────────────────────────
+function submitRemoteAssistance() {
+    var clientId   = document.getElementById('remoteSelectedClientId').value;
+    var clientName = document.getElementById('remoteSelectedClientName').value;
     if (!clientId || !clientName) {
         _remoteToast('⚠️ Por favor selecciona un cliente', 'warning');
         return;
     }
 
-    const btn = document.getElementById('remoteSubmitBtn');
+    var description = document.getElementById('remoteDescription').value.trim();
+    var dateVal     = (document.getElementById('remoteDate')      || {}).value || null;
+    var startTime   = (document.getElementById('remoteStartTime') || {}).value || null;
+    var endTime     = (document.getElementById('remoteEndTime')   || {}).value || null;
+    var techId      = (document.getElementById('remoteTechSelect')|| {}).value || null;
+
+    var btn = document.getElementById('remoteSubmitBtn');
     btn.disabled = true;
-    btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i> Creando...';
+    btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Creando...';
 
     fetch('/api/remote_assistance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ client_id: clientId, client_name: clientName, description,
-                               date: dateVal, start_time: startTime, end_time: endTime,
-                               tech_id: techId || null })
+        body: JSON.stringify({
+            client_id: clientId, client_name: clientName,
+            description: description, date: dateVal,
+            start_time: startTime || null, end_time: endTime || null,
+            tech_id: techId || null
+        })
     })
-    .then(r => r.json())
-    .then(data => {
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
         btn.disabled = false;
         btn.innerHTML = '<i class="bi bi-plus-lg me-1"></i>Crear Asistencia Remota';
         if (data.success) {
             _remoteToast('✅ Asistencia remota creada', 'success');
-            const modal = bootstrap.Modal.getInstance(document.getElementById('modalRemoteAssistance'));
-            if (modal) modal.hide();
-            // Reset
-            document.getElementById('remoteClientSearch').value = '';
-            document.getElementById('remoteDescription').value  = '';
-            document.getElementById('remoteClientCard').style.display = 'none';
-            document.getElementById('remoteHoursSection').style.display = 'none';
-            document.getElementById('remoteSelectedClientId').value = '';
-            document.getElementById('remoteSelectedClientName').value = '';
-            document.getElementById('remoteTechSelect').value = '';
-            document.getElementById('remoteStartTime').value = '';
-            document.getElementById('remoteEndTime').value = '';
-            const rDate = document.getElementById('remoteDate');
-            if (rDate) rDate.value = new Date().toISOString().split('T')[0];
-            // Refrescar calendarios y lista
+            // El evento hidden.bs.modal ya limpia el formulario
+            var m = bootstrap.Modal.getInstance(document.getElementById('modalRemoteAssistance'));
+            if (m) m.hide();
             if (window.calendarGlobalInstance) window.calendarGlobalInstance.refetchEvents();
             if (window.calendarInstance) window.calendarInstance.refetchEvents();
-            setTimeout(() => renderGlobalTaskList && renderGlobalTaskList(), 600);
+            setTimeout(function () {
+                if (typeof renderGlobalTaskList === 'function') renderGlobalTaskList();
+            }, 600);
         } else {
             _remoteToast('❌ ' + (data.msg || 'Error al crear'), 'danger');
         }
     })
-    .catch(() => {
+    .catch(function () {
         btn.disabled = false;
         btn.innerHTML = '<i class="bi bi-plus-lg me-1"></i>Crear Asistencia Remota';
         _remoteToast('❌ Error de conexión', 'danger');
     });
 }
 
-// ── Abrir modal de edición rápida ────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// ABRIR MODAL DE PARTE (edición rápida)
+// ─────────────────────────────────────────────────────────────
 function openRemoteTaskQuickEdit(taskId, clientName, extProps) {
-    document.getElementById('rqeTaskId').value       = taskId;
-    document.getElementById('rqeClientId').value     = extProps.client_id || '';
+    document.getElementById('rqeTaskId').value   = taskId;
+    document.getElementById('rqeClientId').value = extProps.client_id || '';
     document.getElementById('rqeClientTitle').textContent = clientName || 'Asistencia Remota';
 
-    // Estado
-    const statusBadge = document.getElementById('rqeStatusBadge');
-    const st = (extProps.status || '').toLowerCase();
-    statusBadge.textContent  = extProps.status || 'Pendiente';
-    statusBadge.className    = 'badge ' + (st === 'completado' ? 'bg-success' : st === 'sin asignar' ? 'bg-secondary' : 'bg-warning text-dark');
+    var statusBadge = document.getElementById('rqeStatusBadge');
+    var st = (extProps.status || '').toLowerCase();
+    statusBadge.textContent = extProps.status || 'Pendiente';
+    statusBadge.className   = 'badge ' + (
+        st === 'completado'   ? 'bg-success' :
+        st === 'sin asignar'  ? 'bg-secondary' :
+        'bg-warning text-dark'
+    );
 
-    // Fecha
-    document.getElementById('rqeDateLabel').textContent = extProps.date || '';
-
-    // Rellenar campos con datos existentes si los hay
-    document.getElementById('rqeDescription').value = extProps.desc || '';
+    document.getElementById('rqeDateLabel').textContent    = extProps.date || '';
+    document.getElementById('rqeDescription').value        = extProps.desc || '';
     document.getElementById('rqeWarningLimit').style.display = 'none';
+    document.getElementById('rqeClientCard').style.display   = 'none';
+    document.getElementById('rqeStartTime').value = '';
+    document.getElementById('rqeEndTime').value   = '';
+    updateRqeDurationPreview();
 
-    // Ocultar ficha cliente mientras carga
-    document.getElementById('rqeClientCard').style.display = 'none';
-
-    // Cargar datos actualizados de la tarea desde el servidor para rellenar horas
-    fetch(`/api/task/${taskId}`)
-        .then(r => r.json())
-        .then(resp => {
-            const data = resp.data || resp; // compatibilidad
+    // Cargar datos completos de la tarea desde el servidor
+    fetch('/api/task/' + taskId)
+        .then(function (r) { return r.json(); })
+        .then(function (resp) {
+            var data = resp.data || resp;
             if (data.start_time) document.getElementById('rqeStartTime').value = data.start_time.substring(0, 5);
-            else document.getElementById('rqeStartTime').value = '';
-            if (data.end_time) document.getElementById('rqeEndTime').value = data.end_time.substring(0, 5);
-            else document.getElementById('rqeEndTime').value = '';
+            if (data.end_time)   document.getElementById('rqeEndTime').value   = data.end_time.substring(0, 5);
             if (data.description) document.getElementById('rqeDescription').value = data.description;
             if (data.date) document.getElementById('rqeDateLabel').textContent = data.date;
             updateRqeDurationPreview();
 
-            // Mostrar ficha del cliente si hay info
-            const ci = data.client_info;
+            // Ficha del cliente con badge de soporte
+            var ci = data.client_info;
             if (ci) {
-                document.getElementById('rqeClientCardName').textContent  = ci.name || clientName || '—';
+                document.getElementById('rqeClientCardName').textContent  = ci.name  || clientName || '—';
                 document.getElementById('rqeClientCardPhone').textContent = ci.phone || '—';
                 document.getElementById('rqeClientCardEmail').textContent = ci.email || '—';
-                const badgeOk = document.getElementById('rqeSupportBadge');
-                const badgeNo = document.getElementById('rqeNoSupportBadge');
+                var bOk = document.getElementById('rqeSupportBadge');
+                var bNo = document.getElementById('rqeNoSupportBadge');
                 if (ci.has_support) {
-                    badgeOk.style.display = 'inline-block';
-                    badgeNo.style.display = 'none';
+                    bOk.style.display = 'inline-block'; bNo.style.display = 'none';
                 } else {
-                    badgeOk.style.display = 'none';
-                    badgeNo.style.display = 'inline-block';
+                    bOk.style.display = 'none'; bNo.style.display = 'inline-block';
                 }
                 document.getElementById('rqeClientCard').style.display = 'block';
             }
         })
-        .catch(() => {
-            document.getElementById('rqeStartTime').value = '';
-            document.getElementById('rqeEndTime').value   = '';
-        });
+        .catch(function () {});
 
-    // Cargar horas mensuales del cliente
-    const clientId = extProps.client_id;
-    if (clientId) {
-        fetch(`/api/client/${clientId}/monthly_remote_hours`)
-            .then(r => r.json())
-            .then(data => {
+    // Horas mensuales del cliente
+    if (extProps.client_id) {
+        fetch('/api/client/' + extProps.client_id + '/monthly_remote_hours')
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
                 if (!data.success) return;
-                const pct = Math.min(100, (data.used_hours / data.limit_hours) * 100);
-                const bar = document.getElementById('rqeHoursBar');
+                var pct = Math.min(100, (data.used_hours / data.limit_hours) * 100);
+                var bar = document.getElementById('rqeHoursBar');
                 bar.style.width      = pct + '%';
                 bar.style.background = pct >= 100 ? '#ef4444' : pct >= 80 ? '#f59e0b' : '#06b6d4';
-                document.getElementById('rqeHoursLabel').textContent = `${data.used_hours}h / ${data.limit_hours}h`;
+                document.getElementById('rqeHoursLabel').textContent =
+                    data.used_hours + 'h / ' + data.limit_hours + 'h';
                 document.getElementById('rqeHoursDetail').textContent =
-                    `${data.session_count} sesión(es) · Restantes: ${data.remaining_hours}h · Mes: ${data.month}`;
+                    data.session_count + ' sesión(es) · Restantes: ' + data.remaining_hours + 'h · Mes: ' + data.month;
             })
-            .catch(() => {});
+            .catch(function () {});
     }
 
-    const modal = new bootstrap.Modal(document.getElementById('modalRemoteTaskQuickEdit'));
-    modal.show();
+    new bootstrap.Modal(document.getElementById('modalRemoteTaskQuickEdit')).show();
 }
 
-// ── Preview de duración en tiempo real ───────────────────────
+// ─────────────────────────────────────────────────────────────
+// PREVIEW DURACIÓN EN TIEMPO REAL
+// ─────────────────────────────────────────────────────────────
 function updateRqeDurationPreview() {
-    const t0 = document.getElementById('rqeStartTime').value;
-    const t1 = document.getElementById('rqeEndTime').value;
-    const el = document.getElementById('rqeDurationPreview');
+    var t0 = document.getElementById('rqeStartTime').value;
+    var t1 = document.getElementById('rqeEndTime').value;
+    var el = document.getElementById('rqeDurationPreview');
     if (!t0 || !t1) { el.textContent = '—'; return; }
-    const diff = (new Date('1970-01-01T' + t1) - new Date('1970-01-01T' + t0)) / 3600000;
+    var diff = (new Date('1970-01-01T' + t1) - new Date('1970-01-01T' + t0)) / 3600000;
     if (diff <= 0) { el.textContent = '—'; return; }
-    const h = Math.floor(diff);
-    const m = Math.round((diff - h) * 60);
-    el.textContent = h ? `${h}h${m ? m + 'm' : ''}` : `${m}m`;
+    var h = Math.floor(diff);
+    var m = Math.round((diff - h) * 60);
+    el.textContent = h ? (h + 'h' + (m ? m + 'm' : '')) : (m + 'm');
 }
 
-// ── Guardar asistencia remota ────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// GUARDAR / COMPLETAR PARTE REMOTO
+// ─────────────────────────────────────────────────────────────
 function saveRemoteTask(markComplete) {
-    const taskId      = document.getElementById('rqeTaskId').value;
-    const startTime   = document.getElementById('rqeStartTime').value;
-    const endTime     = document.getElementById('rqeEndTime').value;
-    const description = document.getElementById('rqeDescription').value.trim();
+    var taskId      = document.getElementById('rqeTaskId').value;
+    var startTime   = document.getElementById('rqeStartTime').value;
+    var endTime     = document.getElementById('rqeEndTime').value;
+    var description = document.getElementById('rqeDescription').value.trim();
 
-    fetch(`/api/remote_task/${taskId}/update`, {
+    fetch('/api/remote_task/' + taskId + '/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ start_time: startTime, end_time: endTime, description, mark_complete: markComplete })
+        body: JSON.stringify({
+            start_time: startTime, end_time: endTime,
+            description: description, mark_complete: markComplete
+        })
     })
-    .then(r => r.json())
-    .then(data => {
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
         if (data.success) {
             if (data.warning) {
                 document.getElementById('rqeWarningText').textContent = data.warning;
                 document.getElementById('rqeWarningLimit').style.display = 'block';
             }
-            _remoteToast(markComplete ? '✅ Asistencia completada' : '✅ Guardado', 'success');
+            _remoteToast(markComplete ? '✅ Parte registrado' : '✅ Guardado', 'success');
+            // Actualizar badge de estado
+            if (data.status) {
+                var badge = document.getElementById('rqeStatusBadge');
+                var st = data.status.toLowerCase();
+                badge.textContent = data.status;
+                badge.className = 'badge ' + (st === 'completado' ? 'bg-success' : 'bg-warning text-dark');
+            }
             if (markComplete) {
-                const modal = bootstrap.Modal.getInstance(document.getElementById('modalRemoteTaskQuickEdit'));
-                if (modal) modal.hide();
+                var m = bootstrap.Modal.getInstance(document.getElementById('modalRemoteTaskQuickEdit'));
+                if (m) m.hide();
             }
             if (window.calendarGlobalInstance) window.calendarGlobalInstance.refetchEvents();
             if (window.calendarInstance) window.calendarInstance.refetchEvents();
-            setTimeout(() => renderGlobalTaskList && renderGlobalTaskList(), 600);
+            setTimeout(function () {
+                if (typeof renderGlobalTaskList === 'function') renderGlobalTaskList();
+            }, 600);
         } else {
             _remoteToast('❌ ' + (data.msg || 'Error'), 'danger');
         }
     })
-    .catch(() => _remoteToast('❌ Error de conexión', 'danger'));
+    .catch(function () { _remoteToast('❌ Error de conexión', 'danger'); });
 }
 
-// ── Eliminar asistencia remota ───────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// ELIMINAR ASISTENCIA REMOTA
+// ─────────────────────────────────────────────────────────────
 function deleteRemoteTask() {
-    const taskId = document.getElementById('rqeTaskId').value;
+    var taskId = document.getElementById('rqeTaskId').value;
     if (!confirm('¿Eliminar esta asistencia remota?')) return;
 
-    fetch(`/api/task/${taskId}/delete`, { method: 'POST',
-        headers: { 'Content-Type': 'application/json' } })
-        .then(r => r.json())
-        .then(data => {
-            if (data.success) {
-                const modal = bootstrap.Modal.getInstance(document.getElementById('modalRemoteTaskQuickEdit'));
-                if (modal) modal.hide();
-                _remoteToast('🗑️ Asistencia eliminada', 'secondary');
-                if (window.calendarGlobalInstance) window.calendarGlobalInstance.refetchEvents();
-                if (window.calendarInstance) window.calendarInstance.refetchEvents();
-                setTimeout(() => renderGlobalTaskList && renderGlobalTaskList(), 600);
-            } else {
-                _remoteToast('❌ No se pudo eliminar', 'danger');
-            }
-        })
-        .catch(() => _remoteToast('❌ Error de conexión', 'danger'));
+    fetch('/api/task/' + taskId + '/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+        if (data.success) {
+            var m = bootstrap.Modal.getInstance(document.getElementById('modalRemoteTaskQuickEdit'));
+            if (m) m.hide();
+            _remoteToast('🗑️ Asistencia eliminada', 'secondary');
+            if (window.calendarGlobalInstance) window.calendarGlobalInstance.refetchEvents();
+            if (window.calendarInstance) window.calendarInstance.refetchEvents();
+            setTimeout(function () {
+                if (typeof renderGlobalTaskList === 'function') renderGlobalTaskList();
+            }, 600);
+        } else {
+            _remoteToast('❌ No se pudo eliminar', 'danger');
+        }
+    })
+    .catch(function () { _remoteToast('❌ Error de conexión', 'danger'); });
 }
 
-// ── Toast helper ─────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// TOAST HELPER
+// ─────────────────────────────────────────────────────────────
 function _remoteToast(msg, type) {
-    // Intentar reutilizar toast existente de la app, o crear uno propio
-    let container = document.getElementById('remoteToastContainer');
+    var container = document.getElementById('remoteToastContainer');
     if (!container) {
         container = document.createElement('div');
         container.id = 'remoteToastContainer';
         container.style.cssText = 'position:fixed;bottom:1.5rem;right:1.5rem;z-index:9999;';
         document.body.appendChild(container);
     }
-    const id   = 'rt_' + Date.now();
-    const html = `<div id="${id}" class="toast align-items-center text-bg-${type} border-0 mb-1 show" role="alert">
-        <div class="d-flex">
-            <div class="toast-body small">${msg}</div>
-            <button type="button" class="btn-close btn-close-white me-2 m-auto" onclick="document.getElementById('${id}').remove()"></button>
-        </div>
-    </div>`;
-    container.insertAdjacentHTML('beforeend', html);
-    setTimeout(() => { const el = document.getElementById(id); if (el) el.remove(); }, 4000);
+    var id = 'rt_' + Date.now();
+    var div = document.createElement('div');
+    div.id = id;
+    div.className = 'toast align-items-center text-bg-' + type + ' border-0 mb-1 show';
+    div.setAttribute('role', 'alert');
+    div.innerHTML =
+        '<div class="d-flex">' +
+        '<div class="toast-body small">' + msg + '</div>' +
+        '<button type="button" class="btn-close btn-close-white me-2 m-auto" ' +
+        'onclick="this.closest(\'.toast\').remove()"></button>' +
+        '</div>';
+    container.appendChild(div);
+    setTimeout(function () { if (div.parentNode) div.remove(); }, 4000);
 }
 
-        // ══════════════════════════════════════════════════════════════════
-        // MODAL DETALLE DE INFORME
-        // ══════════════════════════════════════════════════════════════════
-        function openReportDetailModal(taskId) {
-            document.getElementById('reportDetailPrintBtn').href = '/print_report/' + taskId;
-            const header = document.getElementById('reportDetailHeader');
-            const body   = document.getElementById('reportDetailBody');
-            body.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-warning"></div><p class="mt-2 text-muted">Cargando...</p></div>';
-            new bootstrap.Modal(document.getElementById('modalReportDetail')).show();
+// ─────────────────────────────────────────────────────────────
+// MODAL DETALLE DE INFORME
+// ─────────────────────────────────────────────────────────────
+function openReportDetailModal(taskId) {
+    document.getElementById('reportDetailPrintBtn').href = '/print_report/' + taskId;
+    var header = document.getElementById('reportDetailHeader');
+    var body   = document.getElementById('reportDetailBody');
+    body.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-warning"></div><p class="mt-2 text-muted">Cargando...</p></div>';
+    new bootstrap.Modal(document.getElementById('modalReportDetail')).show();
 
-            fetch('/api/report_detail/' + taskId)
-                .then(r => r.json())
-                .then(d => {
-                    if (!d.success) {
-                        body.innerHTML = '<div class="alert alert-danger">Error al cargar el detalle</div>';
-                        return;
-                    }
-                    renderReportDetail(d, header, body);
-                })
-                .catch(() => {
-                    body.innerHTML = '<div class="alert alert-danger">Error de conexión</div>';
-                });
+    fetch('/api/report_detail/' + taskId)
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+            if (!d.success) {
+                body.innerHTML = '<div class="alert alert-danger">Error al cargar el detalle</div>';
+                return;
+            }
+            renderReportDetail(d, header, body);
+        })
+        .catch(function () {
+            body.innerHTML = '<div class="alert alert-danger">Error de conexión</div>';
+        });
+}
+
+function renderReportDetail(d, header, body) {
+    if (d.is_remote) {
+        header.querySelector('.modal-title').innerHTML =
+            '<i class="bi bi-telephone-fill me-2 text-info"></i>Asistencia Remota — ' + d.client_name;
+    } else {
+        header.querySelector('.modal-title').innerHTML =
+            '<i class="bi bi-file-earmark-text me-2 text-warning"></i>Parte de Trabajo — ' + d.client_name;
+    }
+
+    var metaHtml = '<div class="row g-2 mb-3">'
+        + _rdCell('Cliente',  d.client_name,  'bi-building',       'col-md-4')
+        + _rdCell('Técnico',  d.tech,          'bi-person-fill',    'col-md-4')
+        + _rdCell('Fecha',    d.date,          'bi-calendar-fill',  'col-md-4')
+        + _rdCell('Servicio', d.service_type,  'bi-tools',          'col-md-6')
+        + _rdCell('ID Parte', '#' + d.id,      'bi-hash',           'col-md-3')
+        + '</div>';
+
+    var timingHtml = '';
+    if (d.is_remote) {
+        timingHtml = '<div class="card border-info bg-dark mb-3">'
+            + '<div class="card-header border-info py-2">'
+            + '<small class="fw-bold text-info"><i class="bi bi-clock me-1"></i>TIEMPOS DE SESIÓN REMOTA</small></div>'
+            + '<div class="card-body py-2"><div class="row g-2">'
+            + _rdCell('Hora inicio', d.start_time  || '—', 'bi-play-circle',  'col-4')
+            + _rdCell('Hora fin',    d.end_time    || '—', 'bi-stop-circle',  'col-4')
+            + _rdCell('Duración',    d.work_duration|| '—','bi-stopwatch',    'col-4')
+            + '</div></div></div>';
+    } else {
+        var hasTransport = d.parte_transport_start || d.parte_arrival;
+        var hasWork      = d.parte_work_start || d.parte_work_end;
+        if (hasTransport || hasWork || d.work_duration) {
+            timingHtml = '<div class="card border-secondary bg-dark mb-3">'
+                + '<div class="card-header border-secondary py-2">'
+                + '<small class="fw-bold text-light"><i class="bi bi-clock-history me-1"></i>TIEMPOS DEL PARTE</small></div>'
+                + '<div class="card-body py-2">';
+            if (hasTransport || hasWork) {
+                timingHtml += '<div class="row g-2 mb-2">';
+                if (d.parte_transport_start) timingHtml += _rdCell('Salida (transporte)', d.parte_transport_start, 'bi-truck', 'col-6 col-md-3');
+                if (d.parte_arrival)         timingHtml += _rdCell('Llegada al cliente',  d.parte_arrival,         'bi-geo-alt-fill', 'col-6 col-md-3');
+                if (d.parte_work_start)      timingHtml += _rdCell('Inicio trabajo',      d.parte_work_start,      'bi-play-circle-fill', 'col-6 col-md-3');
+                if (d.parte_work_end)        timingHtml += _rdCell('Fin trabajo',         d.parte_work_end,        'bi-stop-circle-fill', 'col-6 col-md-3');
+                timingHtml += '</div><div class="row g-2">';
+                if (d.transport_duration)
+                    timingHtml += '<div class="col-md-6"><div class="p-2 rounded" style="background:#001a0f;border:1px solid #20c997;">'
+                        + '<small class="text-muted d-block"><i class="bi bi-truck me-1"></i>Tiempo de transporte</small>'
+                        + '<span style="font-family:monospace;font-size:1rem;font-weight:700;color:#20c997;">' + d.transport_duration + '</span>'
+                        + '</div></div>';
+                if (d.work_duration)
+                    timingHtml += '<div class="col-md-6"><div class="p-2 rounded" style="background:#1a0d00;border:1px solid #f37021;">'
+                        + '<small class="text-muted d-block"><i class="bi bi-stopwatch me-1"></i>Tiempo de trabajo</small>'
+                        + '<span style="font-family:monospace;font-size:1rem;font-weight:700;color:#f37021;">' + d.work_duration + '</span>'
+                        + '</div></div>';
+                timingHtml += '</div>';
+            } else if (d.work_duration) {
+                timingHtml += '<div class="p-2 rounded" style="background:#1a0d00;border:1px solid #f37021;">'
+                    + '<small class="text-muted d-block"><i class="bi bi-stopwatch me-1"></i>Duración total</small>'
+                    + '<span style="font-family:monospace;font-size:1rem;font-weight:700;color:#f37021;">' + d.work_duration + '</span>'
+                    + '</div>';
+            }
+            timingHtml += '</div></div>';
         }
+    }
 
-        function renderReportDetail(d, header, body) {
-            // Actualizar cabecera según tipo
-            if (d.is_remote) {
-                header.querySelector('.modal-title').innerHTML =
-                    '<i class="bi bi-telephone-fill me-2 text-info"></i>Asistencia Remota — ' + d.client_name;
-            } else {
-                header.querySelector('.modal-title').innerHTML =
-                    '<i class="bi bi-file-earmark-text me-2 text-warning"></i>Parte de Trabajo — ' + d.client_name;
-            }
+    var descHtml = '';
+    if (d.description) {
+        descHtml = '<div class="mb-3"><label class="form-label text-muted small fw-bold"><i class="bi bi-chat-text me-1"></i>DESCRIPCIÓN / OBSERVACIONES</label>'
+            + '<div class="p-2 rounded border border-secondary" style="background:#111;white-space:pre-wrap;font-size:0.88rem;">' + _esc(d.description) + '</div></div>';
+    }
 
-            // ── Fila de metadatos ──────────────────────────────────────────
-            var metaHtml = '<div class="row g-2 mb-3">'
-                + _rdCell('Cliente',   d.client_name, 'bi-building', 'col-md-4')
-                + _rdCell('Técnico',   d.tech,         'bi-person-fill', 'col-md-4')
-                + _rdCell('Fecha',     d.date,         'bi-calendar-fill', 'col-md-4')
-                + _rdCell('Servicio',  d.service_type, 'bi-tools', 'col-md-6')
-                + _rdCell('ID Parte',  '#' + d.id,     'bi-hash', 'col-md-3')
-                + '</div>';
+    var partsHtml = '';
+    if (d.parts_text && !d.is_remote) {
+        partsHtml = '<div class="mb-3"><label class="form-label text-muted small fw-bold"><i class="bi bi-box-seam me-1"></i>PIEZAS / MATERIALES</label>'
+            + '<div class="p-2 rounded border border-secondary" style="background:#111;white-space:pre-wrap;font-size:0.88rem;">' + _esc(d.parts_text) + '</div></div>';
+    }
 
-            var timingHtml = '';
-            if (d.is_remote) {
-                // ── Tiempos asistencia remota ──────────────────────────────
-                timingHtml = '<div class="card border-info bg-dark mb-3"><div class="card-header border-info py-2">'
-                    + '<small class="fw-bold text-info"><i class="bi bi-clock me-1"></i>TIEMPOS DE SESIÓN REMOTA</small></div>'
-                    + '<div class="card-body py-2"><div class="row g-2">'
-                    + _rdCell('Hora inicio', d.start_time || '—', 'bi-play-circle', 'col-4')
-                    + _rdCell('Hora fin',    d.end_time   || '—', 'bi-stop-circle', 'col-4')
-                    + _rdCell('Duración',    d.work_duration || '—', 'bi-stopwatch', 'col-4')
-                    + '</div></div></div>';
-            } else {
-                // ── Tiempos parte presencial ───────────────────────────────
-                var hasTransport = d.parte_transport_start || d.parte_arrival;
-                var hasWork      = d.parte_work_start || d.parte_work_end;
+    var firmaHtml = '';
+    if (!d.is_remote && d.has_signature) {
+        firmaHtml = '<div class="mb-2"><div class="d-flex align-items-center gap-2 p-2 rounded border border-success" style="background:#001a00;">'
+            + '<i class="bi bi-pen-fill text-success fs-5"></i>'
+            + '<div><small class="text-muted d-block">Firmado por</small>'
+            + '<span class="text-success fw-bold">' + _esc(d.signature_client_name || 'Cliente') + '</span>'
+            + (d.signature_timestamp ? '<small class="text-muted ms-2">· ' + d.signature_timestamp + '</small>' : '')
+            + '</div></div></div>';
+    }
 
-                if (hasTransport || hasWork || d.work_duration) {
-                    timingHtml = '<div class="card border-secondary bg-dark mb-3"><div class="card-header border-secondary py-2">'
-                        + '<small class="fw-bold text-light"><i class="bi bi-clock-history me-1"></i>TIEMPOS DEL PARTE</small></div>'
-                        + '<div class="card-body py-2">';
+    var attHtml = '';
+    if (d.attachments && d.attachments.length > 0) {
+        attHtml = '<div class="mb-2"><label class="form-label text-muted small fw-bold"><i class="bi bi-paperclip me-1"></i>ARCHIVOS ADJUNTOS (' + d.attachments.length + ')</label><div class="d-flex flex-wrap gap-1">';
+        d.attachments.forEach(function (a) { attHtml += '<span class="badge bg-secondary">' + _esc(a.name) + '</span>'; });
+        attHtml += '</div></div>';
+    }
 
-                    // Barra de progreso visual de la jornada
-                    if (hasTransport || hasWork) {
-                        timingHtml += '<div class="row g-2 mb-2">';
-                        if (d.parte_transport_start)
-                            timingHtml += _rdCell('Salida (transporte)', d.parte_transport_start, 'bi-truck', 'col-6 col-md-3');
-                        if (d.parte_arrival)
-                            timingHtml += _rdCell('Llegada al cliente', d.parte_arrival, 'bi-geo-alt-fill', 'col-6 col-md-3');
-                        if (d.parte_work_start)
-                            timingHtml += _rdCell('Inicio trabajo', d.parte_work_start, 'bi-play-circle-fill', 'col-6 col-md-3');
-                        if (d.parte_work_end)
-                            timingHtml += _rdCell('Fin trabajo', d.parte_work_end, 'bi-stop-circle-fill', 'col-6 col-md-3');
-                        timingHtml += '</div>';
+    body.innerHTML = metaHtml + timingHtml + descHtml + partsHtml + firmaHtml + attHtml;
+}
 
-                        // Resumen de duraciones
-                        timingHtml += '<div class="row g-2">';
-                        if (d.transport_duration)
-                            timingHtml += '<div class="col-md-6"><div class="p-2 rounded" style="background:#001a0f;border:1px solid #20c997;">'
-                                + '<small class="text-muted d-block"><i class="bi bi-truck me-1"></i>Tiempo de transporte</small>'
-                                + '<span style="font-family:'Courier New',monospace;font-size:1rem;font-weight:700;color:#20c997;">' + d.transport_duration + '</span>'
-                                + '</div></div>';
-                        if (d.work_duration)
-                            timingHtml += '<div class="col-md-6"><div class="p-2 rounded" style="background:#1a0d00;border:1px solid #f37021;">'
-                                + '<small class="text-muted d-block"><i class="bi bi-stopwatch me-1"></i>Tiempo de trabajo</small>'
-                                + '<span style="font-family:'Courier New',monospace;font-size:1rem;font-weight:700;color:#f37021;">' + d.work_duration + '</span>'
-                                + '</div></div>';
-                        timingHtml += '</div>';
-                    } else if (d.work_duration) {
-                        timingHtml += '<div class="p-2 rounded" style="background:#1a0d00;border:1px solid #f37021;">'
-                            + '<small class="text-muted d-block"><i class="bi bi-stopwatch me-1"></i>Duración total</small>'
-                            + '<span style="font-family:'Courier New',monospace;font-size:1rem;font-weight:700;color:#f37021;">' + d.work_duration + '</span>'
-                            + '</div>';
-                    }
-                    timingHtml += '</div></div>';
-                }
-            }
+function _rdCell(label, value, icon, colClass) {
+    return '<div class="' + (colClass || 'col-md-4') + '">'
+        + '<div class="p-2 rounded" style="background:#1a1a1a;border:1px solid #333;">'
+        + '<small class="text-muted d-block"><i class="bi ' + icon + ' me-1"></i>' + label + '</small>'
+        + '<span class="fw-bold text-white small">' + (value || '—') + '</span>'
+        + '</div></div>';
+}
 
-            // ── Descripción / observaciones ────────────────────────────────
-            var descHtml = '';
-            if (d.description) {
-                descHtml = '<div class="mb-3"><label class="form-label text-muted small fw-bold"><i class="bi bi-chat-text me-1"></i>DESCRIPCIÓN / OBSERVACIONES</label>'
-                    + '<div class="p-2 rounded border border-secondary" style="background:#111;white-space:pre-wrap;font-size:0.88rem;">' + _esc(d.description) + '</div></div>';
-            }
-
-            // ── Piezas / materiales ───────────────────────────────────────
-            var partsHtml = '';
-            if (d.parts_text && !d.is_remote) {
-                partsHtml = '<div class="mb-3"><label class="form-label text-muted small fw-bold"><i class="bi bi-box-seam me-1"></i>PIEZAS / MATERIALES</label>'
-                    + '<div class="p-2 rounded border border-secondary" style="background:#111;white-space:pre-wrap;font-size:0.88rem;">' + _esc(d.parts_text) + '</div></div>';
-            }
-
-            // ── Firma ─────────────────────────────────────────────────────
-            var firmaHtml = '';
-            if (!d.is_remote && d.has_signature) {
-                firmaHtml = '<div class="mb-2"><div class="d-flex align-items-center gap-2 p-2 rounded border border-success" style="background:#001a00;">'
-                    + '<i class="bi bi-pen-fill text-success fs-5"></i>'
-                    + '<div><small class="text-muted d-block">Firmado por</small>'
-                    + '<span class="text-success fw-bold">' + _esc(d.signature_client_name || 'Cliente') + '</span>'
-                    + (d.signature_timestamp ? '<small class="text-muted ms-2">· ' + d.signature_timestamp + '</small>' : '')
-                    + '</div></div></div>';
-            }
-
-            // ── Adjuntos ──────────────────────────────────────────────────
-            var attHtml = '';
-            if (d.attachments && d.attachments.length > 0) {
-                attHtml = '<div class="mb-2"><label class="form-label text-muted small fw-bold"><i class="bi bi-paperclip me-1"></i>ARCHIVOS ADJUNTOS (' + d.attachments.length + ')</label><div class="d-flex flex-wrap gap-1">';
-                d.attachments.forEach(function(a) {
-                    attHtml += '<span class="badge bg-secondary">' + _esc(a.name) + '</span>';
-                });
-                attHtml += '</div></div>';
-            }
-
-            body.innerHTML = metaHtml + timingHtml + descHtml + partsHtml + firmaHtml + attHtml;
-        }
-
-        function _rdCell(label, value, icon, colClass) {
-            return '<div class="' + (colClass || 'col-md-4') + '">'
-                + '<div class="p-2 rounded" style="background:#1a1a1a;border:1px solid #333;">'
-                + '<small class="text-muted d-block"><i class="bi ' + icon + ' me-1"></i>' + label + '</small>'
-                + '<span class="fw-bold text-white small">' + (value || '—') + '</span>'
-                + '</div></div>';
-        }
-
-        function _esc(s) {
-            return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-        }
+function _esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
 
 </script>
+
+
+</body>
+</html>
