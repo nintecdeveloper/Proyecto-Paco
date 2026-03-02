@@ -210,13 +210,90 @@
                 padding-right: 15px;
             }
 
+            /* ── FullCalendar ── */
             .fc-toolbar {
                 flex-direction: column;
                 gap: 10px;
             }
-
             .fc-toolbar-title {
                 font-size: 1.2rem !important;
+            }
+            .fc-toolbar-chunk {
+                display: flex;
+                flex-wrap: wrap;
+                justify-content: center;
+                gap: 4px;
+            }
+
+            /* ── Section toolbars: all d-flex between → wrap ── */
+            .d-flex.justify-content-between {
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+
+            /* ── All button groups wrap ── */
+            .d-flex.gap-2,
+            .d-flex.gap-1 {
+                flex-wrap: wrap;
+            }
+
+            /* ── Minimum tap targets for all buttons ── */
+            .btn, .btn-sm {
+                min-height: 36px;
+            }
+            td .btn, .btn-action {
+                min-width: 36px;
+                min-height: 36px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            /* ── Modals: full-width on small screens ── */
+            .modal-dialog {
+                margin: 0.5rem;
+                max-width: calc(100vw - 1rem);
+            }
+            .modal-lg {
+                max-width: calc(100vw - 1rem);
+            }
+
+            /* ── Form rows collapse to single column ── */
+            .row.g-2 > [class*="col-sm"],
+            .row.g-2 > [class*="col-md"],
+            .row.g-3 > [class*="col-sm"],
+            .row.g-3 > [class*="col-md"] {
+                flex: 0 0 100%;
+                max-width: 100%;
+            }
+
+            /* ── Agenda section header buttons wrap ── */
+            #section-agenda .d-flex.gap-2 {
+                flex-wrap: wrap;
+                width: 100%;
+            }
+            #section-agenda .d-flex.gap-2 .btn {
+                flex: 1 1 auto;
+                font-size: 0.82rem;
+                padding: 6px 10px;
+            }
+
+            /* ── Home menu cards: 2 per row ── */
+            #home-menu .col-12.col-md-6 {
+                flex: 0 0 50%;
+                max-width: 50%;
+            }
+            .menu-card {
+                padding: 15px 10px;
+            }
+            .menu-card .fs-1 {
+                font-size: 1.8rem !important;
+            }
+
+            /* ── Parte form ── */
+            #section-parte .row > [class*="col-"] {
+                flex: 0 0 100%;
+                max-width: 100%;
             }
         }
 
@@ -683,10 +760,15 @@
         <div id="section-agenda" class="d-none" style="max-width: 1400px; margin: auto;">
             <div class="d-flex justify-content-between mb-3 align-items-center flex-wrap gap-2">
                 <h3 class="text-white fw-bold m-0 fs-4">Mi Calendario</h3>
-                <div class="d-flex gap-2">
+                <div class="d-flex gap-2 flex-wrap">
                     <button class="btn btn-warning btn-sm fw-bold" data-bs-toggle="modal"
                         data-bs-target="#modalNewAppointmentTech">
                         <i class="bi bi-calendar-plus-fill me-1"></i> Nueva Cita
+                    </button>
+                    <button class="btn btn-info btn-sm fw-bold" data-bs-toggle="modal"
+                        data-bs-target="#modalNewRemoteTech"
+                        title="Agendar asistencia remota">
+                        <i class="bi bi-telephone-fill me-1"></i> Asistencia Remota
                     </button>
                     <button class="btn btn-outline-secondary btn-sm px-3"
                         onclick="showSection('home-menu')">Atrás</button>
@@ -839,7 +921,7 @@
 
     <!-- MODALES -->
     <div class="modal fade" id="modalEventAction" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
             <div class="modal-content bg-dark text-white border-warning">
                 <div class="modal-header border-0 pb-0">
                     <h5 class="modal-title" id="evtTitle">Detalles Cita</h5>
@@ -888,7 +970,7 @@
     </div>
 
     <div class="modal fade" id="modalEditAppointmentTech" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <form action="/edit_appointment/0" method="POST" id="formEditApptTech"
                 class="modal-content bg-dark border-warning text-white">
                 <div class="modal-header border-0">
@@ -927,7 +1009,7 @@
 
     <!-- Modal: Nueva Cita (Técnico) -->
     <div class="modal fade" id="modalNewAppointmentTech" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content bg-dark border-warning text-white">
                 <div class="modal-header border-0">
                     <h5 class="modal-title">Nueva Cita</h5>
@@ -983,7 +1065,7 @@
     </div>
 
     <div class="modal fade" id="modalChangePassword" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <form action="/change_password" method="POST" class="modal-content bg-dark border-light">
                 <div class="modal-header border-0">
                     <h5 class="text-white">Cambiar Mi Contraseña</h5><button type="button"
@@ -1008,7 +1090,7 @@
 
     <!-- Modal: Completar Parte de Trabajo -->
     <div class="modal fade" id="modalCompleteTask" tabindex="-1">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content bg-dark text-white">
                 <div class="modal-header border-secondary">
                     <h5 class="modal-title">
@@ -1180,7 +1262,7 @@
 
     <!-- Modal: Asistencia Remota (Técnico) -->
     <div class="modal fade" id="modalTechRemoteAssistance" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
             <div class="modal-content bg-dark text-white border-info">
                 <div class="modal-header border-info bg-info bg-opacity-10 py-2">
                     <h5 class="modal-title">
@@ -1278,7 +1360,96 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Modal: Nueva Asistencia Remota (técnico) -->
+    <div class="modal fade" id="modalNewRemoteTech" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary bg-info bg-opacity-10">
+                    <h5 class="modal-title"><i class="bi bi-wifi me-2 text-info"></i>Nueva Asistencia Remota</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info py-2 small mb-3">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Las asistencias remotas acumulan horas de soporte mensual (límite: 5h/mes). Se registrarán automáticamente a tu nombre.
+                    </div>
+
+                    <!-- Búsqueda de cliente -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small mb-1">Buscar Cliente <span class="text-danger">*</span></label>
+                        <div class="position-relative">
+                            <input type="text" id="techNewRmtClientSearch"
+                                class="form-control form-control-sm bg-dark text-white border-secondary"
+                                placeholder="Escriba nombre del cliente..." autocomplete="off">
+                            <div id="techNewRmtClientsList" class="suggestions-list"></div>
+                        </div>
+                    </div>
+
+                    <!-- Ficha del cliente -->
+                    <div id="techNewRmtClientCard" style="display:none;" class="card bg-secondary bg-opacity-10 border-info mb-3">
+                        <div class="card-body py-2 px-3">
+                            <div class="d-flex align-items-center justify-content-between mb-1">
+                                <h6 class="card-title text-info mb-0" id="techNewRmtClientName">-</h6>
+                                <div>
+                                    <span class="badge bg-success" id="techNewRmtSupportBadge" style="display:none;"><i class="bi bi-shield-check me-1"></i>Con Soporte</span>
+                                    <span class="badge bg-danger" id="techNewRmtNoSupportBadge" style="display:none;"><i class="bi bi-shield-x me-1"></i>Sin Soporte</span>
+                                </div>
+                            </div>
+                            <div class="small text-muted">
+                                <i class="bi bi-telephone me-1"></i><span id="techNewRmtClientPhone">-</span>
+                                &nbsp;·&nbsp;
+                                <i class="bi bi-envelope me-1"></i><span id="techNewRmtClientEmail">-</span>
+                            </div>
+                            <!-- Barra horas mensuales -->
+                            <div id="techNewRmtHoursSection" style="display:none;" class="mt-2">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <small class="text-muted">Soporte remoto este mes</small>
+                                    <small id="techNewRmtHoursLabel" class="fw-bold">0h / 5h</small>
+                                </div>
+                                <div class="progress" style="height:6px;">
+                                    <div id="techNewRmtHoursBar" class="progress-bar" role="progressbar" style="width:0%; background:#06b6d4;"></div>
+                                </div>
+                                <div id="techNewRmtHoursWarning" style="display:none;" class="alert alert-warning py-1 px-2 mt-1 small">
+                                    <i class="bi bi-exclamation-triangle me-1"></i>Este cliente ya ha consumido o superado su límite mensual de 5h.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <input type="hidden" id="techNewRmtSelectedClientId">
+                    <input type="hidden" id="techNewRmtSelectedClientName">
+
+                    <!-- Fecha y horas -->
+                    <div class="row g-2">
+                        <div class="col-sm-4">
+                            <label class="form-label small mb-1">Fecha</label>
+                            <input type="date" id="techNewRmtDate" class="form-control form-control-sm bg-dark text-white border-secondary">
+                        </div>
+                        <div class="col-sm-4">
+                            <label class="form-label small mb-1">Hora inicio</label>
+                            <input type="time" id="techNewRmtStartTime" class="form-control form-control-sm bg-dark text-white border-secondary">
+                        </div>
+                        <div class="col-sm-4">
+                            <label class="form-label small mb-1">Hora fin <span class="text-muted" style="font-size:0.75rem;">(opcional)</span></label>
+                            <input type="time" id="techNewRmtEndTime" class="form-control form-control-sm bg-dark text-white border-secondary">
+                        </div>
+                    </div>
+
+                    <!-- Descripción -->
+                    <div class="mt-3">
+                        <label class="form-label small mb-1">Descripción</label>
+                        <textarea id="techNewRmtDescription" class="form-control form-control-sm bg-dark text-white border-secondary" rows="3" placeholder="Describa brevemente el trabajo a realizar..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-info btn-sm" onclick="techSubmitNewRemote()" id="techNewRmtSubmitBtn">
+                        <i class="bi bi-plus-lg me-1"></i>Crear Asistencia Remota
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
     <script>
         // ====== TOAST NOTIFICATIONS (reemplaza alert() bloqueantes) ======
         function showToast(msg, type = 'success', duration = 1200) {
@@ -3444,6 +3615,188 @@
                 }
             })
             .catch(() => showToast('❌ Error de conexión', 'error'));
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // NUEVA ASISTENCIA REMOTA — Creada desde el calendario del técnico
+        // ═══════════════════════════════════════════════════════════════
+
+        (function initTechNewRemoteModal() {
+            document.addEventListener('DOMContentLoaded', function () {
+                var modal = document.getElementById('modalNewRemoteTech');
+                if (!modal) return;
+
+                // Al abrir: pre-rellenar fecha de hoy
+                modal.addEventListener('show.bs.modal', function () {
+                    var dateEl = document.getElementById('techNewRmtDate');
+                    if (dateEl && !dateEl.value) {
+                        dateEl.value = new Date().toISOString().split('T')[0];
+                    }
+                });
+                modal.addEventListener('shown.bs.modal', function () {
+                    var inp = document.getElementById('techNewRmtClientSearch');
+                    if (inp) inp.focus();
+                    _initTechNewRmtSearch();
+                });
+
+                // Al cerrar: limpiar todo
+                modal.addEventListener('hidden.bs.modal', function () {
+                    ['techNewRmtClientSearch','techNewRmtDescription','techNewRmtStartTime',
+                     'techNewRmtEndTime','techNewRmtSelectedClientId','techNewRmtSelectedClientName']
+                        .forEach(function (id) {
+                            var el = document.getElementById(id);
+                            if (el) el.value = '';
+                        });
+                    var dateEl = document.getElementById('techNewRmtDate');
+                    if (dateEl) dateEl.value = new Date().toISOString().split('T')[0];
+                    var card = document.getElementById('techNewRmtClientCard');
+                    if (card) card.style.display = 'none';
+                    var hrs = document.getElementById('techNewRmtHoursSection');
+                    if (hrs) hrs.style.display = 'none';
+                    _closeTechNewRmtList();
+                    var btn = document.getElementById('techNewRmtSubmitBtn');
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="bi bi-plus-lg me-1"></i>Crear Asistencia Remota';
+                    }
+                });
+            });
+        }());
+
+        var _techNewRmtSearchReady = false;
+
+        function _initTechNewRmtSearch() {
+            if (_techNewRmtSearchReady) return;
+            _techNewRmtSearchReady = true;
+
+            var input = document.getElementById('techNewRmtClientSearch');
+            var list  = document.getElementById('techNewRmtClientsList');
+            if (!input || !list) return;
+
+            list.style.zIndex = '9999';
+
+            input.addEventListener('input', function () {
+                var q = this.value.trim();
+                if (q.length < 2) { _closeTechNewRmtList(); return; }
+                fetch('/api/clients_search?q=' + encodeURIComponent(q))
+                    .then(function (res) { return res.json(); })
+                    .then(function (items) {
+                        list.innerHTML = '';
+                        if (!Array.isArray(items) || items.length === 0) { _closeTechNewRmtList(); return; }
+                        items.forEach(function (item) {
+                            var div = document.createElement('div');
+                            div.className = 'suggestion-item';
+                            div.textContent = item.name + (item.has_support ? ' ✓' : '');
+                            div.addEventListener('mousedown', function (e) {
+                                e.preventDefault();
+                                _selectTechNewRmtClient(item);
+                            });
+                            list.appendChild(div);
+                        });
+                        list.style.display = 'block';
+                    })
+                    .catch(function () { _closeTechNewRmtList(); });
+            });
+
+            input.addEventListener('blur', function () { setTimeout(_closeTechNewRmtList, 150); });
+            input.addEventListener('keydown', function (e) { if (e.key === 'Escape') _closeTechNewRmtList(); });
+            document.addEventListener('mousedown', function (e) {
+                if (!input.contains(e.target) && !list.contains(e.target)) _closeTechNewRmtList();
+            });
+        }
+
+        function _closeTechNewRmtList() {
+            var list = document.getElementById('techNewRmtClientsList');
+            if (list) { list.innerHTML = ''; list.style.display = 'none'; }
+        }
+
+        function _selectTechNewRmtClient(item) {
+            document.getElementById('techNewRmtSelectedClientId').value   = item.id;
+            document.getElementById('techNewRmtSelectedClientName').value = item.name;
+            document.getElementById('techNewRmtClientSearch').value       = item.name;
+            _closeTechNewRmtList();
+
+            document.getElementById('techNewRmtClientName').textContent  = item.name;
+            document.getElementById('techNewRmtClientPhone').textContent = item.phone || '—';
+            document.getElementById('techNewRmtClientEmail').textContent = item.email || '—';
+
+            var badgeOk = document.getElementById('techNewRmtSupportBadge');
+            var badgeNo = document.getElementById('techNewRmtNoSupportBadge');
+            if (item.has_support) {
+                badgeOk.style.display = 'inline-block';
+                badgeNo.style.display = 'none';
+            } else {
+                badgeOk.style.display = 'none';
+                badgeNo.style.display = 'inline-block';
+            }
+            document.getElementById('techNewRmtClientCard').style.display = 'block';
+
+            // Cargar horas mensuales del cliente
+            fetch('/api/client/' + item.id + '/monthly_remote_hours')
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (!data.success) return;
+                    var section = document.getElementById('techNewRmtHoursSection');
+                    section.style.display = 'block';
+                    var pct = Math.min(100, (data.used_hours / data.limit_hours) * 100);
+                    var bar = document.getElementById('techNewRmtHoursBar');
+                    bar.style.width      = pct + '%';
+                    bar.style.background = pct >= 100 ? '#ef4444' : pct >= 80 ? '#f59e0b' : '#06b6d4';
+                    document.getElementById('techNewRmtHoursLabel').textContent = data.used_hours + 'h / ' + data.limit_hours + 'h';
+                    var warn = document.getElementById('techNewRmtHoursWarning');
+                    warn.style.display = data.over_limit ? 'block' : 'none';
+                })
+                .catch(function () {});
+        }
+
+        function techSubmitNewRemote() {
+            var clientId   = document.getElementById('techNewRmtSelectedClientId').value;
+            var clientName = document.getElementById('techNewRmtSelectedClientName').value;
+            if (!clientId || !clientName) {
+                showToast('⚠️ Por favor selecciona un cliente', 'error');
+                return;
+            }
+
+            var description = document.getElementById('techNewRmtDescription').value.trim();
+            var dateVal     = (document.getElementById('techNewRmtDate')      || {}).value || null;
+            var startTime   = (document.getElementById('techNewRmtStartTime') || {}).value || null;
+            var endTime     = (document.getElementById('techNewRmtEndTime')   || {}).value || null;
+
+            var btn = document.getElementById('techNewRmtSubmitBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Creando...';
+
+            fetch('/api/remote_assistance', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    client_id: clientId,
+                    client_name: clientName,
+                    description: description,
+                    date: dateVal,
+                    start_time: startTime || null,
+                    end_time: endTime || null,
+                    tech_id: null   // el backend asigna al usuario autenticado cuando es null
+                })
+            })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-plus-lg me-1"></i>Crear Asistencia Remota';
+                if (data.success) {
+                    showToast('✅ Asistencia remota creada', 'success');
+                    var m = bootstrap.Modal.getInstance(document.getElementById('modalNewRemoteTech'));
+                    if (m) m.hide();
+                    if (calendar) calendar.refetchEvents();
+                } else {
+                    showToast('❌ ' + (data.msg || 'Error al crear'), 'error');
+                }
+            })
+            .catch(function () {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-plus-lg me-1"></i>Crear Asistencia Remota';
+                showToast('❌ Error de conexión', 'error');
+            });
         }
 
         // ═══════════════════════════════════════════════════════════════

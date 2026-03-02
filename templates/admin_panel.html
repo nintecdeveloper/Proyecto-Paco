@@ -170,21 +170,100 @@
 
         /* Mobile overrides */
         @media(max-width: 768px) {
+            /* ── Tabs ── */
             .nav-tabs {
                 display: flex;
                 justify-content: space-around;
                 flex-wrap: wrap;
             }
-
             .nav-item {
                 flex: 1 1 30%;
                 text-align: center;
                 font-size: 0.8em;
             }
 
+            /* ── FullCalendar toolbar ── */
             .fc-header-toolbar {
                 flex-direction: column;
                 font-size: 0.8em;
+            }
+            .fc-toolbar-chunk {
+                display: flex;
+                flex-wrap: wrap;
+                justify-content: center;
+                gap: 4px;
+            }
+
+            /* ── Section toolbars: all d-flex between → wrap ── */
+            .d-flex.justify-content-between {
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+
+            /* ── All button groups wrap ── */
+            .d-flex.gap-2,
+            .d-flex.gap-1 {
+                flex-wrap: wrap;
+            }
+
+            /* ── Agenda toolbar: buttons fill the row ── */
+            .agenda-toolbar-btns {
+                width: 100%;
+                justify-content: flex-start !important;
+            }
+            .agenda-toolbar-btns .btn {
+                flex: 1 1 auto;
+                min-width: 0;
+                font-size: 0.78rem;
+                padding: 6px 8px;
+            }
+
+            /* ── Reports table: hide low-priority columns on mobile ── */
+            .reports-table th:nth-child(6),
+            .reports-table td:nth-child(6),
+            .reports-table th:nth-child(7),
+            .reports-table td:nth-child(7) {
+                display: none;
+            }
+
+            /* ── All action buttons: minimum tap target 44px ── */
+            .btn-sm, .btn {
+                min-height: 36px;
+            }
+            .reports-table .btn,
+            td .btn {
+                min-width: 36px;
+                min-height: 36px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                padding: 6px 10px;
+            }
+
+            /* ── Modals: full-width on small screens ── */
+            .modal-dialog {
+                margin: 0.5rem;
+                max-width: calc(100vw - 1rem);
+            }
+            .modal-lg, .modal-xl {
+                max-width: calc(100vw - 1rem);
+            }
+
+            /* ── Form rows collapse to single column ── */
+            .row.g-2 > [class*="col-sm"],
+            .row.g-2 > [class*="col-md"] {
+                flex: 0 0 100%;
+                max-width: 100%;
+            }
+
+            /* ── Navbar ── */
+            .navbar .fw-bold.me-2 {
+                font-size: 0.85rem;
+            }
+
+            /* ── Cards in client view wrap properly ── */
+            .card-body .d-flex {
+                flex-wrap: wrap;
             }
         }
 
@@ -307,7 +386,7 @@
 
         <div class="tab-content">
             <div class="tab-pane fade show active" id="team">
-                <div class="d-flex justify-content-between mb-3 align-items-center">
+                <div class="d-flex justify-content-between mb-3 align-items-center flex-wrap gap-2">
                     <h4 class="fw-bold text-white fs-5 m-0">Gestión de Equipo</h4>
                     <button class="btn btn-warning btn-sm fw-bold" data-bs-toggle="modal"
                         data-bs-target="#modalAddUser">
@@ -377,7 +456,7 @@
             <div class="tab-pane fade" id="global-agenda">
                 <div class="d-flex justify-content-between mb-3 align-items-center flex-wrap gap-2">
                     <h4 class="fw-bold text-white fs-5 m-0">Agenda Global de Tareas</h4>
-                    <div class="d-flex gap-2">
+                    <div class="d-flex gap-2 agenda-toolbar-btns">
                         <button class="btn btn-outline-info btn-sm fw-bold" onclick="refreshGlobalCalendar()"
                             title="Actualizar calendario">
                             <i class="bi bi-arrow-clockwise me-1"></i> Actualizar
@@ -518,7 +597,7 @@
                 </div>
                 
                 <div class="table-responsive">
-                    <table class="table table-dark table-sm">
+                    <table class="table table-dark table-sm reports-table">
                         <thead>
                             <tr>
                                 <th>ID</th>
@@ -705,7 +784,7 @@
             <!-- Las analíticas ahora se muestran individualmente por técnico desde la tarjeta de cada uno en EQUIPO -->
 
             <div class="tab-pane fade" id="stock">
-                <div class="d-flex justify-content-between mb-3 align-items-center">
+                <div class="d-flex justify-content-between mb-3 align-items-center flex-wrap gap-2">
                     <h4 class="fw-bold text-white fs-5 m-0">Gestión de Inventario</h4>
                     <div>
                         <button class="btn btn-outline-info btn-sm fw-bold me-2" onclick="loadStockTree()">
@@ -1066,7 +1145,7 @@
     <!-- MODALES -->
     <!-- Modal: Añadir Usuario -->
     <div class="modal fade" id="modalAddUser" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-scrollable">
             <div class="modal-content bg-dark text-white">
                 <div class="modal-header border-secondary">
                     <h5 class="modal-title">Nuevo Usuario</h5>
@@ -1103,7 +1182,7 @@
 
     <!-- Modal: Eliminar Usuario -->
     <div class="modal fade" id="modalDeleteUser" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-scrollable">
             <div class="modal-content bg-dark text-white">
                 <div class="modal-header border-secondary">
                     <h5 class="modal-title text-danger">Confirmar Eliminación</h5>
@@ -1126,7 +1205,7 @@
 
     <!-- Modal: Cambiar Nombre de Usuario -->
     <div class="modal fade" id="modalRenameUser" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-scrollable">
             <div class="modal-content bg-dark text-white">
                 <div class="modal-header border-secondary">
                     <h5 class="modal-title"><i class="bi bi-pencil-fill me-2 text-warning"></i>Cambiar Nombre de Usuario</h5>
@@ -1153,7 +1232,7 @@
 
     <!-- Modal: Cambiar Contraseña -->
     <div class="modal fade" id="modalChangePassword" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-scrollable">
             <div class="modal-content bg-dark text-white">
                 <div class="modal-header border-secondary">
                     <h5 class="modal-title">Cambiar Contraseña</h5>
@@ -1176,7 +1255,7 @@
 
     <!-- Modal: Añadir Stock -->
     <div class="modal fade" id="modalAddStock" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-scrollable">
             <div class="modal-content bg-dark text-white">
                 <div class="modal-header border-secondary">
                     <h5 class="modal-title"><i class="bi bi-box-seam-fill me-2"></i>Nuevo Artículo de Stock</h5>
@@ -1246,7 +1325,7 @@
 
     <!-- Modal: Ajustar Stock -->
     <div class="modal fade" id="modalAdjustStock" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-scrollable">
             <div class="modal-content bg-dark text-white">
                 <div class="modal-header border-secondary">
                     <h5 class="modal-title">Ajustar Cantidad</h5>
@@ -1270,7 +1349,7 @@
 
     <!-- Modal: Editar Stock Completo -->
     <div class="modal fade" id="modalEditStock" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-scrollable">
             <div class="modal-content bg-dark text-white">
                 <div class="modal-header border-secondary">
                     <h5 class="modal-title">Editar Artículo</h5>
@@ -1297,7 +1376,7 @@
 
     <!-- Modal: Editar Artículo de Stock (COMPLETO) -->
     <div class="modal fade" id="modalEditStockItem" tabindex="-1">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content bg-dark text-white">
                 <div class="modal-header border-secondary">
                     <h5 class="modal-title"><i class="bi bi-box-seam me-2"></i>Editar Artículo de Stock</h5>
@@ -1360,7 +1439,7 @@
 
     <!-- Modal: Editar Categoría de Stock -->
     <div class="modal fade" id="modalEditCategory" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-scrollable">
             <div class="modal-content bg-dark text-white">
                 <div class="modal-header border-secondary">
                     <h5 class="modal-title"><i class="bi bi-folder-fill me-2"></i>Editar Categoría</h5>
@@ -1402,7 +1481,7 @@
 
     <!-- Modal: Añadir Cliente -->
     <div class="modal fade" id="modalAddClient" tabindex="-1">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content bg-dark text-white">
                 <div class="modal-header border-secondary">
                     <h5 class="modal-title"><i class="bi bi-person-plus-fill me-2"></i>Nuevo Cliente</h5>
@@ -1510,7 +1589,7 @@
 
     <!-- Modal: Editar Cliente -->
     <div class="modal fade" id="modalEditClient" tabindex="-1">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content bg-dark text-white">
                 <div class="modal-header border-secondary">
                     <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>Editar Cliente</h5>
@@ -1609,7 +1688,7 @@
 
     <!-- ✅ NUEVO Modal: Perfil de Técnico -->
     <div class="modal fade" id="modalTechProfile" tabindex="-1">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content bg-dark text-white">
                 <div class="modal-header border-secondary">
                     <h5 class="modal-title">
@@ -1720,7 +1799,7 @@
 
     <!-- Modal: Importar Clientes -->
     <div class="modal fade" id="modalImportClients" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-scrollable">
             <div class="modal-content bg-dark text-white">
                 <div class="modal-header border-secondary">
                     <h5 class="modal-title">Importar Clientes (JSON)</h5>
@@ -1743,7 +1822,7 @@
 
     <!-- Modal: Añadir Tipo de Servicio -->
     <div class="modal fade" id="modalAddService" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-scrollable">
             <div class="modal-content bg-dark text-white">
                 <div class="modal-header border-secondary">
                     <h5 class="modal-title">Nuevo Tipo de Servicio</h5>
@@ -1767,7 +1846,7 @@
 
     <!-- Modal: Editar Tipo de Servicio -->
     <div class="modal fade" id="modalEditService" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-scrollable">
             <div class="modal-content bg-dark text-white">
                 <div class="modal-header border-secondary">
                     <h5 class="modal-title">Editar Tipo de Servicio</h5>
@@ -1792,7 +1871,7 @@
 
     <!-- Modal: Agendar Cita -->
     <div class="modal fade" id="modalScheduleAppointment" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-scrollable">
             <div class="modal-content bg-dark text-white">
                 <div class="modal-header border-secondary">
                     <h5 class="modal-title">Agendar Nueva Cita</h5>
@@ -1849,7 +1928,7 @@
 
     <!-- Modal: Crear Tarea Sin Técnico -->
     <div class="modal fade" id="modalCreateUnassignedTask" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-scrollable">
             <div class="modal-content bg-dark text-white">
                 <div class="modal-header border-secondary bg-danger bg-opacity-10">
                     <h5 class="modal-title"><i class="bi bi-exclamation-circle me-2"></i>Crear Tarea Pendiente por Asignar</h5>
@@ -1911,7 +1990,7 @@
     </div>
 
     <div class="modal fade" id="modalRemoteAssistance" tabindex="-1">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content bg-dark text-white">
                 <div class="modal-header border-secondary bg-info bg-opacity-10">
                     <h5 class="modal-title"><i class="bi bi-wifi me-2 text-info"></i>Nueva Asistencia Remota</h5>
@@ -2106,7 +2185,7 @@
     </div>
 
     <div class="modal fade" id="modalEditAppointmentAdmin" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-scrollable">
             <div class="modal-content bg-dark text-white">
                 <div class="modal-header border-secondary">
                     <h5 class="modal-title">Editar Cita</h5>
@@ -2150,7 +2229,7 @@
 
     <!-- Modal: Acciones Tarea Admin -->
     <div class="modal fade" id="modalActionAdmin" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-scrollable">
             <div class="modal-content bg-dark text-white">
                 <div class="modal-header border-secondary">
                     <h5 class="modal-title">Acciones sobre la Tarea</h5>
@@ -2193,7 +2272,7 @@
 
     <!-- Modal: Detalles Completos de la Tarea -->
     <div class="modal fade" id="modalTaskDetails" tabindex="-1">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content bg-dark text-white">
                 <div class="modal-header border-secondary">
                     <h5 class="modal-title">
@@ -2283,7 +2362,7 @@
 
     <!-- Modal: Añadir Categoría de Stock -->
     <div class="modal fade" id="modalAddCategory" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-scrollable">
             <div class="modal-content bg-dark text-white">
                 <div class="modal-header border-secondary">
                     <h5 class="modal-title">Nueva Categoría/Subcategoría</h5>
@@ -2333,7 +2412,7 @@
 
     <!-- Modal: Archivos Adjuntos del Informe -->
     <div class="modal fade" id="modalAttachments" tabindex="-1">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content bg-dark text-white">
                 <div class="modal-header border-secondary">
                     <h5 class="modal-title">
@@ -2358,7 +2437,7 @@
 
     <!-- Modal: Horas de trabajo del cliente este mes -->
     <div class="modal fade" id="modalClientWorkHours" tabindex="-1">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content bg-dark text-white">
                 <div class="modal-header border-secondary">
                     <h5 class="modal-title">
@@ -2456,7 +2535,7 @@
 
     <!-- Modal: Estadísticas del Técnico -->
     <div class="modal fade" id="modalTechStats" tabindex="-1">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content bg-dark text-white">
                 <div class="modal-header border-secondary">
                     <h5 class="modal-title">
@@ -4550,7 +4629,7 @@
                         if (!modal) {
                             const modalHTML = `
                                 <div class="modal fade" id="modalEditStockComplete" tabindex="-1">
-                                    <div class="modal-dialog">
+                                    <div class="modal-dialog modal-dialog-scrollable">
                                         <div class="modal-content bg-dark text-white">
                                             <div class="modal-header border-secondary">
                                                 <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>Editar Artículo</h5>
@@ -5416,7 +5495,7 @@
                         var transportHtml = (!r.is_remote && r.parte_transport_start && r.parte_arrival)
                             ? '<span style="font-family:\'Courier New\',monospace;font-size:0.82rem;font-weight:600;color:#20c997;background:#001a0f;border:1px solid #20c997;border-radius:6px;padding:2px 7px;white-space:nowrap;">' + r.parte_transport_start + ' → ' + r.parte_arrival + '</span>'
                             : '<span class="text-muted small">—</span>';
-                        var actionHtml = '<a href="/print_report/' + r.id + '" target="_blank" class="btn btn-sm btn-outline-info"><i class="bi bi-eye-fill"></i></a>';
+                        var actionHtml = '<a href="/print_report/' + r.id + '" target="_blank" class="btn btn-sm btn-outline-info" style="min-width:36px;min-height:36px;display:inline-flex;align-items:center;justify-content:center;"><i class="bi bi-eye-fill"></i></a>';
                         var tr = document.createElement('tr');
                         if (r.is_remote) tr.style.borderLeft = '3px solid #06b6d4';
                         tr.innerHTML = '<td>' + r.id + '</td><td>' + r.client_name + '</td><td>' + svcHtml + '</td><td>' + r.date + '</td><td>' + r.tech + '</td><td>' + transportHtml + '</td><td>' + durationHtml + '</td><td>' + attachHtml + '</td><td>' + actionHtml + '</td>';
@@ -5466,11 +5545,11 @@
                     if (data.tasks.length === 0) {
                         html += '<div class="text-center text-muted py-3"><i class="bi bi-calendar-x me-2"></i>Sin servicios este mes</div>';
                     } else {
-                        html += '<table class="table table-dark table-sm table-hover"><thead><tr><th>Fecha</th><th>Técnico</th><th>Servicio</th><th>Duración</th></tr></thead><tbody>';
+                        html += '<div class="table-responsive"><table class="table table-dark table-sm table-hover"><thead><tr><th>Fecha</th><th>Técnico</th><th>Servicio</th><th>Duración</th></tr></thead><tbody>';
                         data.tasks.forEach(function(t) {
                             html += '<tr><td>' + t.date + '</td><td>' + t.tech + '</td><td>' + t.service + '</td><td><span style="font-family:\'Courier New\',monospace;color:#f37021;">' + t.duration + '</span></td></tr>';
                         });
-                        html += '</tbody></table>';
+                        html += '</tbody></table></div>';
                     }
                     document.getElementById('workHoursContent').innerHTML = html;
                 })
@@ -5693,7 +5772,7 @@
             // Crear modal dinámicamente para asignar técnico
             let html = `
                 <div class="modal fade" id="modalAssignTech" tabindex="-1">
-                    <div class="modal-dialog">
+                    <div class="modal-dialog modal-dialog-scrollable">
                         <div class="modal-content bg-dark text-white">
                             <div class="modal-header border-secondary">
                                 <h5 class="modal-title">Asignar Técnico a ${clientName}</h5>
@@ -5856,7 +5935,7 @@
     <!-- Modal: Detalle de Pagos del Cliente                      -->
     <!-- ======================================================= -->
     <div class="modal fade" id="modalClientPayment" tabindex="-1">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content bg-dark text-white">
                 <div class="modal-header border-secondary">
                     <h5 class="modal-title">

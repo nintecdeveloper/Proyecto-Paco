@@ -2770,7 +2770,7 @@ def stop_timer(timer_id):
 @login_required
 def create_remote_assistance():
     """Crear asistencia remota con soporte opcional de fecha/hora/técnico"""
-    if current_user.role != 'admin':
+    if current_user.role not in ('admin', 'tech'):
         return jsonify({'success': False, 'msg': 'No autorizado'}), 403
     
     try:
@@ -2785,6 +2785,10 @@ def create_remote_assistance():
         
         if not client_name:
             return jsonify({'success': False, 'msg': 'Cliente requerido'}), 400
+
+        # Los técnicos siempre se asignan a sí mismos (ignoran tech_id del payload)
+        if current_user.role == 'tech':
+            tech_id = current_user.id
 
         # Detectar tipo de servicio "Asistencia Remota" o crear como primer servicio disponible
         remote_service = ServiceType.query.filter(
