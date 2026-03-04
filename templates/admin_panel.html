@@ -326,9 +326,14 @@
         .modal-header, .modal-footer { flex-shrink: 0 !important; }
         .modal-body {
             flex: 1 1 auto !important;
-            overflow-y: auto !important;
+            overflow-y: scroll !important;
             overflow-x: hidden !important;
             -webkit-overflow-scrolling: touch;
+            min-height: 0 !important;
+        }
+        /* El <form> entre modal-header y modal-body rompe el flex layout — lo hacemos transparente */
+        .modal-content > form {
+            display: contents !important;
         }
         @media (max-height: 750px) {
             .modal-content { max-height: 96vh !important; }
@@ -1596,7 +1601,7 @@
                         </div>
                         <small class="text-muted"><i class="bi bi-info-circle me-1"></i>Marca esta opción si el cliente tiene contratado soporte técnico con OSLAPRINT</small>
                     </div>
-                    <div class="mb-3 p-2 rounded border border-info" id="addSupportScheduleDiv" style="display:none; background:rgba(13,202,240,0.07); overflow-y: auto; max-height: 200px;">
+                    <div class="mb-3 p-2 rounded border border-info" id="addSupportScheduleDiv" style="display:none; background:rgba(13,202,240,0.07);">
                         <label class="form-label fw-bold text-info mb-2 small"><i class="bi bi-calendar-check me-1"></i>Días de Soporte Disponibles</label>
                         <div class="d-grid gap-2">
                             <button type="button" class="btn btn-sm btn-outline-success schedule-btn" onclick="selectSchedule('add','lv')">
@@ -1672,7 +1677,7 @@
                         </div>
                         <small class="text-muted"><i class="bi bi-info-circle me-1"></i>Marca esta opción si el cliente tiene contratado soporte técnico con OSLAPRINT</small>
                     </div>
-                    <div class="mb-3 p-2 rounded border border-info" id="editSupportScheduleDiv" style="display:none; background:rgba(13,202,240,0.07); overflow-y: auto; max-height: 200px;">
+                    <div class="mb-3 p-2 rounded border border-info" id="editSupportScheduleDiv" style="display:none; background:rgba(13,202,240,0.07);">
                         <label class="form-label fw-bold text-info mb-2 small"><i class="bi bi-calendar-check me-1"></i>Días de Soporte Disponibles</label>
                         <div class="d-grid gap-2">
                             <button type="button" class="btn btn-sm btn-outline-success schedule-btn" onclick="selectSchedule('edit','lv')">
@@ -3169,6 +3174,14 @@
                 var val = (hidden && hidden.value) ? hidden.value : 'lv';
                 if (hidden) hidden.value = val;
                 selectSchedule(prefix, val);
+                // Scroll automático al fondo del modal-body para mostrar los días de soporte
+                setTimeout(function() {
+                    var modalBody = div.closest('.modal-body');
+                    if (modalBody) {
+                        div.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        modalBody.scrollTop = modalBody.scrollHeight;
+                    }
+                }, 60);
             }
         }
 
@@ -6725,7 +6738,5 @@ function _esc(s) {
                 });
         }
 </script>
-
-
 </body>
 </html>
