@@ -1445,7 +1445,7 @@
                     <h5 class="modal-title"><i class="bi bi-folder-fill me-2"></i>Editar Categoría</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <form id="formEditCategory" method="POST" action="/edit_stock_category/0">
+                <form method="POST" action="/edit_stock_category">
                     <div class="modal-body">
                         <input type="hidden" name="category_id" id="editCategoryId">
 
@@ -1487,94 +1487,90 @@
                     <h5 class="modal-title"><i class="bi bi-person-plus-fill me-2"></i>Nuevo Cliente</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <form method="POST" action="/manage_clients">
-                    <div class="modal-body">
-                        <input type="hidden" name="action" value="add">
+                <!-- form solo envuelve modal-body para scroll correcto en Bootstrap -->
+                <form id="formAddClient" method="POST" action="/manage_clients">
+                <div class="modal-body">
+                    <input type="hidden" name="action" value="add">
 
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Nombre del Cliente <span class="text-warning">*</span></label>
-                                <input type="text" name="name" class="form-control" required placeholder="Nombre o empresa">
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Teléfono <span class="text-warning">*</span></label>
-                                <input type="tel" name="phone" class="form-control" required
-                                    placeholder="Ej: 912345678">
-                            </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Nombre del Cliente <span class="text-warning">*</span></label>
+                            <input type="text" name="name" class="form-control" required placeholder="Nombre o empresa">
                         </div>
-
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Correo Electrónico</label>
-                                <input type="email" name="email" class="form-control"
-                                    placeholder="ejemplo@email.com">
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Enlace/URL <small class="text-muted">(Opcional)</small></label>
-                                <input type="url" name="link" class="form-control" placeholder="https://ejemplo.com">
-                                <small class="text-muted">
-                                    <i class="bi bi-info-circle me-1"></i>Portal web, sistema interno, etc.
-                                </small>
-                            </div>
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label">Dirección</label>
-                            <input type="text" name="address" id="clientAddress" class="form-control"
-                                placeholder="Calle, número, ciudad">
-                            <a href="#" id="openGoogleMaps" class="small text-info mt-1 d-block" target="_blank"
-                                style="display:none;">
-                                <i class="bi bi-geo-alt-fill me-1"></i>Abrir en Google Maps
-                            </a>
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label">Notas Internas</label>
-                            <textarea name="notes" class="form-control" rows="2"
-                                placeholder="Comentarios internos sobre el cliente"></textarea>
-                        </div>
-
-                        <hr class="border-secondary">
-
-                        <div class="mb-2">
-                            <label class="form-label fw-bold">¿Tiene Soporte Técnico Contratado?</label>
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" id="hasSupportSwitch" name="has_support">
-                                <label class="form-check-label" for="hasSupportSwitch">
-                                    Sí, tiene soporte técnico
-                                </label>
-                            </div>
-                            <small class="text-muted">
-                                <i class="bi bi-info-circle me-1"></i>
-                                Marca esta opción si el cliente tiene contratado soporte técnico con OSLAPRINT
-                            </small>
-                        </div>
-
-                        <!-- Días de soporte -->
-                        <div class="mb-3 p-3 rounded border border-info" id="addSupportScheduleDiv" style="display:none; background:rgba(13,202,240,0.07);">
-                            <label class="form-label fw-bold text-info mb-2"><i class="bi bi-calendar-check me-1"></i>Días de Soporte Disponibles</label>
-                            <div class="d-flex gap-2 flex-wrap" id="addScheduleBtns">
-                                <button type="button" class="btn btn-outline-success schedule-btn" onclick="selectSchedule('add','lv')">
-                                    <i class="bi bi-calendar-week me-1"></i>Lunes – Viernes
-                                </button>
-                                <button type="button" class="btn btn-outline-warning schedule-btn" onclick="selectSchedule('add','ls')">
-                                    <i class="bi bi-calendar-week me-1"></i>Lunes – Sábado
-                                </button>
-                                <button type="button" class="btn btn-outline-danger schedule-btn" onclick="selectSchedule('add','ld')">
-                                    <i class="bi bi-calendar-week me-1"></i>Lunes – Domingo
-                                </button>
-                            </div>
-                            <input type="hidden" name="support_schedule" id="addSupportScheduleValue" value="lv">
-                            <small class="text-muted mt-2 d-block"><i class="bi bi-info-circle me-1"></i>Selecciona los días en que el cliente tiene soporte activo</small>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Teléfono <span class="text-warning">*</span></label>
+                            <input type="tel" name="phone" class="form-control" required placeholder="Ej: 912345678">
                         </div>
                     </div>
-                    <div class="modal-footer border-secondary">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                        <button type="submit" class="btn btn-warning">
-                            <i class="bi bi-save-fill me-1"></i>Guardar Cliente
-                        </button>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Correo Electrónico</label>
+                            <input type="email" name="email" class="form-control" placeholder="ejemplo@email.com">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Enlace/URL <small class="text-muted">(Opcional)</small></label>
+                            <input type="url" name="link" class="form-control" placeholder="https://ejemplo.com">
+                            <small class="text-muted"><i class="bi bi-info-circle me-1"></i>Portal web, sistema interno, etc.</small>
+                        </div>
                     </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Dirección</label>
+                        <input type="text" name="address" id="clientAddress" class="form-control" placeholder="Calle, número, ciudad">
+                        <a href="#" id="openGoogleMaps" class="small text-info mt-1 d-block" target="_blank" style="display:none;">
+                            <i class="bi bi-geo-alt-fill me-1"></i>Abrir en Google Maps
+                        </a>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Notas Internas</label>
+                        <textarea name="notes" class="form-control" rows="2" placeholder="Comentarios internos sobre el cliente"></textarea>
+                    </div>
+
+                    <hr class="border-secondary">
+
+                    <div class="mb-2">
+                        <label class="form-label fw-bold">¿Tiene Soporte Técnico Contratado?</label>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="hasSupportSwitch" name="has_support">
+                            <label class="form-check-label" for="hasSupportSwitch">Sí, tiene soporte técnico</label>
+                        </div>
+                        <small class="text-muted">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Marca esta opción si el cliente tiene contratado soporte técnico con OSLAPRINT
+                        </small>
+                    </div>
+
+                    <!-- Días de soporte: se muestra al activar el switch -->
+                    <div class="mb-3 p-3 rounded border border-info" id="addSupportScheduleDiv" style="display:none; background:rgba(13,202,240,0.07);">
+                        <label class="form-label fw-bold text-info mb-2">
+                            <i class="bi bi-calendar-check me-1"></i>Días de Soporte Disponibles
+                        </label>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <button type="button" class="btn btn-outline-success schedule-btn" onclick="selectSchedule('add','lv')">
+                                <i class="bi bi-calendar-week me-1"></i>Lunes – Viernes
+                            </button>
+                            <button type="button" class="btn btn-outline-warning schedule-btn" onclick="selectSchedule('add','ls')">
+                                <i class="bi bi-calendar-week me-1"></i>Lunes – Sábado
+                            </button>
+                            <button type="button" class="btn btn-outline-danger schedule-btn" onclick="selectSchedule('add','ld')">
+                                <i class="bi bi-calendar-week me-1"></i>Lunes – Domingo
+                            </button>
+                        </div>
+                        <input type="hidden" name="support_schedule" id="addSupportScheduleValue" value="lv">
+                        <small class="text-muted mt-2 d-block">
+                            <i class="bi bi-info-circle me-1"></i>Selecciona los días en que el cliente tiene soporte activo
+                        </small>
+                    </div>
+                </div><!-- /modal-body -->
                 </form>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" form="formAddClient" class="btn btn-warning">
+                        <i class="bi bi-save-fill me-1"></i>Guardar Cliente
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -1587,85 +1583,87 @@
                     <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>Editar Cliente</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <form method="POST" action="/manage_clients">
-                    <div class="modal-body">
-                        <input type="hidden" name="action" value="edit">
-                        <input type="hidden" name="client_id" id="editClientId">
+                <!-- form solo envuelve modal-body para scroll correcto en Bootstrap -->
+                <form id="formEditClient" method="POST" action="/manage_clients">
+                <div class="modal-body">
+                    <input type="hidden" name="action" value="edit">
+                    <input type="hidden" name="client_id" id="editClientId">
 
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Nombre del Cliente *</label>
-                                <input type="text" name="name" id="editClientName" class="form-control" required>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Teléfono *</label>
-                                <input type="tel" name="phone" id="editClientPhone" class="form-control" required>
-                            </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Nombre del Cliente <span class="text-warning">*</span></label>
+                            <input type="text" name="name" id="editClientName" class="form-control" required>
                         </div>
-
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Correo Electrónico *</label>
-                                <input type="email" name="email" id="editClientEmail" class="form-control">
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Enlace/URL (Opcional)</label>
-                                <input type="url" name="link" id="editClientLink" class="form-control"
-                                    placeholder="https://ejemplo.com">
-                            </div>
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label">Dirección Completa *</label>
-                            <input type="text" name="address" id="editClientAddress" class="form-control">
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label">Notas Internas</label>
-                            <textarea name="notes" id="editClientNotes" class="form-control" rows="2"></textarea>
-                        </div>
-
-                        <hr class="border-secondary">
-
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">¿Tiene Soporte Técnico Contratado?</label>
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" id="editHasSupport" name="has_support">
-                                <label class="form-check-label" for="editHasSupport">
-                                    Sí, tiene soporte técnico
-                                </label>
-                            </div>
-                            <small class="text-muted">
-                                <i class="bi bi-info-circle me-1"></i>
-                                Marca esta opción si el cliente tiene contratado soporte técnico con OSLAPRINT
-                            </small>
-                        </div>
-
-                        <!-- Días de soporte en edición -->
-                        <div class="mb-3 p-3 rounded border border-info" id="editSupportScheduleDiv" style="display:none; background:rgba(13,202,240,0.07);">
-                            <label class="form-label fw-bold text-info mb-2"><i class="bi bi-calendar-check me-1"></i>Días de Soporte Disponibles</label>
-                            <div class="d-flex gap-2 flex-wrap">
-                                <button type="button" class="btn btn-outline-success schedule-btn" onclick="selectSchedule('edit','lv')">
-                                    <i class="bi bi-calendar-week me-1"></i>Lunes – Viernes
-                                </button>
-                                <button type="button" class="btn btn-outline-warning schedule-btn" onclick="selectSchedule('edit','ls')">
-                                    <i class="bi bi-calendar-week me-1"></i>Lunes – Sábado
-                                </button>
-                                <button type="button" class="btn btn-outline-danger schedule-btn" onclick="selectSchedule('edit','ld')">
-                                    <i class="bi bi-calendar-week me-1"></i>Lunes – Domingo
-                                </button>
-                            </div>
-                            <input type="hidden" name="support_schedule" id="editSupportScheduleValue" value="lv">
-                            <small class="text-muted mt-2 d-block"><i class="bi bi-info-circle me-1"></i>Selecciona los días en que el cliente tiene soporte activo</small>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Teléfono <span class="text-warning">*</span></label>
+                            <input type="tel" name="phone" id="editClientPhone" class="form-control" required>
                         </div>
                     </div>
-                    <div class="modal-footer border-secondary">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                        <button type="submit" class="btn btn-warning">
-                            <i class="bi bi-save-fill me-1"></i>Guardar Cambios
-                        </button>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Correo Electrónico</label>
+                            <input type="email" name="email" id="editClientEmail" class="form-control">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Enlace/URL <small class="text-muted">(Opcional)</small></label>
+                            <input type="url" name="link" id="editClientLink" class="form-control" placeholder="https://ejemplo.com">
+                        </div>
                     </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Dirección</label>
+                        <input type="text" name="address" id="editClientAddress" class="form-control">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Notas Internas</label>
+                        <textarea name="notes" id="editClientNotes" class="form-control" rows="2"></textarea>
+                    </div>
+
+                    <hr class="border-secondary">
+
+                    <div class="mb-2">
+                        <label class="form-label fw-bold">¿Tiene Soporte Técnico Contratado?</label>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="editHasSupport" name="has_support">
+                            <label class="form-check-label" for="editHasSupport">Sí, tiene soporte técnico</label>
+                        </div>
+                        <small class="text-muted">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Marca esta opción si el cliente tiene contratado soporte técnico con OSLAPRINT
+                        </small>
+                    </div>
+
+                    <!-- Días de soporte en edición -->
+                    <div class="mb-3 p-3 rounded border border-info" id="editSupportScheduleDiv" style="display:none; background:rgba(13,202,240,0.07);">
+                        <label class="form-label fw-bold text-info mb-2">
+                            <i class="bi bi-calendar-check me-1"></i>Días de Soporte Disponibles
+                        </label>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <button type="button" class="btn btn-outline-success schedule-btn" onclick="selectSchedule('edit','lv')">
+                                <i class="bi bi-calendar-week me-1"></i>Lunes – Viernes
+                            </button>
+                            <button type="button" class="btn btn-outline-warning schedule-btn" onclick="selectSchedule('edit','ls')">
+                                <i class="bi bi-calendar-week me-1"></i>Lunes – Sábado
+                            </button>
+                            <button type="button" class="btn btn-outline-danger schedule-btn" onclick="selectSchedule('edit','ld')">
+                                <i class="bi bi-calendar-week me-1"></i>Lunes – Domingo
+                            </button>
+                        </div>
+                        <input type="hidden" name="support_schedule" id="editSupportScheduleValue" value="lv">
+                        <small class="text-muted mt-2 d-block">
+                            <i class="bi bi-info-circle me-1"></i>Selecciona los días en que el cliente tiene soporte activo
+                        </small>
+                    </div>
+                </div><!-- /modal-body -->
                 </form>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" form="formEditClient" class="btn btn-warning">
+                        <i class="bi bi-save-fill me-1"></i>Guardar Cambios
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -3161,39 +3159,49 @@
             });
         }
 
-        // Delegación de eventos para botones de editar cliente + switches de soporte
-        document.addEventListener('DOMContentLoaded', function() {
-            // Delegación de clics en botones de editar cliente y pagos
-            document.body.addEventListener('click', function(e) {
-                var btn = e.target.closest('.edit-client-btn');
-                if (btn) {
-                    e.preventDefault();
-                    var clientId = btn.getAttribute('data-client-id');
-                    openEditClientModalFull(clientId);
-                }
-                var payBtn = e.target.closest('.open-payment-btn');
-                if (payBtn) {
-                    e.preventDefault();
-                    var payId = payBtn.getAttribute('data-pay-id');
-                    openPaymentModal(payId);
-                }
-            });
-
+        // Vinculación segura: funciona tanto si DOM ya está cargado como si no
+        function _bindSupportSwitches() {
             // Switch soporte — añadir cliente
             var addSwitch = document.getElementById('hasSupportSwitch');
-            if (addSwitch) {
+            if (addSwitch && !addSwitch._supportBound) {
+                addSwitch._supportBound = true;
                 addSwitch.addEventListener('change', function() {
                     toggleSupportSchedule('addSupportScheduleDiv', 'add', this.checked);
                 });
             }
             // Switch soporte — editar cliente
             var editSwitch = document.getElementById('editHasSupport');
-            if (editSwitch) {
+            if (editSwitch && !editSwitch._supportBound) {
+                editSwitch._supportBound = true;
                 editSwitch.addEventListener('change', function() {
                     toggleSupportSchedule('editSupportScheduleDiv', 'edit', this.checked);
                 });
             }
-        });
+            // Delegación de clics en botones editar cliente y pagos
+            if (!document.body._clientDelegBound) {
+                document.body._clientDelegBound = true;
+                document.body.addEventListener('click', function(e) {
+                    var btn = e.target.closest('.edit-client-btn');
+                    if (btn) {
+                        e.preventDefault();
+                        openEditClientModalFull(btn.getAttribute('data-client-id'));
+                    }
+                    var payBtn = e.target.closest('.open-payment-btn');
+                    if (payBtn) {
+                        e.preventDefault();
+                        openPaymentModal(payBtn.getAttribute('data-pay-id'));
+                    }
+                });
+            }
+        }
+        // Ejecutar ahora (scripts están al final del body, DOM ya disponible)
+        // y también en DOMContentLoaded por si acaso
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', _bindSupportSwitches);
+        } else {
+            _bindSupportSwitches();
+        }
+
 
         // ✅ NUEVO: Abrir y cargar perfil de técnico
         function openRenameModal(userId, username) {
@@ -3319,7 +3327,6 @@
             document.getElementById('editCategoryId').value = categoryId;
             document.getElementById('editCategoryName').value = categoryName;
             document.getElementById('editCategoryParent').value = parentId || '';
-            document.getElementById('formEditCategory').action = '/edit_stock_category/' + categoryId;
             new bootstrap.Modal(document.getElementById('modalEditCategory')).show();
         }
 
