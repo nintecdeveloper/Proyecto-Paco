@@ -313,6 +313,31 @@
         .fc-event-time {
             font-size: 0.78rem !important;
         }
+
+        /* ═══════════════════════════════════════════════════
+           MODALS: scroll adaptable a cualquier pantalla
+           ═══════════════════════════════════════════════════ */
+        .modal-content {
+            display: flex !important;
+            flex-direction: column !important;
+            max-height: 92vh !important;
+            overflow: hidden !important;
+        }
+        .modal-header, .modal-footer { flex-shrink: 0 !important; }
+        .modal-body {
+            flex: 1 1 auto !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            -webkit-overflow-scrolling: touch;
+        }
+        @media (max-height: 750px) {
+            .modal-content { max-height: 96vh !important; }
+            .modal-dialog  { margin: 0.2rem auto; }
+        }
+        @media (max-width: 576px) {
+            .modal-content { max-height: 96vh !important; }
+            .modal-dialog  { margin: 0.25rem; }
+        }
     </style>
 </head>
 
@@ -1445,7 +1470,7 @@
                     <h5 class="modal-title"><i class="bi bi-folder-fill me-2"></i>Editar Categoría</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <form method="POST" action="/edit_stock_category">
+                <form id="formEditCategory" method="POST" action="/edit_stock_category/0">
                     <div class="modal-body">
                         <input type="hidden" name="category_id" id="editCategoryId">
 
@@ -1487,11 +1512,9 @@
                     <h5 class="modal-title"><i class="bi bi-person-plus-fill me-2"></i>Nuevo Cliente</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <!-- form solo envuelve modal-body para scroll correcto en Bootstrap -->
                 <form id="formAddClient" method="POST" action="/manage_clients">
                 <div class="modal-body">
                     <input type="hidden" name="action" value="add">
-
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Nombre del Cliente <span class="text-warning">*</span></label>
@@ -1502,7 +1525,6 @@
                             <input type="tel" name="phone" class="form-control" required placeholder="Ej: 912345678">
                         </div>
                     </div>
-
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Correo Electrónico</label>
@@ -1514,7 +1536,6 @@
                             <small class="text-muted"><i class="bi bi-info-circle me-1"></i>Portal web, sistema interno, etc.</small>
                         </div>
                     </div>
-
                     <div class="mb-3">
                         <label class="form-label">Dirección</label>
                         <input type="text" name="address" id="clientAddress" class="form-control" placeholder="Calle, número, ciudad">
@@ -1522,31 +1543,21 @@
                             <i class="bi bi-geo-alt-fill me-1"></i>Abrir en Google Maps
                         </a>
                     </div>
-
                     <div class="mb-3">
                         <label class="form-label">Notas Internas</label>
                         <textarea name="notes" class="form-control" rows="2" placeholder="Comentarios internos sobre el cliente"></textarea>
                     </div>
-
                     <hr class="border-secondary">
-
                     <div class="mb-2">
                         <label class="form-label fw-bold">¿Tiene Soporte Técnico Contratado?</label>
                         <div class="form-check form-switch">
                             <input class="form-check-input" type="checkbox" id="hasSupportSwitch" name="has_support">
                             <label class="form-check-label" for="hasSupportSwitch">Sí, tiene soporte técnico</label>
                         </div>
-                        <small class="text-muted">
-                            <i class="bi bi-info-circle me-1"></i>
-                            Marca esta opción si el cliente tiene contratado soporte técnico con OSLAPRINT
-                        </small>
+                        <small class="text-muted"><i class="bi bi-info-circle me-1"></i>Marca esta opción si el cliente tiene contratado soporte técnico con OSLAPRINT</small>
                     </div>
-
-                    <!-- Días de soporte: se muestra al activar el switch -->
                     <div class="mb-3 p-3 rounded border border-info" id="addSupportScheduleDiv" style="display:none; background:rgba(13,202,240,0.07);">
-                        <label class="form-label fw-bold text-info mb-2">
-                            <i class="bi bi-calendar-check me-1"></i>Días de Soporte Disponibles
-                        </label>
+                        <label class="form-label fw-bold text-info mb-2"><i class="bi bi-calendar-check me-1"></i>Días de Soporte Disponibles</label>
                         <div class="d-flex gap-2 flex-wrap">
                             <button type="button" class="btn btn-outline-success schedule-btn" onclick="selectSchedule('add','lv')">
                                 <i class="bi bi-calendar-week me-1"></i>Lunes – Viernes
@@ -1559,9 +1570,7 @@
                             </button>
                         </div>
                         <input type="hidden" name="support_schedule" id="addSupportScheduleValue" value="lv">
-                        <small class="text-muted mt-2 d-block">
-                            <i class="bi bi-info-circle me-1"></i>Selecciona los días en que el cliente tiene soporte activo
-                        </small>
+                        <small class="text-muted mt-2 d-block"><i class="bi bi-info-circle me-1"></i>Selecciona los días en que el cliente tiene soporte activo</small>
                     </div>
                 </div><!-- /modal-body -->
                 </form>
@@ -1574,7 +1583,6 @@
             </div>
         </div>
     </div>
-
     <!-- Modal: Editar Cliente -->
     <div class="modal fade" id="modalEditClient" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-scrollable">
@@ -1583,12 +1591,10 @@
                     <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>Editar Cliente</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <!-- form solo envuelve modal-body para scroll correcto en Bootstrap -->
                 <form id="formEditClient" method="POST" action="/manage_clients">
                 <div class="modal-body">
                     <input type="hidden" name="action" value="edit">
                     <input type="hidden" name="client_id" id="editClientId">
-
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Nombre del Cliente <span class="text-warning">*</span></label>
@@ -1599,7 +1605,6 @@
                             <input type="tel" name="phone" id="editClientPhone" class="form-control" required>
                         </div>
                     </div>
-
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Correo Electrónico</label>
@@ -1610,36 +1615,25 @@
                             <input type="url" name="link" id="editClientLink" class="form-control" placeholder="https://ejemplo.com">
                         </div>
                     </div>
-
                     <div class="mb-3">
                         <label class="form-label">Dirección</label>
                         <input type="text" name="address" id="editClientAddress" class="form-control">
                     </div>
-
                     <div class="mb-3">
                         <label class="form-label">Notas Internas</label>
                         <textarea name="notes" id="editClientNotes" class="form-control" rows="2"></textarea>
                     </div>
-
                     <hr class="border-secondary">
-
                     <div class="mb-2">
                         <label class="form-label fw-bold">¿Tiene Soporte Técnico Contratado?</label>
                         <div class="form-check form-switch">
                             <input class="form-check-input" type="checkbox" id="editHasSupport" name="has_support">
                             <label class="form-check-label" for="editHasSupport">Sí, tiene soporte técnico</label>
                         </div>
-                        <small class="text-muted">
-                            <i class="bi bi-info-circle me-1"></i>
-                            Marca esta opción si el cliente tiene contratado soporte técnico con OSLAPRINT
-                        </small>
+                        <small class="text-muted"><i class="bi bi-info-circle me-1"></i>Marca esta opción si el cliente tiene contratado soporte técnico con OSLAPRINT</small>
                     </div>
-
-                    <!-- Días de soporte en edición -->
                     <div class="mb-3 p-3 rounded border border-info" id="editSupportScheduleDiv" style="display:none; background:rgba(13,202,240,0.07);">
-                        <label class="form-label fw-bold text-info mb-2">
-                            <i class="bi bi-calendar-check me-1"></i>Días de Soporte Disponibles
-                        </label>
+                        <label class="form-label fw-bold text-info mb-2"><i class="bi bi-calendar-check me-1"></i>Días de Soporte Disponibles</label>
                         <div class="d-flex gap-2 flex-wrap">
                             <button type="button" class="btn btn-outline-success schedule-btn" onclick="selectSchedule('edit','lv')">
                                 <i class="bi bi-calendar-week me-1"></i>Lunes – Viernes
@@ -1652,9 +1646,7 @@
                             </button>
                         </div>
                         <input type="hidden" name="support_schedule" id="editSupportScheduleValue" value="lv">
-                        <small class="text-muted mt-2 d-block">
-                            <i class="bi bi-info-circle me-1"></i>Selecciona los días en que el cliente tiene soporte activo
-                        </small>
+                        <small class="text-muted mt-2 d-block"><i class="bi bi-info-circle me-1"></i>Selecciona los días en que el cliente tiene soporte activo</small>
                     </div>
                 </div><!-- /modal-body -->
                 </form>
@@ -1667,7 +1659,6 @@
             </div>
         </div>
     </div>
-
     <!-- ✅ NUEVO Modal: Perfil de Técnico -->
     <div class="modal fade" id="modalTechProfile" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-scrollable">
@@ -3159,49 +3150,37 @@
             });
         }
 
-        // Vinculación segura: funciona tanto si DOM ya está cargado como si no
-        function _bindSupportSwitches() {
-            // Switch soporte — añadir cliente
+        // Vinculación robusta: funciona si DOM ya está cargado (scripts al final del body)
+        function _initSupportAndDelegation() {
             var addSwitch = document.getElementById('hasSupportSwitch');
-            if (addSwitch && !addSwitch._supportBound) {
-                addSwitch._supportBound = true;
+            if (addSwitch && !addSwitch._bound) {
+                addSwitch._bound = true;
                 addSwitch.addEventListener('change', function() {
                     toggleSupportSchedule('addSupportScheduleDiv', 'add', this.checked);
                 });
             }
-            // Switch soporte — editar cliente
             var editSwitch = document.getElementById('editHasSupport');
-            if (editSwitch && !editSwitch._supportBound) {
-                editSwitch._supportBound = true;
+            if (editSwitch && !editSwitch._bound) {
+                editSwitch._bound = true;
                 editSwitch.addEventListener('change', function() {
                     toggleSupportSchedule('editSupportScheduleDiv', 'edit', this.checked);
                 });
             }
-            // Delegación de clics en botones editar cliente y pagos
-            if (!document.body._clientDelegBound) {
-                document.body._clientDelegBound = true;
+            if (!document.body._delegBound) {
+                document.body._delegBound = true;
                 document.body.addEventListener('click', function(e) {
                     var btn = e.target.closest('.edit-client-btn');
-                    if (btn) {
-                        e.preventDefault();
-                        openEditClientModalFull(btn.getAttribute('data-client-id'));
-                    }
+                    if (btn) { e.preventDefault(); openEditClientModalFull(btn.getAttribute('data-client-id')); }
                     var payBtn = e.target.closest('.open-payment-btn');
-                    if (payBtn) {
-                        e.preventDefault();
-                        openPaymentModal(payBtn.getAttribute('data-pay-id'));
-                    }
+                    if (payBtn) { e.preventDefault(); openPaymentModal(payBtn.getAttribute('data-pay-id')); }
                 });
             }
         }
-        // Ejecutar ahora (scripts están al final del body, DOM ya disponible)
-        // y también en DOMContentLoaded por si acaso
         if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', _bindSupportSwitches);
+            document.addEventListener('DOMContentLoaded', _initSupportAndDelegation);
         } else {
-            _bindSupportSwitches();
+            _initSupportAndDelegation();
         }
-
 
         // ✅ NUEVO: Abrir y cargar perfil de técnico
         function openRenameModal(userId, username) {
@@ -3327,6 +3306,7 @@
             document.getElementById('editCategoryId').value = categoryId;
             document.getElementById('editCategoryName').value = categoryName;
             document.getElementById('editCategoryParent').value = parentId || '';
+            document.getElementById('formEditCategory').action = '/edit_stock_category/' + categoryId;
             new bootstrap.Modal(document.getElementById('modalEditCategory')).show();
         }
 
@@ -4397,7 +4377,7 @@
                     </div>
                     <div class="col-6">
                         <div class="card bg-dark border-secondary p-3 text-center">
-                            <h3 class="text-info fw-bold mb-0">${data.total_hours}h</h3>
+                            <h3 class="text-info fw-bold mb-0">${data.total_hours}</h3>
                             <small class="text-muted">Horas Trabajadas</small>
                         </div>
                     </div>

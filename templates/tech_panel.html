@@ -884,9 +884,9 @@
                 </div>
                 <div class="col-md-4 col-6">
                     <div class="card bg-dark border-secondary p-3 text-center">
-                        <i class="bi bi-tools fs-1 text-warning mb-2"></i>
-                        <h2 class="text-white fw-bold mb-0" id="totalMaintenances">0</h2>
-                        <small class="text-muted">Mantenimientos</small>
+                        <i class="bi bi-stopwatch fs-1 text-info mb-2"></i>
+                        <h2 class="text-info fw-bold mb-0" id="totalHoursWorked">0h</h2>
+                        <small class="text-muted">Horas Trabajadas</small>
                     </div>
                 </div>
                 <div class="col-md-4 col-6">
@@ -2422,8 +2422,9 @@
 
             // Mostrar indicador de carga
             document.getElementById('totalServices').textContent = '...';
-            document.getElementById('totalMaintenances').textContent = '...';
+            var _tm_l = document.getElementById('totalMaintenances'); if(_tm_l) _tm_l.textContent = '...';
             document.getElementById('avgTime').textContent = '...';
+            var _thw_l = document.getElementById('totalHoursWorked'); if(_thw_l) _thw_l.textContent = '...';
 
             fetch(`/api/tech_analytics?period=${period}`)
                 .then(res => {
@@ -2440,7 +2441,8 @@
                 .catch(err => {
                     console.error('Error cargando analíticas:', err);
                     document.getElementById('totalServices').textContent = '0';
-                    document.getElementById('totalMaintenances').textContent = '0';
+                    var _tm_e = document.getElementById('totalMaintenances'); if(_tm_e) _tm_e.textContent = '0';
+                    var _thw_e = document.getElementById('totalHoursWorked'); if(_thw_e) _thw_e.textContent = '0h';
                     document.getElementById('avgTime').textContent = '0h';
                     // Mostrar mensaje en la UI en lugar de alert
                     const container = document.querySelector('#section-analytics .row');
@@ -2456,7 +2458,10 @@
 
         function updateAnalyticsSummary(data) {
             document.getElementById('totalServices').textContent = data.total_services || 0;
-            document.getElementById('totalMaintenances').textContent = data.total_maintenances || 0;
+            var _thw = document.getElementById('totalHoursWorked');
+            if (_thw) _thw.textContent = data.total_hours || '0h';
+            var _tm = document.getElementById('totalMaintenances');
+            if (_tm) _tm.textContent = data.total_maintenances || 0;
             document.getElementById('avgTime').textContent = (data.avg_time || 0) + 'h';
         }
 

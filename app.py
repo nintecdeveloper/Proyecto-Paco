@@ -623,6 +623,67 @@ def manage_users():
     return redirect(url_for('dashboard'))
 
 # --- GESTIÓN DE CLIENTES ---
+
+def _task_duration_minutes(task):
+    """Calcula la duración de una tarea en MINUTOS probando todas las fuentes.
+    Prioridad: work_duration → remote_support_hours → start/end_time → work_start/end_time
+    """
+    import re as _re
+
+    wd = (task.work_duration or '').strip()
+    if wd:
+        # HH:MM:SS o MM:SS
+        if wd.count(':') >= 1:
+            try:
+                parts = wd.split(':')
+                if len(parts) == 3:
+                    h, m, s = int(parts[0]), int(parts[1]), int(parts[2])
+                elif len(parts) == 2:
+                    h, m, s = 0, int(parts[0]), int(parts[1])
+                else:
+                    raise ValueError
+                mins = h * 60 + m + (1 if s >= 30 else 0)
+                if mins > 0:
+                    return mins
+            except Exception:
+                pass
+        # "Xh YYmin" / "Xh" / "YYmin"
+        try:
+            h_m = _re.search(r'(\d+)\s*h', wd)
+            m_m = _re.search(r'(\d+)\s*min', wd)
+            h_val = int(h_m.group(1)) if h_m else 0
+            m_val = int(m_m.group(1)) if m_m else 0
+            mins = h_val * 60 + m_val
+            if mins > 0:
+                return mins
+        except Exception:
+            pass
+
+    rsh = getattr(task, 'remote_support_hours', None) or 0
+    if rsh > 0:
+        return int(round(rsh * 60))
+
+    if task.start_time and task.end_time:
+        try:
+            sh, sm = map(int, task.start_time.split(':'))
+            eh, em = map(int, task.end_time.split(':'))
+            mins = (eh * 60 + em) - (sh * 60 + sm)
+            if mins > 0:
+                return mins
+        except Exception:
+            pass
+
+    if task.work_start_time and task.work_end_time:
+        try:
+            diff = (task.work_end_time - task.work_start_time).total_seconds()
+            mins = int(diff / 60)
+            if mins > 0:
+                return mins
+        except Exception:
+            pass
+
+    return 0
+
 @app.route('/manage_clients', methods=['POST'])
 @login_required
 def manage_clients():
@@ -1550,17 +1611,18 @@ def get_tech_analytics():
     # Calcular estadísticas
     total_services = len(tasks)
     total_maintenances = sum(1 for t in tasks if t.service_type and 'manten' in t.service_type.name.lower())
-    
-    # Tiempo promedio
-    total_time = 0
+
+    total_minutes = 0
     time_count = 0
     for task in tasks:
-        if task.work_start_time and task.work_end_time:
-            duration = (task.work_end_time - task.work_start_time).total_seconds() / 3600
-            total_time += duration
+        mins = _task_duration_minutes(task)
+        if mins > 0:
+            total_minutes += mins
             time_count += 1
-    
-    avg_time = round(total_time / time_count, 1) if time_count > 0 else 0
+
+    total_h, total_m = total_minutes // 60, total_minutes % 60
+    total_hours_str = f"{total_h}h {total_m:02d}min" if total_m else f"{total_h}h"
+    avg_time = round((total_minutes / time_count) / 60, 1) if time_count > 0 else 0
     
     # Distribución por tipo de servicio
     service_distribution = {}
@@ -1595,6 +1657,7 @@ def get_tech_analytics():
     return jsonify({
         'total_services': total_services,
         'total_maintenances': total_maintenances,
+        'total_hours': total_hours_str,
         'avg_time': avg_time,
         'service_distribution': service_distribution,
         'timeline_data': timeline_data
@@ -1611,39 +1674,47 @@ def get_tech_stats(tech_id):
     tasks = Task.query.filter_by(tech_id=tech_id, status='Completado').all()
     
     service_stats = {}
-    total_time = 0
-    
+    total_minutes = 0
+
     for task in tasks:
         service_type = ServiceType.query.get(task.service_type_id) if task.service_type_id else None
         service_name = service_type.name if service_type else 'Sin tipo'
-        
+
         if service_name not in service_stats:
-            service_stats[service_name] = {
-                'count': 0,
-                'tasks': []
-            }
-        
+            service_stats[service_name] = {'count': 0, 'tasks': []}
+
         service_stats[service_name]['count'] += 1
+
+        task_mins = _task_duration_minutes(task)
+        total_minutes += task_mins
+
+        if task_mins > 0:
+            dur_h, dur_m = task_mins // 60, task_mins % 60
+            dur_str = f"{dur_h}h {dur_m:02d}min" if dur_h else f"{dur_m}min"
+        else:
+            dur_str = '—'
+
         service_stats[service_name]['tasks'].append({
             'id': task.id,
             'client': task.client_name,
             'date': task.date.strftime('%d/%m/%Y') if task.date else None,
             'time': f"{task.start_time} - {task.end_time}" if task.start_time and task.end_time else 'No especificado',
-            'description': task.description or 'Sin descripción',  # ✅ AÑADIDO
+            'duration': dur_str,
+            'description': task.description or 'Sin descripción',
             'has_attachments': bool(task.attachments),
             'has_signature': bool(task.signature_data)
         })
-        
-        if task.work_start_time and task.work_end_time:
-            duration = (task.work_end_time - task.work_start_time).total_seconds() / 3600
-            total_time += duration
-    
+
+    total_h, total_m = total_minutes // 60, total_minutes % 60
+    total_hours_str = f"{total_h}h {total_m:02d}min" if total_m else f"{total_h}h"
+
     return jsonify({
         'success': True,
         'data': {
             'tech_name': tech.username,
             'total_completed': len(tasks),
-            'total_hours': round(total_time, 2),
+            'total_hours': total_hours_str,
+            'total_hours_raw': round(total_minutes / 60, 2),
             'service_breakdown': service_stats
         }
     })
@@ -2105,41 +2176,31 @@ def print_report(report_id):
         flash('Error al cargar el reporte', 'danger')
         return redirect(url_for('dashboard'))
 
+
 @app.route('/complete_task/<int:task_id>', methods=['POST'])
 @login_required
 def complete_task(task_id):
     """Completar una tarea desde el panel técnico vía JSON (firma, stock, descripción)"""
     try:
         task = Task.query.get_or_404(task_id)
-
-        # Permisos: admin, técnico asignado, técnico secundario o tarea sin asignar
-        _is_extra = db.session.query(TaskTechnician).filter_by(
-            task_id=task_id, user_id=current_user.id).first()
+        _is_extra = db.session.query(TaskTechnician).filter_by(task_id=task_id, user_id=current_user.id).first()
         _is_unassigned = (task.tech_id is None)
-        _allowed = (
-            current_user.role == 'admin'
-            or task.tech_id == current_user.id
-            or bool(_is_extra)
-            or _is_unassigned
-        )
+        _allowed = (current_user.role == 'admin' or task.tech_id == current_user.id or bool(_is_extra) or _is_unassigned)
         if not _allowed:
             return jsonify({'success': False, 'msg': 'No autorizado'}), 403
 
         data = request.get_json() or {}
+        description     = data.get('description', task.description or '')
+        parts           = data.get('parts', task.parts_text or '')
+        signature       = data.get('signature')
+        sig_client_name = data.get('signature_client_name', '')
+        stock_item_id   = data.get('stock_item_id')
+        stock_quantity  = int(data.get('stock_quantity', 0) or 0)
+        stock_action_val= data.get('stock_action', 'usar')
 
-        description        = data.get('description', task.description or '')
-        parts              = data.get('parts', task.parts_text or '')
-        signature          = data.get('signature')
-        sig_client_name    = data.get('signature_client_name', '')
-        stock_item_id      = data.get('stock_item_id')
-        stock_quantity     = int(data.get('stock_quantity', 0) or 0)
-        stock_action_val   = data.get('stock_action', 'usar')
-
-        # Firma obligatoria
         if not signature:
             return jsonify({'success': False, 'msg': 'La firma del cliente es obligatoria'}), 400
 
-        # Actualizar tarea
         task.description           = description
         task.parts_text            = parts
         task.signature_data        = signature
@@ -2148,11 +2209,9 @@ def complete_task(task_id):
         task.status                = 'Completado'
         task.work_end_time         = datetime.now()
 
-        # Asignar técnico si la tarea estaba sin asignar
         if _is_unassigned and current_user.role == 'tech':
             task.tech_id = current_user.id
 
-        # Stock
         if stock_item_id and stock_quantity > 0:
             stock_item = Stock.query.get(int(stock_item_id))
             if stock_item:
@@ -2163,19 +2222,17 @@ def complete_task(task_id):
                         return jsonify({'success': False, 'msg': f'Stock insuficiente de {stock_item.name}'}), 400
                 elif stock_action_val == 'devolver':
                     stock_item.quantity += stock_quantity
-                task.stock_item_id        = stock_item.id
-                task.stock_quantity_used  = stock_quantity
-                task.stock_action         = stock_action_val
+                task.stock_item_id       = stock_item.id
+                task.stock_quantity_used = stock_quantity
+                task.stock_action        = stock_action_val
 
         db.session.commit()
-        check_low_stock()
         return jsonify({'success': True, 'msg': 'Parte completado correctamente'})
 
     except Exception as e:
         db.session.rollback()
         print(f"Error en complete_task {task_id}: {e}")
         return jsonify({'success': False, 'msg': str(e)}), 500
-
 
 @app.route('/api/task_action/<int:task_id>/<action>', methods=['POST'])
 @login_required
