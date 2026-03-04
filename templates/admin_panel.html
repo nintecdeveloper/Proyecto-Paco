@@ -1506,7 +1506,7 @@
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Correo Electrónico *</label>
-                                <input type="email" name="email" class="form-control" required
+                                <input type="email" name="email" class="form-control"
                                     placeholder="ejemplo@email.com">
                             </div>
                             <div class="col-md-6 mb-3">
@@ -1520,7 +1520,7 @@
 
                         <div class="mb-3">
                             <label class="form-label">Dirección Completa *</label>
-                            <input type="text" name="address" id="clientAddress" class="form-control" required
+                            <input type="text" name="address" id="clientAddress" class="form-control"
                                 placeholder="Calle, número, ciudad">
                             <a href="#" id="openGoogleMaps" class="small text-info mt-1 d-block" target="_blank"
                                 style="display:none;">
@@ -1540,7 +1540,7 @@
                             <label class="form-label fw-bold">¿Tiene Soporte Técnico Contratado?</label>
                             <div class="form-check form-switch">
                                 <input class="form-check-input" type="checkbox" id="hasSupportSwitch"
-                                    name="has_support" onchange="toggleSupportSchedule('addSupportScheduleDiv', this.checked)">
+                                    name="has_support" onchange="toggleSupportSchedule('addSupportScheduleDiv', 'add', this.checked)">
                                 <label class="form-check-label" for="hasSupportSwitch">
                                     Sí, tiene soporte técnico
                                 </label>
@@ -1551,29 +1551,28 @@
                             </small>
                         </div>
 
-                        <!-- ✅ NUEVO: Horario de soporte -->
+                        <!-- Horario de soporte -->
                         <div class="mb-3" id="addSupportScheduleDiv" style="display:none;">
-                            <label class="form-label fw-bold text-info"><i class="bi bi-clock me-1"></i>Horario de Soporte</label>
-                            <div class="d-flex gap-3 flex-wrap">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="radio" name="support_schedule" id="addSched_lv" value="lv" checked>
-                                    <label class="form-check-label" for="addSched_lv">
-                                        <i class="bi bi-calendar-week me-1 text-success"></i>Lunes a Viernes
-                                    </label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="radio" name="support_schedule" id="addSched_ls" value="ls">
-                                    <label class="form-check-label" for="addSched_ls">
-                                        <i class="bi bi-calendar-week me-1 text-warning"></i>Lunes a Sábado
-                                    </label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="radio" name="support_schedule" id="addSched_ld" value="ld">
-                                    <label class="form-check-label" for="addSched_ld">
-                                        <i class="bi bi-calendar-week me-1 text-danger"></i>Lunes a Domingo
-                                    </label>
-                                </div>
+                            <label class="form-label fw-bold text-info"><i class="bi bi-clock me-1"></i>Días de Soporte Disponibles</label>
+                            <div class="d-flex gap-2 flex-wrap mt-2">
+                                <input type="radio" class="btn-check" name="support_schedule" id="addSched_lv" value="lv" disabled>
+                                <label class="btn btn-outline-success btn-sm px-3" for="addSched_lv">
+                                    <i class="bi bi-calendar-week me-1"></i>Lunes – Viernes
+                                </label>
+
+                                <input type="radio" class="btn-check" name="support_schedule" id="addSched_ls" value="ls" disabled>
+                                <label class="btn btn-outline-warning btn-sm px-3" for="addSched_ls">
+                                    <i class="bi bi-calendar-week me-1"></i>Lunes – Sábado
+                                </label>
+
+                                <input type="radio" class="btn-check" name="support_schedule" id="addSched_ld" value="ld" disabled>
+                                <label class="btn btn-outline-danger btn-sm px-3" for="addSched_ld">
+                                    <i class="bi bi-calendar-week me-1"></i>Lunes – Domingo
+                                </label>
                             </div>
+                            <small class="text-muted mt-1 d-block">
+                                <i class="bi bi-info-circle me-1"></i>Selecciona los días en que el cliente tiene soporte activo
+                            </small>
                         </div>
                     </div>
                     <div class="modal-footer border-secondary">
@@ -1614,7 +1613,7 @@
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Correo Electrónico *</label>
-                                <input type="email" name="email" id="editClientEmail" class="form-control" required>
+                                <input type="email" name="email" id="editClientEmail" class="form-control">
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Enlace/URL (Opcional)</label>
@@ -1625,7 +1624,7 @@
 
                         <div class="mb-3">
                             <label class="form-label">Dirección Completa *</label>
-                            <input type="text" name="address" id="editClientAddress" class="form-control" required>
+                            <input type="text" name="address" id="editClientAddress" class="form-control">
                         </div>
 
                         <div class="mb-3">
@@ -1639,7 +1638,7 @@
                             <label class="form-label fw-bold">¿Tiene Soporte Técnico Contratado?</label>
                             <div class="form-check form-switch">
                                 <input class="form-check-input" type="checkbox" id="editHasSupport" name="has_support"
-                                    onchange="toggleSupportSchedule('editSupportScheduleDiv', this.checked)">
+                                    onchange="toggleSupportSchedule('editSupportScheduleDiv', 'edit', this.checked)">
                                 <label class="form-check-label" for="editHasSupport">
                                     Sí, tiene soporte técnico
                                 </label>
@@ -1650,29 +1649,28 @@
                             </small>
                         </div>
 
-                        <!-- ✅ NUEVO: Horario de soporte en edición -->
+                        <!-- Horario de soporte en edición -->
                         <div class="mb-3" id="editSupportScheduleDiv" style="display:none;">
-                            <label class="form-label fw-bold text-info"><i class="bi bi-clock me-1"></i>Horario de Soporte</label>
-                            <div class="d-flex gap-3 flex-wrap">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="radio" name="support_schedule" id="editSched_lv" value="lv">
-                                    <label class="form-check-label" for="editSched_lv">
-                                        <i class="bi bi-calendar-week me-1 text-success"></i>Lunes a Viernes
-                                    </label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="radio" name="support_schedule" id="editSched_ls" value="ls">
-                                    <label class="form-check-label" for="editSched_ls">
-                                        <i class="bi bi-calendar-week me-1 text-warning"></i>Lunes a Sábado
-                                    </label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="radio" name="support_schedule" id="editSched_ld" value="ld">
-                                    <label class="form-check-label" for="editSched_ld">
-                                        <i class="bi bi-calendar-week me-1 text-danger"></i>Lunes a Domingo
-                                    </label>
-                                </div>
+                            <label class="form-label fw-bold text-info"><i class="bi bi-clock me-1"></i>Días de Soporte Disponibles</label>
+                            <div class="d-flex gap-2 flex-wrap mt-2">
+                                <input type="radio" class="btn-check" name="support_schedule" id="editSched_lv" value="lv" disabled>
+                                <label class="btn btn-outline-success btn-sm px-3" for="editSched_lv">
+                                    <i class="bi bi-calendar-week me-1"></i>Lunes – Viernes
+                                </label>
+
+                                <input type="radio" class="btn-check" name="support_schedule" id="editSched_ls" value="ls" disabled>
+                                <label class="btn btn-outline-warning btn-sm px-3" for="editSched_ls">
+                                    <i class="bi bi-calendar-week me-1"></i>Lunes – Sábado
+                                </label>
+
+                                <input type="radio" class="btn-check" name="support_schedule" id="editSched_ld" value="ld" disabled>
+                                <label class="btn btn-outline-danger btn-sm px-3" for="editSched_ld">
+                                    <i class="bi bi-calendar-week me-1"></i>Lunes – Domingo
+                                </label>
                             </div>
+                            <small class="text-muted mt-1 d-block">
+                                <i class="bi bi-info-circle me-1"></i>Selecciona los días en que el cliente tiene soporte activo
+                            </small>
                         </div>
                     </div>
                     <div class="modal-footer border-secondary">
@@ -3112,7 +3110,7 @@
             document.getElementById('editClientLink').value = '';
             document.getElementById('editClientNotes').value = '';
             document.getElementById('editHasSupport').checked = false;
-            toggleSupportSchedule('editSupportScheduleDiv', false);
+            toggleSupportSchedule('editSupportScheduleDiv', 'edit', false);
 
             new bootstrap.Modal(document.getElementById('modalEditClient')).show();
 
@@ -3130,10 +3128,10 @@
                         document.getElementById('editClientLink').value = c.link || '';
                         document.getElementById('editClientNotes').value = c.notes || '';
                         document.getElementById('editHasSupport').checked = c.has_support;
-                        toggleSupportSchedule('editSupportScheduleDiv', c.has_support);
+                        toggleSupportSchedule('editSupportScheduleDiv', 'edit', c.has_support);
                         var sched = c.support_schedule || 'lv';
                         var radio = document.getElementById('editSched_' + sched);
-                        if (radio) radio.checked = true;
+                        if (radio) { radio.checked = true; }
                     } else {
                         alert('Error al cargar datos del cliente');
                         bootstrap.Modal.getInstance(document.getElementById('modalEditClient')).hide();
@@ -3163,10 +3161,26 @@
             });
         });
 
-        // ✅ NUEVO: mostrar/ocultar el selector de horario de soporte
-        function toggleSupportSchedule(divId, show) {
+        // Mostrar/ocultar y habilitar/deshabilitar el selector de días de soporte
+        function toggleSupportSchedule(divId, prefix, show) {
             const div = document.getElementById(divId);
-            if (div) div.style.display = show ? 'block' : 'none';
+            if (!div) return;
+            div.style.display = show ? 'block' : 'none';
+
+            // Habilitar o deshabilitar los radios para que se envíen (o no) con el form
+            const radios = div.querySelectorAll('input[type="radio"]');
+            radios.forEach(function(r) {
+                r.disabled = !show;
+            });
+
+            // Si se activa soporte y ningún radio está seleccionado, marcar "lv" por defecto
+            if (show) {
+                const anyChecked = Array.from(radios).some(r => r.checked);
+                if (!anyChecked) {
+                    const defaultRadio = div.querySelector('input[value="lv"]');
+                    if (defaultRadio) defaultRadio.checked = true;
+                }
+            }
         }
 
         // ✅ NUEVO: Abrir y cargar perfil de técnico

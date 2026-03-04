@@ -633,15 +633,25 @@ def manage_clients():
     action = request.form.get('action')
     
     if action == 'add':
-        name = request.form.get('name')
-        phone = request.form.get('phone')
-        email = request.form.get('email')
-        address = request.form.get('address')
-        link = request.form.get('link', '')
+        name = request.form.get('name', '').strip()
+        phone = request.form.get('phone', '').strip()
+        email = request.form.get('email', '').strip()
+        address = request.form.get('address', '').strip()
+        link = request.form.get('link', '').strip()
         notes = request.form.get('notes', '')
         has_support = request.form.get('has_support') == 'on'
-        support_schedule = request.form.get('support_schedule', '') if has_support else None
-        
+        support_schedule = request.form.get('support_schedule', '').strip() if has_support else None
+
+        # Validaciones básicas
+        if not name:
+            flash('El nombre del cliente es obligatorio', 'danger')
+            return redirect(url_for('dashboard'))
+        if not phone:
+            flash('El teléfono es obligatorio', 'danger')
+            return redirect(url_for('dashboard'))
+        if has_support and support_schedule not in ('lv', 'ls', 'ld'):
+            support_schedule = 'lv'  # valor por defecto seguro
+
         if Client.query.filter_by(name=name).first():
             flash('Ya existe un cliente con ese nombre', 'danger')
             return redirect(url_for('dashboard'))
@@ -654,7 +664,7 @@ def manage_clients():
             link=link,
             notes=notes,
             has_support=has_support,
-            support_schedule=support_schedule if support_schedule else None
+            support_schedule=support_schedule if has_support else None
         )
         db.session.add(new_client)
         db.session.commit()
@@ -682,8 +692,12 @@ def manage_clients():
             client.notes = request.form.get('notes', '')
             has_support_value = request.form.get('has_support')
             client.has_support = (has_support_value == 'on' or has_support_value == 'true')
-            # ✅ NUEVO: guardar horario de soporte
-            client.support_schedule = request.form.get('support_schedule', '') if client.has_support else None
+            # Guardar horario de soporte con validación
+            if client.has_support:
+                sched = request.form.get('support_schedule', 'lv').strip()
+                client.support_schedule = sched if sched in ('lv', 'ls', 'ld') else 'lv'
+            else:
+                client.support_schedule = None
             
             db.session.commit()
             flash('Cliente actualizado correctamente', 'success')
