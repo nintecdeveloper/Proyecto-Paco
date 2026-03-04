@@ -1551,28 +1551,22 @@
                             </small>
                         </div>
 
-                        <!-- Horario de soporte -->
-                        <div class="mb-3" id="addSupportScheduleDiv" style="display:none;">
-                            <label class="form-label fw-bold text-info"><i class="bi bi-clock me-1"></i>Días de Soporte Disponibles</label>
-                            <div class="d-flex gap-2 flex-wrap mt-2">
-                                <input type="radio" class="btn-check" name="support_schedule" id="addSched_lv" value="lv" disabled>
-                                <label class="btn btn-outline-success btn-sm px-3" for="addSched_lv">
+                        <!-- Días de soporte -->
+                        <div class="mb-3 p-3 rounded border border-info" id="addSupportScheduleDiv" style="display:none; background:rgba(13,202,240,0.07);">
+                            <label class="form-label fw-bold text-info mb-2"><i class="bi bi-calendar-check me-1"></i>Días de Soporte Disponibles</label>
+                            <div class="d-flex gap-2 flex-wrap">
+                                <button type="button" class="btn btn-outline-success schedule-btn" data-target="addSched_lv" onclick="selectSchedule('add','lv')">
                                     <i class="bi bi-calendar-week me-1"></i>Lunes – Viernes
-                                </label>
-
-                                <input type="radio" class="btn-check" name="support_schedule" id="addSched_ls" value="ls" disabled>
-                                <label class="btn btn-outline-warning btn-sm px-3" for="addSched_ls">
+                                </button>
+                                <button type="button" class="btn btn-outline-warning schedule-btn" data-target="addSched_ls" onclick="selectSchedule('add','ls')">
                                     <i class="bi bi-calendar-week me-1"></i>Lunes – Sábado
-                                </label>
-
-                                <input type="radio" class="btn-check" name="support_schedule" id="addSched_ld" value="ld" disabled>
-                                <label class="btn btn-outline-danger btn-sm px-3" for="addSched_ld">
+                                </button>
+                                <button type="button" class="btn btn-outline-danger schedule-btn" data-target="addSched_ld" onclick="selectSchedule('add','ld')">
                                     <i class="bi bi-calendar-week me-1"></i>Lunes – Domingo
-                                </label>
+                                </button>
                             </div>
-                            <small class="text-muted mt-1 d-block">
-                                <i class="bi bi-info-circle me-1"></i>Selecciona los días en que el cliente tiene soporte activo
-                            </small>
+                            <input type="hidden" name="support_schedule" id="addSupportScheduleValue" value="lv">
+                            <small class="text-muted mt-2 d-block"><i class="bi bi-info-circle me-1"></i>Selecciona los días en que el cliente tiene soporte activo</small>
                         </div>
                     </div>
                     <div class="modal-footer border-secondary">
@@ -1649,28 +1643,22 @@
                             </small>
                         </div>
 
-                        <!-- Horario de soporte en edición -->
-                        <div class="mb-3" id="editSupportScheduleDiv" style="display:none;">
-                            <label class="form-label fw-bold text-info"><i class="bi bi-clock me-1"></i>Días de Soporte Disponibles</label>
-                            <div class="d-flex gap-2 flex-wrap mt-2">
-                                <input type="radio" class="btn-check" name="support_schedule" id="editSched_lv" value="lv" disabled>
-                                <label class="btn btn-outline-success btn-sm px-3" for="editSched_lv">
+                        <!-- Días de soporte en edición -->
+                        <div class="mb-3 p-3 rounded border border-info" id="editSupportScheduleDiv" style="display:none; background:rgba(13,202,240,0.07);">
+                            <label class="form-label fw-bold text-info mb-2"><i class="bi bi-calendar-check me-1"></i>Días de Soporte Disponibles</label>
+                            <div class="d-flex gap-2 flex-wrap">
+                                <button type="button" class="btn btn-outline-success schedule-btn" onclick="selectSchedule('edit','lv')">
                                     <i class="bi bi-calendar-week me-1"></i>Lunes – Viernes
-                                </label>
-
-                                <input type="radio" class="btn-check" name="support_schedule" id="editSched_ls" value="ls" disabled>
-                                <label class="btn btn-outline-warning btn-sm px-3" for="editSched_ls">
+                                </button>
+                                <button type="button" class="btn btn-outline-warning schedule-btn" onclick="selectSchedule('edit','ls')">
                                     <i class="bi bi-calendar-week me-1"></i>Lunes – Sábado
-                                </label>
-
-                                <input type="radio" class="btn-check" name="support_schedule" id="editSched_ld" value="ld" disabled>
-                                <label class="btn btn-outline-danger btn-sm px-3" for="editSched_ld">
+                                </button>
+                                <button type="button" class="btn btn-outline-danger schedule-btn" onclick="selectSchedule('edit','ld')">
                                     <i class="bi bi-calendar-week me-1"></i>Lunes – Domingo
-                                </label>
+                                </button>
                             </div>
-                            <small class="text-muted mt-1 d-block">
-                                <i class="bi bi-info-circle me-1"></i>Selecciona los días en que el cliente tiene soporte activo
-                            </small>
+                            <input type="hidden" name="support_schedule" id="editSupportScheduleValue" value="lv">
+                            <small class="text-muted mt-2 d-block"><i class="bi bi-info-circle me-1"></i>Selecciona los días en que el cliente tiene soporte activo</small>
                         </div>
                     </div>
                     <div class="modal-footer border-secondary">
@@ -3130,8 +3118,9 @@
                         document.getElementById('editHasSupport').checked = c.has_support;
                         toggleSupportSchedule('editSupportScheduleDiv', 'edit', c.has_support);
                         var sched = c.support_schedule || 'lv';
-                        var radio = document.getElementById('editSched_' + sched);
-                        if (radio) { radio.checked = true; }
+                        var hidden = document.getElementById('editSupportScheduleValue');
+                        if (hidden) { hidden.value = sched; }
+                        selectSchedule('edit', sched);
                     } else {
                         alert('Error al cargar datos del cliente');
                         bootstrap.Modal.getInstance(document.getElementById('modalEditClient')).hide();
@@ -3161,26 +3150,44 @@
             });
         });
 
-        // Mostrar/ocultar y habilitar/deshabilitar el selector de días de soporte
+        // Mostrar/ocultar el selector de días de soporte
         function toggleSupportSchedule(divId, prefix, show) {
             const div = document.getElementById(divId);
             if (!div) return;
             div.style.display = show ? 'block' : 'none';
-
-            // Habilitar o deshabilitar los radios para que se envíen (o no) con el form
-            const radios = div.querySelectorAll('input[type="radio"]');
-            radios.forEach(function(r) {
-                r.disabled = !show;
-            });
-
-            // Si se activa soporte y ningún radio está seleccionado, marcar "lv" por defecto
+            // Al mostrar, asegurarse de que haya un valor seleccionado por defecto
             if (show) {
-                const anyChecked = Array.from(radios).some(r => r.checked);
-                if (!anyChecked) {
-                    const defaultRadio = div.querySelector('input[value="lv"]');
-                    if (defaultRadio) defaultRadio.checked = true;
-                }
+                const hiddenInput = document.getElementById(prefix + 'SupportScheduleValue');
+                if (hiddenInput && !hiddenInput.value) hiddenInput.value = 'lv';
+                selectSchedule(prefix, hiddenInput ? hiddenInput.value : 'lv');
             }
+        }
+
+        // Seleccionar un día de soporte y resaltar el botón activo
+        function selectSchedule(prefix, value) {
+            const divId = prefix + 'SupportScheduleDiv';
+            const div = document.getElementById(divId);
+            if (!div) return;
+
+            // Actualizar el hidden input
+            const hidden = document.getElementById(prefix + 'SupportScheduleValue');
+            if (hidden) hidden.value = value;
+
+            // Resaltar el botón correcto: quitar active de todos, añadir al seleccionado
+            const btns = div.querySelectorAll('.schedule-btn');
+            const colorMap = { lv: 'success', ls: 'warning', ld: 'danger' };
+            const values = ['lv', 'ls', 'ld'];
+            btns.forEach(function(btn, i) {
+                const v = values[i];
+                const color = colorMap[v];
+                btn.classList.remove('btn-success', 'btn-warning', 'btn-danger',
+                                     'btn-outline-success', 'btn-outline-warning', 'btn-outline-danger');
+                if (v === value) {
+                    btn.classList.add('btn-' + color);
+                } else {
+                    btn.classList.add('btn-outline-' + color);
+                }
+            });
         }
 
         // ✅ NUEVO: Abrir y cargar perfil de técnico
