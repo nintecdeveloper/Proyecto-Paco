@@ -684,6 +684,62 @@ def _task_duration_minutes(task):
 
     return 0
 
+
+@app.route('/api/export_clients_csv')
+@login_required
+def export_clients_csv():
+    """Exportar lista de clientes a CSV descargable"""
+    if current_user.role != 'admin':
+        flash('No autorizado', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    try:
+        import csv
+        from io import StringIO
+        
+        # Obtener todos los clientes
+        clients = Client.query.order_by(Client.name).all()
+        
+        # Crear CSV en memoria
+        output = StringIO()
+        writer = csv.writer(output, delimiter=';', lineterminator='\n')
+        
+        # Encabezados
+        writer.writerow([
+            'Nombre', 'Teléfono', 'Email', 'Dirección', 
+            'Enlace', 'Tiene Soporte', 'Horario Soporte', 'Notas'
+        ])
+        
+        # Datos de clientes
+        for client in clients:
+            support_schedule_map = {'lv': 'L-V', 'ls': 'L-S', 'ld': 'L-D'}
+            schedule_display = support_schedule_map.get(client.support_schedule, '—') if client.has_support else '—'
+            
+            writer.writerow([
+                client.name or '',
+                client.phone or '',
+                client.email or '',
+                client.address or '',
+                client.link or '',
+                'Sí' if client.has_support else 'No',
+                schedule_display,
+                client.notes or ''
+            ])
+        
+        # Crear respuesta con descarga
+        output.seek(0)
+        return send_file(
+            io.BytesIO(output.getvalue().encode('utf-8')),
+            mimetype='text/csv',
+            as_attachment=True,
+            download_name=f'clientes_oslaprint_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+        )
+    except Exception as e:
+        print(f"Error exporting clients: {str(e)}")
+        flash('Error al exportar clientes', 'danger')
+        return redirect(url_for('dashboard'))
+
+
 @app.route('/manage_clients', methods=['POST'])
 @login_required
 def manage_clients():
@@ -1330,6 +1386,74 @@ def parte_draft():
             return jsonify({'success': False, 'msg': str(e)})
 
 # --- API ENDPOINTS ---
+
+@app.route('/api/tasks/filter')
+@login_required
+def filter_tasks():
+    """Endpoint para filtrar tareas con múltiples criterios"""
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'msg': 'No autorizado'}), 403
+    
+    try:
+        service_type = request.args.get('service_type', '').strip()
+        status = request.args.get('status', '').strip()
+        tech_id = request.args.get('tech_id', '').strip()
+        client_name = request.args.get('client_name', '').strip()
+        date_from = request.args.get('date_from', '').strip()
+        date_to = request.args.get('date_to', '').strip()
+        
+        query = Task.query
+        
+        if service_type:
+            service = ServiceType.query.filter_by(name=service_type).first()
+            if service:
+                query = query.filter_by(service_type_id=service.id)
+        
+        if status:
+            query = query.filter_by(status=status)
+        
+        if tech_id:
+            query = query.filter_by(tech_id=int(tech_id))
+        
+        if client_name:
+            query = query.filter(Task.client_name.ilike(f'%{client_name}%'))
+        
+        if date_from:
+            try:
+                df = datetime.strptime(date_from, '%Y-%m-%d').date()
+                query = query.filter(Task.date >= df)
+            except:
+                pass
+        
+        if date_to:
+            try:
+                dt = datetime.strptime(date_to, '%Y-%m-%d').date()
+                query = query.filter(Task.date <= dt)
+            except:
+                pass
+        
+        tasks = query.order_by(Task.date.desc()).limit(500).all()
+        
+        results = []
+        for task in tasks:
+            results.append({
+                'id': task.id,
+                'client_name': task.client_name or '—',
+                'service_type': task.service_type.name if task.service_type else '—',
+                'status': task.status,
+                'date': task.date.strftime('%d/%m/%Y') if task.date else '—',
+                'time': task.start_time or '—',
+                'tech': task.tech.username if task.tech else 'Sin asignar',
+                'description': task.description or ''
+            })
+        
+        return jsonify({'success': True, 'data': results, 'total': len(results)})
+    
+    except Exception as e:
+        print(f"Error filtering tasks: {str(e)}")
+        return jsonify({'success': False, 'msg': str(e)}), 500
+
+
 @app.route('/api/tasks')
 @login_required
 def get_all_tasks():
@@ -2745,7 +2869,7 @@ def get_tech_unassigned_tasks():
 @app.route('/api/task/<int:task_id>/assign_tech', methods=['POST'])
 @login_required
 def assign_tech_to_task(task_id):
-    """Asignar técnico a una tarea sin técnico"""
+    """Asignar técnico a una tarea sin técnico - MEJORADO"""
     if current_user.role != 'admin':
         return jsonify({'success': False, 'msg': 'No autorizado'}), 403
     
@@ -2754,22 +2878,31 @@ def assign_tech_to_task(task_id):
         if not task:
             return jsonify({'success': False, 'msg': 'Tarea no encontrada'}), 404
         
-        data = request.get_json()
+        data = request.get_json() or {}
         tech_id = data.get('tech_id')
         date_str = data.get('date')
         start_time = data.get('start_time')
         end_time = data.get('end_time', '')
         
-        if not tech_id or not date_str or not start_time:
-            return jsonify({'success': False, 'msg': 'Técnico, Fecha y hora de inicio son obligatorios'}), 400
+        # Validaciones mejoradas
+        if not tech_id:
+            return jsonify({'success': False, 'msg': 'Técnico es obligatorio'}), 400
+        if not date_str:
+            return jsonify({'success': False, 'msg': 'Fecha es obligatoria'}), 400
+        if not start_time:
+            return jsonify({'success': False, 'msg': 'Hora de inicio es obligatoria'}), 400
         
         tech = User.query.get(tech_id)
         if not tech or tech.role != 'tech':
-            return jsonify({'success': False, 'msg': 'Técnico no encontrado'}), 404
+            return jsonify({'success': False, 'msg': 'Técnico no válido'}), 404
         
-        # Actualizar tarea
+        try:
+            task_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify({'success': False, 'msg': 'Formato de fecha inválido (use YYYY-MM-DD)'}), 400
+        
         task.tech_id = tech_id
-        task.date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        task.date = task_date
         task.start_time = start_time
         task.end_time = end_time if end_time else None
         task.status = 'Pendiente'
@@ -2778,8 +2911,17 @@ def assign_tech_to_task(task_id):
         
         return jsonify({
             'success': True,
-            'msg': f'Tarea asignada a {tech.username}',
-            'task_id': task.id
+            'msg': f'Tarea asignada a {tech.username} correctamente',
+            'task_id': task.id,
+            'task': {
+                'id': task.id,
+                'date': task.date.isoformat(),
+                'start_time': task.start_time,
+                'end_time': task.end_time,
+                'tech_id': tech_id,
+                'status': 'Pendiente',
+                'client_name': task.client_name
+            }
         })
     except Exception as e:
         db.session.rollback()
