@@ -1445,7 +1445,7 @@
                     <h5 class="modal-title"><i class="bi bi-folder-fill me-2"></i>Editar Categoría</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <form method="POST" action="/edit_stock_category">
+                <form id="formEditCategory" method="POST" action="/edit_stock_category/0">
                     <div class="modal-body">
                         <input type="hidden" name="category_id" id="editCategoryId">
 
@@ -1493,11 +1493,11 @@
 
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label class="form-label">Nombre del Cliente *</label>
-                                <input type="text" name="name" class="form-control" required>
+                                <label class="form-label">Nombre del Cliente <span class="text-warning">*</span></label>
+                                <input type="text" name="name" class="form-control" required placeholder="Nombre o empresa">
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label class="form-label">Teléfono *</label>
+                                <label class="form-label">Teléfono <span class="text-warning">*</span></label>
                                 <input type="tel" name="phone" class="form-control" required
                                     placeholder="Ej: 912345678">
                             </div>
@@ -1505,12 +1505,12 @@
 
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label class="form-label">Correo Electrónico *</label>
+                                <label class="form-label">Correo Electrónico</label>
                                 <input type="email" name="email" class="form-control"
                                     placeholder="ejemplo@email.com">
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label class="form-label">Enlace/URL (Opcional)</label>
+                                <label class="form-label">Enlace/URL <small class="text-muted">(Opcional)</small></label>
                                 <input type="url" name="link" class="form-control" placeholder="https://ejemplo.com">
                                 <small class="text-muted">
                                     <i class="bi bi-info-circle me-1"></i>Portal web, sistema interno, etc.
@@ -1519,7 +1519,7 @@
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label">Dirección Completa *</label>
+                            <label class="form-label">Dirección</label>
                             <input type="text" name="address" id="clientAddress" class="form-control"
                                 placeholder="Calle, número, ciudad">
                             <a href="#" id="openGoogleMaps" class="small text-info mt-1 d-block" target="_blank"
@@ -1536,11 +1536,10 @@
 
                         <hr class="border-secondary">
 
-                        <div class="mb-3">
+                        <div class="mb-2">
                             <label class="form-label fw-bold">¿Tiene Soporte Técnico Contratado?</label>
                             <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" id="hasSupportSwitch"
-                                    name="has_support" onchange="toggleSupportSchedule('addSupportScheduleDiv', 'add', this.checked)">
+                                <input class="form-check-input" type="checkbox" id="hasSupportSwitch" name="has_support">
                                 <label class="form-check-label" for="hasSupportSwitch">
                                     Sí, tiene soporte técnico
                                 </label>
@@ -1554,14 +1553,14 @@
                         <!-- Días de soporte -->
                         <div class="mb-3 p-3 rounded border border-info" id="addSupportScheduleDiv" style="display:none; background:rgba(13,202,240,0.07);">
                             <label class="form-label fw-bold text-info mb-2"><i class="bi bi-calendar-check me-1"></i>Días de Soporte Disponibles</label>
-                            <div class="d-flex gap-2 flex-wrap">
-                                <button type="button" class="btn btn-outline-success schedule-btn" data-target="addSched_lv" onclick="selectSchedule('add','lv')">
+                            <div class="d-flex gap-2 flex-wrap" id="addScheduleBtns">
+                                <button type="button" class="btn btn-outline-success schedule-btn" onclick="selectSchedule('add','lv')">
                                     <i class="bi bi-calendar-week me-1"></i>Lunes – Viernes
                                 </button>
-                                <button type="button" class="btn btn-outline-warning schedule-btn" data-target="addSched_ls" onclick="selectSchedule('add','ls')">
+                                <button type="button" class="btn btn-outline-warning schedule-btn" onclick="selectSchedule('add','ls')">
                                     <i class="bi bi-calendar-week me-1"></i>Lunes – Sábado
                                 </button>
-                                <button type="button" class="btn btn-outline-danger schedule-btn" data-target="addSched_ld" onclick="selectSchedule('add','ld')">
+                                <button type="button" class="btn btn-outline-danger schedule-btn" onclick="selectSchedule('add','ld')">
                                     <i class="bi bi-calendar-week me-1"></i>Lunes – Domingo
                                 </button>
                             </div>
@@ -1631,8 +1630,7 @@
                         <div class="mb-3">
                             <label class="form-label fw-bold">¿Tiene Soporte Técnico Contratado?</label>
                             <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" id="editHasSupport" name="has_support"
-                                    onchange="toggleSupportSchedule('editSupportScheduleDiv', 'edit', this.checked)">
+                                <input class="form-check-input" type="checkbox" id="editHasSupport" name="has_support">
                                 <label class="form-check-label" for="editHasSupport">
                                     Sí, tiene soporte técnico
                                 </label>
@@ -3132,8 +3130,40 @@
                 });
         }
 
-        // Delegación de eventos para botones de editar cliente (evita problemas con caracteres especiales)
+        // ==================== SOPORTE: días disponibles ====================
+        function toggleSupportSchedule(divId, prefix, show) {
+            var div = document.getElementById(divId);
+            if (!div) return;
+            div.style.display = show ? 'block' : 'none';
+            if (show) {
+                var hidden = document.getElementById(prefix + 'SupportScheduleValue');
+                var val = (hidden && hidden.value) ? hidden.value : 'lv';
+                if (hidden) hidden.value = val;
+                selectSchedule(prefix, val);
+            }
+        }
+
+        function selectSchedule(prefix, value) {
+            var divId = prefix + 'SupportScheduleDiv';
+            var div = document.getElementById(divId);
+            if (!div) return;
+            var hidden = document.getElementById(prefix + 'SupportScheduleValue');
+            if (hidden) hidden.value = value;
+            var btns = div.querySelectorAll('.schedule-btn');
+            var colorMap = { lv: 'success', ls: 'warning', ld: 'danger' };
+            var values = ['lv', 'ls', 'ld'];
+            btns.forEach(function(btn, i) {
+                var v = values[i];
+                var color = colorMap[v];
+                btn.classList.remove('btn-success','btn-warning','btn-danger',
+                                     'btn-outline-success','btn-outline-warning','btn-outline-danger');
+                btn.classList.add(v === value ? 'btn-' + color : 'btn-outline-' + color);
+            });
+        }
+
+        // Delegación de eventos para botones de editar cliente + switches de soporte
         document.addEventListener('DOMContentLoaded', function() {
+            // Delegación de clics en botones de editar cliente y pagos
             document.body.addEventListener('click', function(e) {
                 var btn = e.target.closest('.edit-client-btn');
                 if (btn) {
@@ -3148,47 +3178,22 @@
                     openPaymentModal(payId);
                 }
             });
-        });
 
-        // Mostrar/ocultar el selector de días de soporte
-        function toggleSupportSchedule(divId, prefix, show) {
-            const div = document.getElementById(divId);
-            if (!div) return;
-            div.style.display = show ? 'block' : 'none';
-            // Al mostrar, asegurarse de que haya un valor seleccionado por defecto
-            if (show) {
-                const hiddenInput = document.getElementById(prefix + 'SupportScheduleValue');
-                if (hiddenInput && !hiddenInput.value) hiddenInput.value = 'lv';
-                selectSchedule(prefix, hiddenInput ? hiddenInput.value : 'lv');
+            // Switch soporte — añadir cliente
+            var addSwitch = document.getElementById('hasSupportSwitch');
+            if (addSwitch) {
+                addSwitch.addEventListener('change', function() {
+                    toggleSupportSchedule('addSupportScheduleDiv', 'add', this.checked);
+                });
             }
-        }
-
-        // Seleccionar un día de soporte y resaltar el botón activo
-        function selectSchedule(prefix, value) {
-            const divId = prefix + 'SupportScheduleDiv';
-            const div = document.getElementById(divId);
-            if (!div) return;
-
-            // Actualizar el hidden input
-            const hidden = document.getElementById(prefix + 'SupportScheduleValue');
-            if (hidden) hidden.value = value;
-
-            // Resaltar el botón correcto: quitar active de todos, añadir al seleccionado
-            const btns = div.querySelectorAll('.schedule-btn');
-            const colorMap = { lv: 'success', ls: 'warning', ld: 'danger' };
-            const values = ['lv', 'ls', 'ld'];
-            btns.forEach(function(btn, i) {
-                const v = values[i];
-                const color = colorMap[v];
-                btn.classList.remove('btn-success', 'btn-warning', 'btn-danger',
-                                     'btn-outline-success', 'btn-outline-warning', 'btn-outline-danger');
-                if (v === value) {
-                    btn.classList.add('btn-' + color);
-                } else {
-                    btn.classList.add('btn-outline-' + color);
-                }
-            });
-        }
+            // Switch soporte — editar cliente
+            var editSwitch = document.getElementById('editHasSupport');
+            if (editSwitch) {
+                editSwitch.addEventListener('change', function() {
+                    toggleSupportSchedule('editSupportScheduleDiv', 'edit', this.checked);
+                });
+            }
+        });
 
         // ✅ NUEVO: Abrir y cargar perfil de técnico
         function openRenameModal(userId, username) {
@@ -3314,6 +3319,7 @@
             document.getElementById('editCategoryId').value = categoryId;
             document.getElementById('editCategoryName').value = categoryName;
             document.getElementById('editCategoryParent').value = parentId || '';
+            document.getElementById('formEditCategory').action = '/edit_stock_category/' + categoryId;
             new bootstrap.Modal(document.getElementById('modalEditCategory')).show();
         }
 
@@ -5548,17 +5554,18 @@
             new bootstrap.Modal(document.getElementById('modalClientWorkHours')).show();
             
             fetch('/api/client_work_hours/' + clientId)
-                .then(r => r.json())
+                .then(function(r) { return r.json(); })
                 .then(function(data) {
                     if (!data.success) {
-                        document.getElementById('workHoursContent').innerHTML = '<div class="text-danger">Error al cargar datos</div>';
+                        document.getElementById('workHoursContent').innerHTML = '<div class="text-danger p-3">Error al cargar datos</div>';
                         return;
                     }
+                    // Actualizar badge en la tarjeta del cliente si existe
                     var btn = document.getElementById('clientHours_' + clientId);
                     if (btn) btn.textContent = data.total_hours;
 
                     var html = '<div class="d-flex align-items-center gap-3 mb-3 p-3 rounded" style="background:#1a1a1a;">';
-                    html += '<div class="text-center"><div style="font-size:2rem;font-weight:700;color:#f37021;font-family:\'Courier New\',monospace;">' + data.total_hours + '</div>';
+                    html += '<div class="text-center"><div style="font-size:2.2rem;font-weight:700;color:#f37021;font-family:\'Courier New\',monospace;">' + data.total_hours + '</div>';
                     html += '<small class="text-muted">Total ' + data.month + '</small></div>';
                     html += '<div class="flex-fill"><small class="text-muted">Servicios completados: <b class="text-white">' + data.tasks.length + '</b></small></div>';
                     html += '</div>';
@@ -5566,16 +5573,24 @@
                     if (data.tasks.length === 0) {
                         html += '<div class="text-center text-muted py-3"><i class="bi bi-calendar-x me-2"></i>Sin servicios este mes</div>';
                     } else {
-                        html += '<div class="table-responsive"><table class="table table-dark table-sm table-hover"><thead><tr><th>Fecha</th><th>Técnico</th><th>Servicio</th><th>Duración</th></tr></thead><tbody>';
+                        html += '<div class="table-responsive"><table class="table table-dark table-sm table-hover">';
+                        html += '<thead><tr><th>Fecha</th><th>Técnico</th><th>Servicio</th><th>Duración</th></tr></thead><tbody>';
                         data.tasks.forEach(function(t) {
-                            html += '<tr><td>' + t.date + '</td><td>' + t.tech + '</td><td>' + t.service + '</td><td><span style="font-family:\'Courier New\',monospace;color:#f37021;">' + t.duration + '</span></td></tr>';
+                            var remoteIcon = t.is_remote ? '<span class="badge bg-info text-dark me-1" title="Soporte remoto"><i class="bi bi-wifi"></i></span>' : '';
+                            var durColor = t.duration === '—' ? '#6c757d' : '#f37021';
+                            html += '<tr>';
+                            html += '<td>' + (t.date || '—') + '</td>';
+                            html += '<td>' + t.tech + '</td>';
+                            html += '<td>' + remoteIcon + t.service + '</td>';
+                            html += '<td><span style="font-family:\'Courier New\',monospace;color:' + durColor + ';">' + t.duration + '</span></td>';
+                            html += '</tr>';
                         });
                         html += '</tbody></table></div>';
                     }
                     document.getElementById('workHoursContent').innerHTML = html;
                 })
                 .catch(function(e) {
-                    document.getElementById('workHoursContent').innerHTML = '<div class="text-danger">Error de conexión</div>';
+                    document.getElementById('workHoursContent').innerHTML = '<div class="text-danger p-3"><i class="bi bi-exclamation-triangle me-2"></i>Error de conexión</div>';
                 });
         }
 

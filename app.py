@@ -46,8 +46,8 @@ class Client(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
     phone = db.Column(db.String(20), nullable=False)
-    email = db.Column(db.String(100), nullable=False)
-    address = db.Column(db.String(250), nullable=False)
+    email = db.Column(db.String(100), nullable=True)
+    address = db.Column(db.String(250), nullable=True)
     link = db.Column(db.String(500), nullable=True)
     notes = db.Column(db.Text)
     has_support = db.Column(db.Boolean, default=False)
@@ -2105,6 +2105,78 @@ def print_report(report_id):
         flash('Error al cargar el reporte', 'danger')
         return redirect(url_for('dashboard'))
 
+@app.route('/complete_task/<int:task_id>', methods=['POST'])
+@login_required
+def complete_task(task_id):
+    """Completar una tarea desde el panel técnico vía JSON (firma, stock, descripción)"""
+    try:
+        task = Task.query.get_or_404(task_id)
+
+        # Permisos: admin, técnico asignado, técnico secundario o tarea sin asignar
+        _is_extra = db.session.query(TaskTechnician).filter_by(
+            task_id=task_id, user_id=current_user.id).first()
+        _is_unassigned = (task.tech_id is None)
+        _allowed = (
+            current_user.role == 'admin'
+            or task.tech_id == current_user.id
+            or bool(_is_extra)
+            or _is_unassigned
+        )
+        if not _allowed:
+            return jsonify({'success': False, 'msg': 'No autorizado'}), 403
+
+        data = request.get_json() or {}
+
+        description        = data.get('description', task.description or '')
+        parts              = data.get('parts', task.parts_text or '')
+        signature          = data.get('signature')
+        sig_client_name    = data.get('signature_client_name', '')
+        stock_item_id      = data.get('stock_item_id')
+        stock_quantity     = int(data.get('stock_quantity', 0) or 0)
+        stock_action_val   = data.get('stock_action', 'usar')
+
+        # Firma obligatoria
+        if not signature:
+            return jsonify({'success': False, 'msg': 'La firma del cliente es obligatoria'}), 400
+
+        # Actualizar tarea
+        task.description           = description
+        task.parts_text            = parts
+        task.signature_data        = signature
+        task.signature_client_name = sig_client_name
+        task.signature_timestamp   = datetime.now()
+        task.status                = 'Completado'
+        task.work_end_time         = datetime.now()
+
+        # Asignar técnico si la tarea estaba sin asignar
+        if _is_unassigned and current_user.role == 'tech':
+            task.tech_id = current_user.id
+
+        # Stock
+        if stock_item_id and stock_quantity > 0:
+            stock_item = Stock.query.get(int(stock_item_id))
+            if stock_item:
+                if stock_action_val in ('usar', 'retirar'):
+                    if stock_item.quantity >= stock_quantity:
+                        stock_item.quantity -= stock_quantity
+                    else:
+                        return jsonify({'success': False, 'msg': f'Stock insuficiente de {stock_item.name}'}), 400
+                elif stock_action_val == 'devolver':
+                    stock_item.quantity += stock_quantity
+                task.stock_item_id        = stock_item.id
+                task.stock_quantity_used  = stock_quantity
+                task.stock_action         = stock_action_val
+
+        db.session.commit()
+        check_low_stock()
+        return jsonify({'success': True, 'msg': 'Parte completado correctamente'})
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error en complete_task {task_id}: {e}")
+        return jsonify({'success': False, 'msg': str(e)}), 500
+
+
 @app.route('/api/task_action/<int:task_id>/<action>', methods=['POST'])
 @login_required
 def task_action(task_id, action):
@@ -3710,54 +3782,91 @@ def api_client_monthly_hours(client_id):
 @app.route('/api/client_work_hours/<int:client_id>')
 @login_required
 def api_client_work_hours_alias(client_id):
-    """Alias para obtener horas de trabajo del cliente este mes (formato legado)"""
+    """Horas de trabajo del cliente este mes — incluye partes presenciales y soporte remoto"""
     try:
         today = date.today()
         month_start = today.replace(day=1)
-        
+
         tasks = Task.query.filter(
             Task.client_id == client_id,
             Task.status == 'Completado',
             Task.date >= month_start,
             Task.date <= today
         ).all()
-        
+
         total_minutes = 0
         task_list = []
-        
+
         for task in tasks:
             duration_str = '—'
             mins = 0
+
+            # 1) Intentar work_duration en formato HH:MM:SS
             if task.work_duration:
+                wd = task.work_duration.strip()
+                # Formato HH:MM:SS
+                if wd.count(':') == 2:
+                    try:
+                        parts = wd.split(':')
+                        h, m, s = int(parts[0]), int(parts[1]), int(parts[2])
+                        mins = h * 60 + m + (1 if s >= 30 else 0)
+                        duration_str = f"{h:02d}:{m:02d}:{s:02d}"
+                    except Exception:
+                        pass
+                # Formato "Xh YYmin" generado por tareas remotas
+                elif 'h' in wd or 'min' in wd:
+                    try:
+                        import re as _re
+                        h_match = _re.search(r'(\d+)\s*h', wd)
+                        m_match = _re.search(r'(\d+)\s*min', wd)
+                        h_val = int(h_match.group(1)) if h_match else 0
+                        m_val = int(m_match.group(1)) if m_match else 0
+                        mins = h_val * 60 + m_val
+                        duration_str = f"{h_val:02d}:{m_val:02d}:00"
+                    except Exception:
+                        pass
+
+            # 2) Fallback: remote_support_hours (float guardado al completar remota)
+            if mins == 0 and task.remote_support_hours:
                 try:
-                    parts = task.work_duration.split(':')
-                    h, m, s = int(parts[0]), int(parts[1]), int(parts[2])
-                    mins = h * 60 + m + (1 if s >= 30 else 0)
-                    duration_str = task.work_duration
-                except:
+                    total_secs = int(task.remote_support_hours * 3600)
+                    h_val = total_secs // 3600
+                    m_val = (total_secs % 3600) // 60
+                    s_val = total_secs % 60
+                    mins = h_val * 60 + m_val + (1 if s_val >= 30 else 0)
+                    duration_str = f"{h_val:02d}:{m_val:02d}:{s_val:02d}"
+                except Exception:
                     pass
-            elif task.start_time and task.end_time:
+
+            # 3) Fallback: start_time / end_time
+            if mins == 0 and task.start_time and task.end_time:
                 try:
                     sh, sm = map(int, task.start_time.split(':'))
                     eh, em = map(int, task.end_time.split(':'))
                     mins = (eh * 60 + em) - (sh * 60 + sm)
                     if mins > 0:
-                        duration_str = f"{mins//60:02d}:{mins%60:02d}:00"
-                except:
+                        duration_str = f"{mins // 60:02d}:{mins % 60:02d}:00"
+                    else:
+                        mins = 0
+                except Exception:
                     pass
+
             if mins > 0:
                 total_minutes += mins
+
+            svc_name = task.service_type.name if task.service_type else ('Soporte Remoto' if task.is_remote else '—')
             task_list.append({
-                'date': task.date.strftime('%d/%m/%Y') if task.date else None,
+                'date': task.date.strftime('%d/%m/%Y') if task.date else '—',
                 'tech': task.tech.username if task.tech else 'N/A',
-                'service': task.service_type.name if task.service_type else 'N/A',
-                'duration': duration_str
+                'service': svc_name,
+                'duration': duration_str,
+                'is_remote': bool(task.is_remote)
             })
-        
-        h = total_minutes // 60
-        m = total_minutes % 60
-        total_str = f"{h}h {m}min" if h > 0 or m > 0 else '0h'
-        
+
+        h_total = total_minutes // 60
+        m_total = total_minutes % 60
+        total_str = f"{h_total}h {m_total}min" if (h_total > 0 or m_total > 0) else '0h'
+
         return jsonify({
             'success': True,
             'total_hours': total_str,
@@ -3765,6 +3874,7 @@ def api_client_work_hours_alias(client_id):
             'tasks': task_list
         })
     except Exception as e:
+        print(f"Error client_work_hours: {e}")
         return jsonify({'success': False, 'msg': str(e)}), 500
 
 
@@ -3921,6 +4031,10 @@ def initialize_database():
             # --- CLIENT ---
             _run_migration(conn, 'ALTER TABLE client ADD COLUMN link VARCHAR(500)', "client.link")
             _run_migration(conn, 'ALTER TABLE client ADD COLUMN support_schedule VARCHAR(5)', "client.support_schedule")
+            # Hacer email y address opcionales en PostgreSQL (SQLite ya permite NULL)
+            if is_pg:
+                _run_migration(conn, 'ALTER TABLE client ALTER COLUMN email DROP NOT NULL', "client.email nullable")
+                _run_migration(conn, 'ALTER TABLE client ALTER COLUMN address DROP NOT NULL', "client.address nullable")
 
             # --- STOCK ---
             _run_migration(conn, 'ALTER TABLE stock ADD COLUMN supplier VARCHAR(100)', "stock.supplier")
