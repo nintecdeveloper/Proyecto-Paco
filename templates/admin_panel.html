@@ -337,6 +337,22 @@
         @media (max-width: 576px) {
             .modal-content { max-height: 96vh !important; }
             .modal-dialog  { margin: 0.25rem; }
+            
+            /* Soporte Schedule - Móvil */
+            #addSupportScheduleDiv,
+            #editSupportScheduleDiv {
+                padding: 0.75rem !important;
+            }
+            
+            .schedule-btn {
+                font-size: 0.75rem !important;
+                width: 100% !important;
+            }
+            
+            /* Asegurar que el modal body sea completamente scrollable */
+            .modal-body {
+                min-height: 50vh;
+            }
         }
     /* Support Schedule Mobile Fix */
         @media(max-width: 576px) {
@@ -1580,21 +1596,21 @@
                         </div>
                         <small class="text-muted"><i class="bi bi-info-circle me-1"></i>Marca esta opción si el cliente tiene contratado soporte técnico con OSLAPRINT</small>
                     </div>
-                    <div class="mb-3 p-3 rounded border border-info" id="addSupportScheduleDiv" style="display:none; background:rgba(13,202,240,0.07);">
-                        <label class="form-label fw-bold text-info mb-2"><i class="bi bi-calendar-check me-1"></i>Días de Soporte Disponibles</label>
-                        <div class="d-flex gap-2 flex-wrap">
-                            <button type="button" class="btn btn-outline-success schedule-btn" onclick="selectSchedule('add','lv')">
+                    <div class="mb-3 p-2 rounded border border-info" id="addSupportScheduleDiv" style="display:none; background:rgba(13,202,240,0.07); overflow-y: auto; max-height: 200px;">
+                        <label class="form-label fw-bold text-info mb-2 small"><i class="bi bi-calendar-check me-1"></i>Días de Soporte Disponibles</label>
+                        <div class="d-grid gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-success schedule-btn" onclick="selectSchedule('add','lv')">
                                 <i class="bi bi-calendar-week me-1"></i>Lunes – Viernes
                             </button>
-                            <button type="button" class="btn btn-outline-warning schedule-btn" onclick="selectSchedule('add','ls')">
+                            <button type="button" class="btn btn-sm btn-outline-warning schedule-btn" onclick="selectSchedule('add','ls')">
                                 <i class="bi bi-calendar-week me-1"></i>Lunes – Sábado
                             </button>
-                            <button type="button" class="btn btn-outline-danger schedule-btn" onclick="selectSchedule('add','ld')">
+                            <button type="button" class="btn btn-sm btn-outline-danger schedule-btn" onclick="selectSchedule('add','ld')">
                                 <i class="bi bi-calendar-week me-1"></i>Lunes – Domingo
                             </button>
                         </div>
                         <input type="hidden" name="support_schedule" id="addSupportScheduleValue" value="lv">
-                        <small class="text-muted mt-2 d-block"><i class="bi bi-info-circle me-1"></i>Selecciona los días en que el cliente tiene soporte activo</small>
+                        <small class="text-muted mt-2 d-block"><i class="bi bi-info-circle me-1"></i>Selecciona horario de soporte</small>
                     </div>
                 </div><!-- /modal-body -->
                 </form>
@@ -1656,21 +1672,21 @@
                         </div>
                         <small class="text-muted"><i class="bi bi-info-circle me-1"></i>Marca esta opción si el cliente tiene contratado soporte técnico con OSLAPRINT</small>
                     </div>
-                    <div class="mb-3 p-3 rounded border border-info" id="editSupportScheduleDiv" style="display:none; background:rgba(13,202,240,0.07);">
-                        <label class="form-label fw-bold text-info mb-2"><i class="bi bi-calendar-check me-1"></i>Días de Soporte Disponibles</label>
-                        <div class="d-flex gap-2 flex-wrap">
-                            <button type="button" class="btn btn-outline-success schedule-btn" onclick="selectSchedule('edit','lv')">
+                    <div class="mb-3 p-2 rounded border border-info" id="editSupportScheduleDiv" style="display:none; background:rgba(13,202,240,0.07); overflow-y: auto; max-height: 200px;">
+                        <label class="form-label fw-bold text-info mb-2 small"><i class="bi bi-calendar-check me-1"></i>Días de Soporte Disponibles</label>
+                        <div class="d-grid gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-success schedule-btn" onclick="selectSchedule('edit','lv')">
                                 <i class="bi bi-calendar-week me-1"></i>Lunes – Viernes
                             </button>
-                            <button type="button" class="btn btn-outline-warning schedule-btn" onclick="selectSchedule('edit','ls')">
+                            <button type="button" class="btn btn-sm btn-outline-warning schedule-btn" onclick="selectSchedule('edit','ls')">
                                 <i class="bi bi-calendar-week me-1"></i>Lunes – Sábado
                             </button>
-                            <button type="button" class="btn btn-outline-danger schedule-btn" onclick="selectSchedule('edit','ld')">
+                            <button type="button" class="btn btn-sm btn-outline-danger schedule-btn" onclick="selectSchedule('edit','ld')">
                                 <i class="bi bi-calendar-week me-1"></i>Lunes – Domingo
                             </button>
                         </div>
                         <input type="hidden" name="support_schedule" id="editSupportScheduleValue" value="lv">
-                        <small class="text-muted mt-2 d-block"><i class="bi bi-info-circle me-1"></i>Selecciona los días en que el cliente tiene soporte activo</small>
+                        <small class="text-muted mt-2 d-block"><i class="bi bi-info-circle me-1"></i>Selecciona horario de soporte</small>
                     </div>
                 </div><!-- /modal-body -->
                 </form>
