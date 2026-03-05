@@ -1,8 +1,7 @@
 import os
 import json
 import secrets
-from datetime import datetime, date, timedelta
-import pytz
+from datetime import datetime, date, timedelta, timezone
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_file, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
@@ -16,7 +15,6 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'oslaprint_pro_2026_secure_key')
-app.config['TIMEZONE'] = pytz.timezone('Europe/Madrid')  # Cambiar a tu zona horaria si es diferente
 database_url = os.environ.get('DATABASE_URL', 'sqlite:///' + os.path.join(basedir, 'oslaprint.db'))
 if database_url.startswith('postgres://'):
     database_url = database_url.replace('postgres://', 'postgresql://', 1)
@@ -1183,9 +1181,9 @@ def save_report():
                 task.parts_text = parts_text
                 task.signature_data = signature_data
                 task.signature_client_name = signature_name
-                task.signature_timestamp = datetime.now(app.config['TIMEZONE'])
+                task.signature_timestamp = datetime.now(timezone.utc)
                 task.status = 'Completado'
-                task.work_end_time = datetime.now(app.config['TIMEZONE'])
+                task.work_end_time = datetime.now(timezone.utc)
                 if work_duration:
                     task.work_duration = work_duration
                 # Guardar timestamps v2
@@ -1254,9 +1252,9 @@ def save_report():
             parts_text=parts_text,
             signature_data=signature_data,
             signature_client_name=signature_name,
-            signature_timestamp=datetime.now(app.config['TIMEZONE']),
+            signature_timestamp=datetime.now(timezone.utc),
             status='Completado',
-            work_end_time=datetime.now(app.config['TIMEZONE']),
+            work_end_time=datetime.now(timezone.utc),
             work_duration=work_duration,
             parte_transport_start=parte_transport_start,
             parte_arrival=parte_arrival,
@@ -2332,9 +2330,9 @@ def complete_task(task_id):
         task.parts_text            = parts
         task.signature_data        = signature
         task.signature_client_name = sig_client_name
-        task.signature_timestamp   = datetime.now(app.config['TIMEZONE'])
+        task.signature_timestamp   = datetime.now(timezone.utc)
         task.status                = 'Completado'
-        task.work_end_time         = datetime.now(app.config['TIMEZONE'])
+        task.work_end_time         = datetime.now(timezone.utc)
 
         if _is_unassigned and current_user.role == 'tech':
             task.tech_id = current_user.id
@@ -2389,7 +2387,7 @@ def task_action(task_id, action):
                 task.tech_id = current_user.id
             task.status = 'Completado'
             if not task.work_end_time:
-                task.work_end_time = datetime.now(app.config['TIMEZONE'])
+                task.work_end_time = datetime.now(timezone.utc)
             db.session.commit()
             return jsonify({'success': True, 'msg': 'Tarea completada', 'status': task.status})
 
@@ -2405,7 +2403,7 @@ def task_action(task_id, action):
                     task.tech_id = current_user.id
                 task.status = 'Completado'
                 if not task.work_end_time:
-                    task.work_end_time = datetime.now(app.config['TIMEZONE'])
+                    task.work_end_time = datetime.now(timezone.utc)
             db.session.commit()
             return jsonify({'success': True, 'msg': f'Tarea marcada como {task.status}', 'status': task.status})
         
@@ -3187,7 +3185,7 @@ def update_remote_task(task_id):
 
         if mark_complete:
             task.status = 'Completado'
-            task.work_end_time = datetime.now(app.config['TIMEZONE'])
+            task.work_end_time = datetime.now(timezone.utc)
             # Asignar fecha de hoy si la tarea no tiene fecha aún
             if not task.date:
                 task.date = date.today()
