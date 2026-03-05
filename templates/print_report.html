@@ -179,14 +179,12 @@
             <span class="info-label">Soporte Activo:</span>
             <span class="info-value">
                 <span class="badge bg-success">SÍ</span>
-                {% if task.client.support_monday_friday %}
+                {% if task.client.support_schedule == 'lv' %}
                 <span class="badge bg-info">L-V</span>
-                {% endif %}
-                {% if task.client.support_saturday %}
-                <span class="badge bg-info">Sábado</span>
-                {% endif %}
-                {% if task.client.support_sunday %}
-                <span class="badge bg-info">Domingo</span>
+                {% elif task.client.support_schedule == 'ls' %}
+                <span class="badge bg-info">L-S</span>
+                {% elif task.client.support_schedule == 'ld' %}
+                <span class="badge bg-info">L-D</span>
                 {% endif %}
             </span>
         </div>
