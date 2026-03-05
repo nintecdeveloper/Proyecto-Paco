@@ -1181,9 +1181,9 @@ def save_report():
                 task.parts_text = parts_text
                 task.signature_data = signature_data
                 task.signature_client_name = signature_name
-                task.signature_timestamp = datetime.now()
+                task.signature_timestamp = datetime.now(timezone(timedelta(hours=1)))
                 task.status = 'Completado'
-                task.work_end_time = datetime.now()
+                task.work_end_time = datetime.now(timezone(timedelta(hours=1)))
                 if work_duration:
                     task.work_duration = work_duration
                 # Guardar hora de entrada y salida
@@ -1255,9 +1255,9 @@ def save_report():
             parts_text=parts_text,
             signature_data=signature_data,
             signature_client_name=signature_name,
-            signature_timestamp=datetime.now(),
+            signature_timestamp=datetime.now(timezone(timedelta(hours=1))),
             status='Completado',
-            work_end_time=datetime.now(),
+            work_end_time=datetime.now(timezone(timedelta(hours=1))),
             work_duration=work_duration,
             parte_transport_start=parte_transport_start,
             parte_arrival=parte_arrival,
@@ -1532,8 +1532,8 @@ def get_all_tasks():
                 event = {
                     'id': task.id,
                     'title': ('📡 ' if is_remote_at else '') + f"{task.client_name if task.client_name else 'Sin cliente'} - {service_type.name if service_type else 'Sin tipo'}",
-                    'start': f"{task.date}T{task.start_time}:00" if (task.date and task.start_time) else str(task.date) if task.date else '',
-                    'end': f"{task.date}T{task.end_time}:00" if (task.date and task.end_time) else str(task.date) if task.date else '',
+                    'start': f"{task.date}T{task.start_time}:00" if (task.date and task.start_time and task.start_time != '00:00') else str(task.date) if task.date else '',
+                    'end': f"{task.date}T{task.end_time}:00" if (task.date and task.end_time and task.end_time != '00:00') else str(task.date) if task.date else '',
                     'backgroundColor': '#06b6d4' if is_remote_at else color,
                     'borderColor': '#0891b2' if is_remote_at else color,
                     'extendedProps': {
@@ -2333,9 +2333,9 @@ def complete_task(task_id):
         task.parts_text            = parts
         task.signature_data        = signature
         task.signature_client_name = sig_client_name
-        task.signature_timestamp   = datetime.now()
+        task.signature_timestamp   = datetime.now(timezone(timedelta(hours=1)))
         task.status                = 'Completado'
-        task.work_end_time         = datetime.now()
+        task.work_end_time         = datetime.now(timezone(timedelta(hours=1)))
 
         if _is_unassigned and current_user.role == 'tech':
             task.tech_id = current_user.id
@@ -2390,7 +2390,7 @@ def task_action(task_id, action):
                 task.tech_id = current_user.id
             task.status = 'Completado'
             if not task.work_end_time:
-                task.work_end_time = datetime.now()
+                task.work_end_time = datetime.now(timezone(timedelta(hours=1)))
             db.session.commit()
             return jsonify({'success': True, 'msg': 'Tarea completada', 'status': task.status})
 
@@ -2406,7 +2406,7 @@ def task_action(task_id, action):
                     task.tech_id = current_user.id
                 task.status = 'Completado'
                 if not task.work_end_time:
-                    task.work_end_time = datetime.now()
+                    task.work_end_time = datetime.now(timezone(timedelta(hours=1)))
             db.session.commit()
             return jsonify({'success': True, 'msg': f'Tarea marcada como {task.status}', 'status': task.status})
         
@@ -3188,7 +3188,7 @@ def update_remote_task(task_id):
 
         if mark_complete:
             task.status = 'Completado'
-            task.work_end_time = datetime.now()
+            task.work_end_time = datetime.now(timezone(timedelta(hours=1)))
             # Asignar fecha de hoy si la tarea no tiene fecha aún
             if not task.date:
                 task.date = date.today()
