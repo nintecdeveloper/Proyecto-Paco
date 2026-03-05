@@ -2658,7 +2658,7 @@
                         return {
                             id: e.id,
                             title: e.title,
-                            start: e.start ? e.start.toISOString().split("T")[0] + "T" + (e.extendedProps.start_time || "00:00") : "",
+                            start: e.start ? e.start.toISOString().split("T")[0] + "T" + e.start.toISOString().split("T")[1].substring(0, 5) : "",
                             color: e.backgroundColor || '#6c757d',
                             extendedProps: {
                                 status: e.extendedProps.status,
