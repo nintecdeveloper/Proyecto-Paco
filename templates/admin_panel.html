@@ -1896,7 +1896,7 @@
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <form id="formScheduleAppointment">
-                    <div class="modal-body">
+                    <div class="modal-body" style="max-height: 55vh; overflow-y: auto;">
                         <label class="form-label">Técnicos <span class="text-muted small">(opcional)</span></label>
                         <div class="border border-secondary rounded p-2 mb-2" style="max-height:130px;overflow-y:auto;background:#111;">
                             {% for u in empleados %}
@@ -1953,7 +1953,7 @@
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <form id="formCreateUnassignedTask">
-                    <div class="modal-body">
+                    <div class="modal-body" style="max-height: 55vh; overflow-y: auto;">
                         <div class="alert alert-warning alert-dismissible fade show" role="alert">
                             <i class="bi bi-info-circle me-1"></i>
                             Esta tarea <strong>no tendrá fecha ni técnico asignado</strong>. Deberá ser asignada desde el apartado de tareas pendientes.
@@ -2015,7 +2015,7 @@
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <form id="formRemoteAssistance">
-                    <div class="modal-body">
+                    <div class="modal-body" style="max-height: 55vh; overflow-y: auto;">
                         <div class="alert alert-info py-2 small mb-3">
                             <i class="bi bi-info-circle me-1"></i>
                             Las asistencias remotas se registran independientemente y acumulan horas de soporte mensual (límite: 5h/mes).
@@ -2210,7 +2210,7 @@
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <form method="POST" id="formEditApptAdmin">
-                    <div class="modal-body">
+                    <div class="modal-body" style="max-height: 55vh; overflow-y: auto;">
                         <label class="form-label">Cliente</label>
                         <div class="position-relative mb-2">
                             <input type="text" name="client_name" id="editAdminClientInput" class="form-control"
