@@ -633,8 +633,8 @@
                 </div>
 
                 <div class="mb-3">
-                    <label class="form-label">TRABAJO REALIZADO</label>
-                    <textarea name="description" id="fieldDescription" class="form-control" rows="4" required
+                    <label class="form-label">TRABAJO REALIZADO <span class="text-muted fw-normal small">(opcional)</span></label>
+                    <textarea name="description" id="fieldDescription" class="form-control" rows="4"
                         placeholder="Describa la solución..."></textarea>
                 </div>
 
@@ -962,7 +962,7 @@
                         onclick="openEditTechModal()">Editar</button>
                     <button type="button" class="btn btn-success flex-grow-1"
                         onclick="performTaskAction('complete')">
-                        <i class="bi bi-check-circle-fill me-1"></i>Completar
+                        <i class="bi bi-file-earmark-text-fill me-1"></i>Hacer parte
                     </button>
                 </div>
             </div>
@@ -2242,11 +2242,13 @@
                                 const div = document.createElement('div');
                                 div.className = 'suggestion-item';
                                 div.innerText = item.name;
-                                div.onclick = function () {
+                                // mousedown antes de blur para que no se cierre la lista
+                                div.addEventListener('mousedown', function (e) {
+                                    e.preventDefault();
                                     input.value = item.name;
                                     list.innerHTML = '';
                                     list.style.display = 'none';
-                                };
+                                });
                                 list.appendChild(div);
                             });
                         } else {
@@ -2255,8 +2257,12 @@
                     });
             });
 
+            input.addEventListener('blur', function () {
+                setTimeout(() => { list.style.display = 'none'; }, 150);
+            });
+
             document.addEventListener('click', function (e) {
-                if (e.target !== input && e.target !== list) {
+                if (!input.contains(e.target) && !list.contains(e.target)) {
                     list.style.display = 'none';
                 }
             });
@@ -2555,13 +2561,13 @@
                 // Eventos de mouse
                 this.canvas.addEventListener('mousedown', (e) => this.startDrawing(e));
                 this.canvas.addEventListener('mousemove', (e) => this.draw(e));
-                this.canvas.addEventListener('mouseup', () => this.stopDrawing());
+                this.canvas.addEventListener('mouseup', () => { this.stopDrawing(); setTimeout(() => saveDraft(false), 300); });
                 this.canvas.addEventListener('mouseout', () => this.stopDrawing());
 
                 // Eventos táctiles
                 this.canvas.addEventListener('touchstart', (e) => this.handleTouch(e));
                 this.canvas.addEventListener('touchmove', (e) => this.handleTouch(e));
-                this.canvas.addEventListener('touchend', () => this.stopDrawing());
+                this.canvas.addEventListener('touchend', () => { this.stopDrawing(); setTimeout(() => saveDraft(false), 300); });
             },
 
             startDrawing: function (e) {
@@ -3322,6 +3328,14 @@
         // ==================== BORRADOR DEL PARTE ====================
 
         function getDraftData() {
+            // Capturar firma si existe y no está vacía
+            var sigData = '';
+            try {
+                if (mainSignaturePad && !mainSignaturePad.isEmpty()) {
+                    sigData = mainSignaturePad.toDataURL();
+                }
+            } catch(e) {}
+
             return {
                 linked_task_id:        (document.getElementById('linkedTaskSelect')      || {}).value || 'none',
                 client_name:           (document.getElementById('fieldClient')            || {}).value || '',
@@ -3330,6 +3344,7 @@
                 description:           (document.getElementById('fieldDescription')       || {}).value || '',
                 parts_text:            (document.querySelector('input[name="parts_text"]') || {}).value || '',
                 signature_name:        (document.getElementById('signatureName')          || {}).value || '',
+                signature_data:        sigData,
                 parte_transport_start: (document.getElementById('parte_transport_start')  || {}).value || '',
                 parte_arrival:         (document.getElementById('parte_arrival')          || {}).value || '',
                 parte_work_start:      (document.getElementById('parte_work_start')       || {}).value || '',
@@ -3418,6 +3433,29 @@
                             dsp.style.color = '#fff';
                         }
                     });
+
+                    // Restaurar firma guardada en borrador
+                    if (d.signature_data && d.signature_data.startsWith('data:image')) {
+                        try {
+                            const restoreSig = function() {
+                                if (!mainSignaturePad || !mainSignaturePad.canvas) {
+                                    setTimeout(restoreSig, 150);
+                                    return;
+                                }
+                                const img = new Image();
+                                img.onload = function() {
+                                    mainSignaturePad.ctx.drawImage(img, 0, 0);
+                                    // Mostrar preview
+                                    const preview = document.getElementById('mainSignaturePreview');
+                                    const previewImg = document.getElementById('mainSignaturePreviewImg');
+                                    if (preview) preview.style.display = 'block';
+                                    if (previewImg) previewImg.src = d.signature_data;
+                                };
+                                img.src = d.signature_data;
+                            };
+                            setTimeout(restoreSig, 350);
+                        } catch(e) {}
+                    }
                 })
                 .catch(() => {});
         }

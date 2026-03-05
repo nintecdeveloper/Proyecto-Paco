@@ -3366,7 +3366,7 @@
         function setupAutocomplete(inputId, listId) {
             const input = document.getElementById(inputId);
             const list = document.getElementById(listId);
-            if (!input) return;
+            if (!input || !list) return;
 
             input.addEventListener('input', function () {
                 const val = this.value;
@@ -3385,11 +3385,13 @@
                                 const div = document.createElement('div');
                                 div.className = 'suggestion-item';
                                 div.innerText = item.name;
-                                div.onclick = function () {
+                                // mousedown antes de blur para que no se cierre la lista
+                                div.addEventListener('mousedown', function (e) {
+                                    e.preventDefault();
                                     input.value = item.name;
                                     list.innerHTML = '';
                                     list.style.display = 'none';
-                                };
+                                });
                                 list.appendChild(div);
                             });
                         } else {
@@ -3398,8 +3400,12 @@
                     });
             });
 
+            input.addEventListener('blur', function () {
+                setTimeout(() => { list.style.display = 'none'; }, 150);
+            });
+
             document.addEventListener('click', function (e) {
-                if (e.target !== input && e.target !== list) {
+                if (!input.contains(e.target) && !list.contains(e.target)) {
                     list.style.display = 'none';
                 }
             });
