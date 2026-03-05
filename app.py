@@ -1181,9 +1181,9 @@ def save_report():
                 task.parts_text = parts_text
                 task.signature_data = signature_data
                 task.signature_client_name = signature_name
-                task.signature_timestamp = datetime.now() + timedelta(hours=1)
+                task.signature_timestamp = datetime.now()
                 task.status = 'Completado'
-                task.work_end_time = datetime.now() + timedelta(hours=1)
+                task.work_end_time = datetime.now()
                 if work_duration:
                     task.work_duration = work_duration
                 # Guardar hora de entrada y salida
@@ -1255,9 +1255,9 @@ def save_report():
             parts_text=parts_text,
             signature_data=signature_data,
             signature_client_name=signature_name,
-            signature_timestamp=datetime.now() + timedelta(hours=1),
+            signature_timestamp=datetime.now(),
             status='Completado',
-            work_end_time=datetime.now() + timedelta(hours=1),
+            work_end_time=datetime.now(),
             work_duration=work_duration,
             parte_transport_start=parte_transport_start,
             parte_arrival=parte_arrival,
@@ -2333,9 +2333,9 @@ def complete_task(task_id):
         task.parts_text            = parts
         task.signature_data        = signature
         task.signature_client_name = sig_client_name
-        task.signature_timestamp   = datetime.now() + timedelta(hours=1)
+        task.signature_timestamp   = datetime.now()
         task.status                = 'Completado'
-        task.work_end_time         = datetime.now() + timedelta(hours=1)
+        task.work_end_time         = datetime.now()
 
         if _is_unassigned and current_user.role == 'tech':
             task.tech_id = current_user.id
@@ -2390,7 +2390,7 @@ def task_action(task_id, action):
                 task.tech_id = current_user.id
             task.status = 'Completado'
             if not task.work_end_time:
-                task.work_end_time = datetime.now() + timedelta(hours=1)
+                task.work_end_time = datetime.now()
             db.session.commit()
             return jsonify({'success': True, 'msg': 'Tarea completada', 'status': task.status})
 
@@ -2406,7 +2406,7 @@ def task_action(task_id, action):
                     task.tech_id = current_user.id
                 task.status = 'Completado'
                 if not task.work_end_time:
-                    task.work_end_time = datetime.now() + timedelta(hours=1)
+                    task.work_end_time = datetime.now()
             db.session.commit()
             return jsonify({'success': True, 'msg': f'Tarea marcada como {task.status}', 'status': task.status})
         
@@ -3188,7 +3188,7 @@ def update_remote_task(task_id):
 
         if mark_complete:
             task.status = 'Completado'
-            task.work_end_time = datetime.now() + timedelta(hours=1)
+            task.work_end_time = datetime.now()
             # Asignar fecha de hoy si la tarea no tiene fecha aún
             if not task.date:
                 task.date = date.today()
