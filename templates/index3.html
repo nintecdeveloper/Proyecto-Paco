@@ -3413,14 +3413,15 @@
 
         <!-- WhatsApp Reminder -->
         <div style="margin-top:16px;padding:14px;background:var(--bg2);border-radius:var(--radius);border:1px solid var(--border)">
-          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--text-muted);margin-bottom:10px">Recordatorio WhatsApp</div>
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--text-muted);margin-bottom:4px">💬 Recordatorio WhatsApp</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px">Envía un mensaje recordatorio al cliente</div>
           <div class="wa-reminder-wrap">
             <button class="btn-wa" type="button" onclick="toggleWaDropdown('ev-wa-dropdown')">
               <span class="wa-icon">💬</span> Añadir recordatorio
               <span style="font-size:10px;margin-left:2px">▼</span>
             </button>
             <div class="wa-dropdown" id="ev-wa-dropdown">
-              <div class="wa-dropdown-title">Cuándo enviar</div>
+              <div class="wa-dropdown-title">Cuándo enviar al cliente</div>
               <div class="wa-dropdown-opt" onclick="selectWaReminder('ev', 'now', 'Ahora mismo', this)">
                 <span class="wa-opt-icon">⚡</span> Ahora mismo
               </div>
@@ -3440,7 +3441,8 @@
 
         <!-- RECORDATORIO PERSONAL (Notificaciones del navegador) -->
         <div style="margin-top:16px;padding:14px;background:var(--bg2);border-radius:var(--radius);border:1px solid var(--border)">
-          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--text-muted);margin-bottom:10px">🔔 Recordatorio Personal (Notificación)</div>
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--text-muted);margin-bottom:4px">🔔 Recordatorio Personal</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px">Recibe una notificación en tu navegador</div>
           <div class="pr-reminder-wrap">
             <button class="btn-pr" type="button" onclick="togglePrDropdown('ev-pr-dropdown')">
               <span class="pr-icon">🔔</span> Agregar recordatorio
@@ -3826,15 +3828,16 @@
 
         <!-- WhatsApp Reminder -->
         <div style="margin-top:4px;margin-bottom:8px;padding:14px;background:var(--bg2);border-radius:var(--radius);border:1px solid var(--border)">
-          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--text-muted);margin-bottom:10px">Recordatorio WhatsApp</div>
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--text-muted);margin-bottom:4px">💬 Recordatorio WhatsApp</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px">Envía un mensaje recordatorio al cliente</div>
           <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
             <div class="wa-reminder-wrap">
               <button class="btn-wa" type="button" onclick="toggleWaDropdown('aev-wa-dropdown')">
                 <span class="wa-icon">💬</span> Enviar recordatorio
-                <span style="font-size:10px;margin-left:2px">▲</span>
+                <span style="font-size:10px;margin-left:2px">▼</span>
               </button>
               <div class="wa-dropdown" id="aev-wa-dropdown">
-                <div class="wa-dropdown-title">Enviar recordatorio</div>
+                <div class="wa-dropdown-title">Cuándo enviar al cliente</div>
                 <div class="wa-dropdown-opt" onclick="selectWaReminder('aev', '1h', '1 hora antes', this)">
                   <span class="wa-opt-icon">⏰</span> 1 hora antes
                 </div>
@@ -3851,6 +3854,40 @@
               <button onclick="clearWaReminder('aev')" style="background:none;border:none;cursor:pointer;color:#128C7E;font-size:14px;padding:0;line-height:1" title="Quitar recordatorio">&times;</button>
             </div>
           </div>
+        </div>
+
+        <!-- Recordatorio Personal Admin -->
+        <div style="margin-top:8px;margin-bottom:8px;padding:14px;background:var(--bg2);border-radius:var(--radius);border:1px solid var(--border)">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--text-muted);margin-bottom:4px">🔔 Recordatorio Personal</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px">Recibe una notificación en tu navegador</div>
+          <div class="pr-reminder-wrap">
+            <button class="btn-pr" type="button" onclick="togglePrDropdown('aev-pr-dropdown')">
+              <span class="pr-icon">🔔</span> Agregar recordatorio
+              <span style="font-size:10px;margin-left:2px">▼</span>
+            </button>
+            <div class="pr-dropdown" id="aev-pr-dropdown">
+              <div class="pr-dropdown-title">Cuándo recordar</div>
+              <div class="pr-dropdown-opt" onclick="selectPrReminder('aev', '15m', '15 minutos antes', this)">
+                <span class="pr-opt-icon">⏰</span> 15 minutos antes
+              </div>
+              <div class="pr-dropdown-opt" onclick="selectPrReminder('aev', '30m', '30 minutos antes', this)">
+                <span class="pr-opt-icon">⏰</span> 30 minutos antes
+              </div>
+              <div class="pr-dropdown-opt" onclick="selectPrReminder('aev', '1h', '1 hora antes', this)">
+                <span class="pr-opt-icon">⏰</span> 1 hora antes
+              </div>
+              <div class="pr-dropdown-opt" onclick="selectPrReminder('aev', '2h', '2 horas antes', this)">
+                <span class="pr-opt-icon">⏰</span> 2 horas antes
+              </div>
+              <div class="pr-dropdown-opt" onclick="selectPrReminder('aev', '1d', '1 día antes', this)">
+                <span class="pr-opt-icon">📅</span> 1 día antes
+              </div>
+              <div class="pr-dropdown-opt" onclick="selectPrReminder('aev', '1w', '1 semana antes', this)">
+                <span class="pr-opt-icon">🗓️</span> 1 semana antes
+              </div>
+            </div>
+          </div>
+          <div id="aev-pr-badges" class="pr-badges-container"></div>
         </div>
 
         <div class="modal-actions">
@@ -5187,6 +5224,13 @@
         if (pvChk) pvChk.checked = false;
         fillServiceSelect();
         fillEmployeeSelect(currentUser.id);
+        
+        // Limpiar recordatorios al abrir el modal para nueva cita
+        _prReminders['ev'] = {};
+        _renderPrBadges('ev');
+        _waReminders['ev'] = {};
+        _renderWaBadges('ev');
+        
         openModal("event-modal");
       }
 
@@ -5214,6 +5258,30 @@
         fillServiceSelect();
         document.getElementById("ev-service").value = ev.service;
         fillEmployeeSelect(ev.assignedTo);
+        
+        // Cargar recordatorio personal si existe
+        if (ev.prReminder) {
+          _prReminders['ev'] = {
+            timing: ev.prReminder.timing,
+            label: ev.prReminder.label
+          };
+          _renderPrBadges('ev');
+        } else {
+          _prReminders['ev'] = {};
+          _renderPrBadges('ev');
+        }
+        
+        // Cargar recordatorio WhatsApp si existe
+        if (ev.waReminder) {
+          _waReminders['ev'] = {
+            [ev.waReminder.timing]: ev.waReminder.label
+          };
+          _renderWaBadges('ev');
+        } else {
+          _waReminders['ev'] = {};
+          _renderWaBadges('ev');
+        }
+        
         openModal("event-modal");
       }
 
@@ -5259,6 +5327,10 @@
           return;
         }
 
+        // Obtener estado de recordatorios
+        const prState = _prReminders['ev'] || {};
+        const waState = _waReminders['ev'] || {};
+
         if (editingEvId !== null) {
           const ev = EVENTS.find((e) => e.id === editingEvId);
           if (ev) {
@@ -5269,9 +5341,30 @@
             ev.service = service;
             ev.notes = notes;
             if (isAdmin) { ev.assignedTo = assignedTo; ev.private = isPrivate; }
+            
+            // Guardar recordatorio personal al editar
+            if (prState.timing) {
+              ev.prReminder = {
+                timing: prState.timing,
+                label: prState.label
+              };
+              requestNotificationPermission();
+              scheduleReminder(ev, prState.timing);
+            } else {
+              delete ev.prReminder;
+            }
+            
+            // Guardar recordatorio WhatsApp al editar
+            if (waState.timing) {
+              ev.waReminder = {
+                timing: waState.timing,
+                label: waState.label
+              };
+            } else {
+              delete ev.waReminder;
+            }
           }
         } else {
-          const prState = _prReminders['ev'] || {};
           const eventObj = {
             id: nextEventId++,
             ownerId: currentUser.id,
@@ -5295,6 +5388,14 @@
             // Programar notificación
             requestNotificationPermission();
             scheduleReminder(eventObj, prState.timing);
+          }
+          
+          // Agregar recordatorio WhatsApp si está configurado
+          if (waState.timing) {
+            eventObj.waReminder = {
+              timing: waState.timing,
+              label: waState.label
+            };
           }
           
           EVENTS.push(eventObj);
@@ -5746,6 +5847,12 @@
         document.getElementById("aev-err").style.display = "none";
         document.getElementById("aev-blocked-warning").style.display = "none";
 
+        // Limpiar recordatorios al abrir el modal para nueva cita
+        _prReminders['aev'] = {};
+        _renderPrBadges('aev');
+        _waReminders['aev'] = {};
+        _renderWaBadges('aev');
+
         // NUEVO: si hay múltiples admins, llenar select de admin objetivo
         fillAdminTargetSelect();
         fillAdminEventServiceSelect();
@@ -5825,7 +5932,11 @@
 
         document.getElementById("aev-blocked-warning").style.display = "none";
 
-        EVENTS.push({
+        // Obtener estado de recordatorios
+        const prState = _prReminders['aev'] || {};
+        const waState = _waReminders['aev'] || {};
+
+        const eventObj = {
           id: nextEventId++,
           ownerId: currentUser.id,
           assignedTo: targetAdmin.id,
@@ -5836,7 +5947,27 @@
           service,
           notes,
           private: false,
-        });
+        };
+
+        // Agregar recordatorio personal si está configurado
+        if (prState.timing) {
+          eventObj.prReminder = {
+            timing: prState.timing,
+            label: prState.label
+          };
+          requestNotificationPermission();
+          scheduleReminder(eventObj, prState.timing);
+        }
+
+        // Agregar recordatorio WhatsApp si está configurado
+        if (waState.timing) {
+          eventObj.waReminder = {
+            timing: waState.timing,
+            label: waState.label
+          };
+        }
+
+        EVENTS.push(eventObj);
 
         closeModal("admin-event-modal");
         refreshCals();
