@@ -3411,10 +3411,12 @@
           Rellena los campos obligatorios (*).
         </div>
 
-        <!-- WhatsApp Reminder -->
-        <div style="margin-top:16px;padding:14px;background:var(--bg2);border-radius:var(--radius);border:1px solid var(--border)">
-          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--text-muted);margin-bottom:4px">💬 Recordatorio WhatsApp</div>
-          <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px">Envía un mensaje recordatorio al cliente</div>
+        <!-- ════════════════════════════════════════════════════════════ -->
+        <!-- WhatsApp Reminder (Para el CLIENTE) -->
+        <!-- ════════════════════════════════════════════════════════════ -->
+        <div style="margin-top:16px;padding:14px;background:var(--bg2);border-radius:var(--radius);border:1px solid var(--border);border-left:4px solid #128C7E">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--text-muted);margin-bottom:4px">💬 Recordatorio WhatsApp (Para el cliente)</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px">Envía un mensaje recordatorio al cliente por WhatsApp</div>
           <div class="wa-reminder-wrap">
             <button class="btn-wa" type="button" onclick="toggleWaDropdown('ev-wa-dropdown')">
               <span class="wa-icon">💬</span> Añadir recordatorio
@@ -3439,17 +3441,19 @@
           <div id="ev-wa-badges" class="wa-badges-container"></div>
         </div>
 
-        <!-- RECORDATORIO PERSONAL (Notificaciones del navegador) -->
-        <div style="margin-top:16px;padding:14px;background:var(--bg2);border-radius:var(--radius);border:1px solid var(--border)">
-          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--text-muted);margin-bottom:4px">🔔 Recordatorio Personal</div>
-          <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px">Recibe una notificación en tu navegador</div>
+        <!-- ════════════════════════════════════════════════════════════ -->
+        <!-- Personal Reminder (Para TI - el usuario) -->
+        <!-- ════════════════════════════════════════════════════════════ -->
+        <div style="margin-top:16px;padding:14px;background:#fef3f5;border-radius:var(--radius);border:1px solid #e8bcc0;border-left:4px solid var(--accent2)">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--accent2);margin-bottom:4px">🔔 Mi Recordatorio Personal (Para ti)</div>
+          <div style="font-size:11px;color:#7a5a52;margin-bottom:10px">Te notificaremos en el navegador para que no olvides esta cita</div>
           <div class="pr-reminder-wrap">
             <button class="btn-pr" type="button" onclick="togglePrDropdown('ev-pr-dropdown')">
-              <span class="pr-icon">🔔</span> Agregar recordatorio
+              <span class="pr-icon">🔔</span> Añadir notificación
               <span style="font-size:10px;margin-left:2px">▼</span>
             </button>
             <div class="pr-dropdown" id="ev-pr-dropdown">
-              <div class="pr-dropdown-title">Cuándo recordar</div>
+              <div class="pr-dropdown-title">Recordarme en...</div>
               <div class="pr-dropdown-opt" onclick="selectPrReminder('ev', 'now', 'Ahora mismo', this)">
                 <span class="pr-opt-icon">⚡</span> Ahora mismo
               </div>
@@ -3826,10 +3830,12 @@
         </div>
         <div class="form-err" id="aev-err">Rellena los campos obligatorios (*).</div>
 
-        <!-- WhatsApp Reminder -->
-        <div style="margin-top:4px;margin-bottom:8px;padding:14px;background:var(--bg2);border-radius:var(--radius);border:1px solid var(--border)">
-          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--text-muted);margin-bottom:4px">💬 Recordatorio WhatsApp</div>
-          <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px">Envía un mensaje recordatorio al cliente</div>
+        <!-- ════════════════════════════════════════════════════════════ -->
+        <!-- WhatsApp Reminder (Para el CLIENTE) -->
+        <!-- ════════════════════════════════════════════════════════════ -->
+        <div style="margin-top:12px;margin-bottom:8px;padding:14px;background:var(--bg2);border-radius:var(--radius);border:1px solid var(--border);border-left:4px solid #128C7E">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--text-muted);margin-bottom:4px">💬 Recordatorio WhatsApp (Para el cliente)</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px">Envía un mensaje recordatorio al cliente por WhatsApp</div>
           <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
             <div class="wa-reminder-wrap">
               <button class="btn-wa" type="button" onclick="toggleWaDropdown('aev-wa-dropdown')">
@@ -3856,17 +3862,19 @@
           </div>
         </div>
 
-        <!-- Recordatorio Personal Admin -->
-        <div style="margin-top:8px;margin-bottom:8px;padding:14px;background:var(--bg2);border-radius:var(--radius);border:1px solid var(--border)">
-          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--text-muted);margin-bottom:4px">🔔 Recordatorio Personal</div>
-          <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px">Recibe una notificación en tu navegador</div>
+        <!-- ════════════════════════════════════════════════════════════ -->
+        <!-- Personal Reminder (Para TI - el usuario/admin) -->
+        <!-- ════════════════════════════════════════════════════════════ -->
+        <div style="margin-top:12px;margin-bottom:8px;padding:14px;background:#fef3f5;border-radius:var(--radius);border:1px solid #e8bcc0;border-left:4px solid var(--accent2)">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--accent2);margin-bottom:4px">🔔 Mi Recordatorio Personal (Para ti)</div>
+          <div style="font-size:11px;color:#7a5a52;margin-bottom:10px">Te notificaremos en el navegador para que no olvides esta cita</div>
           <div class="pr-reminder-wrap">
             <button class="btn-pr" type="button" onclick="togglePrDropdown('aev-pr-dropdown')">
-              <span class="pr-icon">🔔</span> Agregar recordatorio
+              <span class="pr-icon">🔔</span> Añadir notificación
               <span style="font-size:10px;margin-left:2px">▼</span>
             </button>
             <div class="pr-dropdown" id="aev-pr-dropdown">
-              <div class="pr-dropdown-title">Cuándo recordar</div>
+              <div class="pr-dropdown-title">Recordarme en...</div>
               <div class="pr-dropdown-opt" onclick="selectPrReminder('aev', '15m', '15 minutos antes', this)">
                 <span class="pr-opt-icon">⏰</span> 15 minutos antes
               </div>
@@ -7217,6 +7225,13 @@
             dropdown.querySelectorAll('.pr-dropdown-opt').forEach(o => o.classList.remove('selected'));
           }
           optEl.classList.add('selected');
+          
+          // Mostrar notificación de confirmación inmediata
+          requestNotificationPermission();
+          sendNotification('✅ Recordatorio configurado', {
+            body: `Te recordaremos ${label.toLowerCase()} de la cita`,
+            icon: '🔔'
+          });
         }
         _renderPrBadges(prefix);
       }
