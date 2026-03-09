@@ -3529,8 +3529,8 @@
                         document.getElementById('detailClient').textContent = task.client_name;
                         document.getElementById('detailTech').textContent = task.tech_name;
                         document.getElementById('detailDate').textContent = task.date || 'N/A';  // ✅ FIX: Mostrar fecha sin conversión timezone
-                        document.getElementById('detailStartTime').textContent = task.start_time || 'N/A';
-                        document.getElementById('detailEndTime').textContent = task.end_time || 'N/A';
+                        document.getElementById('detailStartTime').textContent = task.parte_work_start || 'N/A';
+                        document.getElementById('detailEndTime').textContent = task.parte_work_end || 'N/A';
                         document.getElementById('detailService').textContent = task.service_type;
                         document.getElementById('detailStatus').textContent = task.status;
                         document.getElementById('detailDescription').textContent = task.description || 'Sin descripción';
