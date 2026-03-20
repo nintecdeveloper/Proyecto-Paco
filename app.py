@@ -15,13 +15,28 @@ import re
 basedir = os.path.abspath(os.path.dirname(__file__))
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'oslaprint_pro_2026_secure_key')
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
+_secret = os.environ.get('SECRET_KEY')
+if not _secret:
+    raise RuntimeError("SECRET_KEY no configurada a Render > Environment")
+app.config['SECRET_KEY'] = _secret
 database_url = os.environ.get('DATABASE_URL', 'sqlite:///' + os.path.join(basedir, 'oslaprint.db'))
 if database_url.startswith('postgres://'):
     database_url = database_url.replace('postgres://', 'postgresql://', 1)
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['UPLOAD_FOLDER'] = os.path.join(basedir, 'uploads')
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_pre_ping': True,
+    'pool_recycle': 300,
+    'pool_timeout': 20,
+    'max_overflow': 0,
+}
+app.config['SESSION_COOKIE_SECURE'] = True
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['REMEMBER_COOKIE_SECURE'] = True
+app.config['REMEMBER_COOKIE_HTTPONLY'] = Trueapp.config['UPLOAD_FOLDER'] = os.path.join(basedir, 'uploads')
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf', 'doc', 'docx', 'txt'}
 
@@ -202,8 +217,12 @@ class TimerSession(db.Model):
     task = db.relationship('Task', backref='timer_sessions')
 
 @login_manager.user_loader
-def load_user(id):
-    return User.query.get(int(id))
+def load_user(user_id):
+    try:
+        return db.session.get(User, int(user_id))
+    except Exception as e:
+        print(f"ERROR load_user: {e}")
+        return None
 
 # --- FUNCIONES AUXILIARES ---
 def allowed_file(filename):
