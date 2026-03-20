@@ -258,22 +258,28 @@ def inject_globals():
     try:
         unread_alarms = 0
         employees = []
-        
-        try:
-            if current_user.is_authenticated and current_user.role == 'admin':
-                unread_alarms = Alarm.query.filter_by(is_read=False).count()
-                employees = User.query.filter_by(role='tech').all()
-        except Exception as e:
-            print(f"Error en context_processor: {e}")
-            unread_alarms = 0
-            employees = []
-        
+        service_types = []
+
+        if current_user.is_authenticated:
+            try:
+                service_types = ServiceType.query.order_by(ServiceType.name).all()
+            except Exception as e:
+                print(f"Error service types: {e}")
+
+            if current_user.role == 'admin':
+                try:
+                    unread_alarms = Alarm.query.filter_by(is_read=False).count()
+                    employees = User.query.filter_by(role='tech').all()
+                except Exception as e:
+                    print(f"Error admin data: {e}")
+
         return {
-            'all_service_types': ServiceType.query.order_by(ServiceType.name).all() if ServiceType.query.count() > 0 else [],
+            'all_service_types': service_types,
             'unread_alarms_count': unread_alarms,
             'employees': employees,
-            'now': datetime.now  # ✅ Añadir función now para templates
+            'now': datetime.now
         }
+
     except Exception as e:
         print(f"ERROR context_processor: {e}")
         return {
@@ -282,7 +288,7 @@ def inject_globals():
             'employees': [],
             'now': datetime.now
         }
-
+        
 # Filtro Jinja2 para parsear JSON
 @app.template_filter('from_json')
 def from_json_filter(value):
