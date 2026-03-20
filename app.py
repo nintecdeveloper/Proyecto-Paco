@@ -303,7 +303,19 @@ def from_json_filter(value):
 # --- RUTAS PRINCIPALES ---
 @app.route('/')
 def index():
-    return 'HOME OK', 200
+    try:
+        print("Entrando a /")
+        
+        if current_user.is_authenticated:
+            print("Usuario autenticado")
+            return redirect(url_for('dashboard'))
+        
+        print("Usuario NO autenticado")
+        return redirect(url_for('login'))
+
+    except Exception as e:
+        print(f"ERROR en index: {e}")
+        return f"ERROR INDEX: {e}", 500
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
