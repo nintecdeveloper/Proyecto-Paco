@@ -683,7 +683,7 @@
                         </thead>
                         <tbody id="reportsTbody">
                             {% for r in informes %}
-                            <tr data-report-id="{{ r.id }}" data-client="{{ r.client_name|lower }}" data-date="{{ r.date.strftime('%Y-%m-%d') }}"
+                            <tr data-report-id="{{ r.id }}" data-client="{{ r.client_name|lower }}" data-date="{{ r.date.strftime('%Y-%m-%d') if r.date else '' }}"
                                 {% if r.is_remote %}style="border-left:3px solid #06b6d4;"{% endif %}>
                                 <td>{{ r.id }}</td>
                                 <td>{{ r.client_name }}</td>
