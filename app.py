@@ -303,9 +303,7 @@ def from_json_filter(value):
 # --- RUTAS PRINCIPALES ---
 @app.route('/')
 def index():
-    if current_user.is_authenticated:
-        return redirect(url_for('dashboard'))
-    return redirect(url_for('login'))
+    return 'HOME OK', 200
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
