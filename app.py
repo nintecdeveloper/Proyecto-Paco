@@ -618,7 +618,13 @@ def manage_users():
                 if user.tasks:
                     flash(f'No se puede eliminar el usuario porque tiene {len(user.tasks)} tareas asignadas', 'danger')
                     return redirect(url_for('dashboard'))
-                
+
+                # Eliminar registros dependientes antes de borrar el usuario
+                # (TechProfile y TimerSession tienen FK sin CASCADE → causaban IntegrityError)
+                TechProfile.query.filter_by(user_id=user.id).delete()
+                TimerSession.query.filter_by(user_id=user.id).delete()
+                TaskTechnician.query.filter_by(user_id=user.id).delete()
+
                 db.session.delete(user)
                 db.session.commit()
                 flash('Usuario eliminado correctamente', 'success')
